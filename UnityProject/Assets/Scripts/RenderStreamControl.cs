@@ -25,29 +25,6 @@ public class RenderStreamControl : MonoBehaviour
     public UnityEvent OnStartStreaming;
     public UnityEvent OnStopStreaming;
     
-    // Log filtering to prevent Railway rate limiting (500+ logs/sec)
-    private static bool logFilterInitialized = false;
-    
-    void Awake()
-    {
-        if (!logFilterInitialized)
-        {
-            // Reduce Unity's internal logging to prevent Railway rate limiting
-            Application.SetStackTraceLogType(LogType.Log, StackTraceLogType.None);
-            Application.SetStackTraceLogType(LogType.Warning, StackTraceLogType.ScriptOnly);
-            
-#if !UNITY_EDITOR
-            // In builds, only show errors and warnings to reduce log spam
-            Debug.unityLogger.filterLogType = LogType.Warning;
-            Debug.Log("Log filtering enabled - Railway rate limit protection active");
-#else
-            Debug.Log("Log filtering initialized - Railway rate limit protection (Editor: full logging)");
-#endif
-            
-            logFilterInitialized = true;
-        }
-    }
-    
     void Start()
     {
         signalingManager = FindObjectOfType<SignalingManager>();
