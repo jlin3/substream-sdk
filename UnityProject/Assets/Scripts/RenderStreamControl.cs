@@ -34,6 +34,10 @@ public class RenderStreamControl : MonoBehaviour
             GameObject signalingObj = new GameObject("SignalingManager");
             signalingManager = signalingObj.AddComponent<SignalingManager>();
             signalingManager.runOnAwake = false; // Manual control via our script
+            
+            // Ensure SignalingManager persists (important for VR scenes)
+            DontDestroyOnLoad(signalingObj);
+            
 #if UNITY_EDITOR
             Debug.Log("Created SignalingManager automatically");
 #endif
@@ -144,6 +148,9 @@ public class RenderStreamControl : MonoBehaviour
         // Add broadcast to SignalingManager
         signalingManager.AddSignalingHandler(broadcast);
         
+        // Ensure stream camera persists (important for VR scenes)
+        DontDestroyOnLoad(streamCameraObj);
+        
         // Disable until streaming starts
         streamCamera.enabled = false;
         videoStreamSender.enabled = false;
@@ -151,6 +158,7 @@ public class RenderStreamControl : MonoBehaviour
         
 #if UNITY_EDITOR
         Debug.Log("Stream camera setup complete: 1920x1080 following player head (VR gameplay unaffected)");
+        Debug.Log($"Broadcast component created and added to SignalingManager: {broadcast != null}");
 #endif
     }
 
@@ -170,20 +178,65 @@ public class RenderStreamControl : MonoBehaviour
 
     private void StartStreaming()
     {
+#if UNITY_EDITOR
+        Debug.Log($"StartStreaming called - Component status: SignalingManager={signalingManager != null}, Broadcast={broadcast != null}, VideoSender={videoStreamSender != null}, AudioSender={audioStreamSender != null}");
+#endif
+        
+        // Validate all components before starting
+        if (signalingManager == null)
+        {
+            Debug.LogError("SignalingManager is null! Cannot start streaming. Re-finding SignalingManager...");
+            signalingManager = FindObjectOfType<SignalingManager>();
+            if (signalingManager == null)
+            {
+                Debug.LogError("SignalingManager still null after FindObjectOfType!");
+                if (_errors != null) _errors.text = "ERROR: SignalingManager is null";
+                return;
+            }
+            Debug.Log("SignalingManager found successfully after re-search");
+        }
+        
+        if (broadcast == null)
+        {
+            Debug.LogError("Broadcast component is null! Cannot start streaming.");
+            if (_errors != null) _errors.text = "ERROR: Broadcast component is null";
+            return;
+        }
+        
+        if (videoStreamSender == null || audioStreamSender == null)
+        {
+            Debug.LogError("Stream senders are null! Cannot start streaming.");
+            if (_errors != null) _errors.text = "ERROR: Stream senders are null";
+            return;
+        }
+        
         // Enable 1080p stream camera
         if (streamCamera != null) streamCamera.enabled = true;
         if (videoStreamSender != null) videoStreamSender.enabled = true;
         if (audioStreamSender != null) audioStreamSender.enabled = true;
 
         SetAutoFiltersSender();
-        signalingManager.Run();
-        isStreaming = true;
+        
+        try
+        {
+            signalingManager.Run();
+            isStreaming = true;
 #if UNITY_EDITOR
-        Debug.Log("Render Streaming started at 1920x1080.");
+            Debug.Log("Render Streaming started at 1920x1080.");
 #endif
-        
-        OnStartStreaming.Invoke();
-        
+            
+            OnStartStreaming.Invoke();
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"Failed to start streaming: {e.Message}\n{e.StackTrace}");
+            if (_errors != null) _errors.text = $"ERROR: {e.Message}";
+            
+            // Clean up on failure
+            if (streamCamera != null) streamCamera.enabled = false;
+            if (videoStreamSender != null) videoStreamSender.enabled = false;
+            if (audioStreamSender != null) audioStreamSender.enabled = false;
+        }
     }
 
     private void StopStreaming()
