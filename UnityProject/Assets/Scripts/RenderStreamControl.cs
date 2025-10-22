@@ -145,6 +145,10 @@ public class RenderStreamControl : MonoBehaviour
         broadcast.AddComponent(videoStreamSender);
         broadcast.AddComponent(audioStreamSender);
         
+        // Subscribe to connection events for debugging
+        broadcast.OnStartedConnection += OnConnectionStarted;
+        broadcast.OnStoppedConnection += OnConnectionStopped;
+        
         // Add broadcast to SignalingManager
         signalingManager.AddSignalingHandler(broadcast);
         
@@ -360,5 +364,25 @@ public class RenderStreamControl : MonoBehaviour
             streamTexture.Release();
             DestroyImmediate(streamTexture);
         }
+        
+        // Unsubscribe from events
+        if (broadcast != null)
+        {
+            broadcast.OnStartedConnection -= OnConnectionStarted;
+            broadcast.OnStoppedConnection -= OnConnectionStopped;
+        }
+    }
+    
+    // Connection event handlers for debugging
+    private void OnConnectionStarted(string connectionId)
+    {
+        Debug.Log($"✅ WebRTC Connection STARTED with ID: {connectionId}");
+        if (_errors != null) _errors.text = $"Connected: {connectionId}";
+    }
+    
+    private void OnConnectionStopped(string connectionId)
+    {
+        Debug.Log($"❌ WebRTC Connection STOPPED with ID: {connectionId}");
+        if (_errors != null) _errors.text = $"Disconnected: {connectionId}";
     }
 }
