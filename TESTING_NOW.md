@@ -58,12 +58,12 @@ SUPABASE_URL=https://kxysgyvqguanyigtttaq.supabase.co
 SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4eXNneXZxZ3VhbnlpZ3R0dGFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExNjM4NzYsImV4cCI6MjA3NjczOTg3Nn0.C53OUkB76_SwXIAurfbb2gWxY02Y-fPUUwrAnI9AXR8
 
 # Copy these exact values from your main BookVid app's .env file:
-JWT_SECRET=<copy-SECRET_KEY-from-main-env>
-TWILIO_ACCOUNT_SID=<copy-from-main-env>
-TWILIO_AUTH_TOKEN=<copy-from-main-env>
-SENDGRID_API_KEY=<copy-from-main-env>
-SENTRY_DSN=<copy-from-main-env>
-GCP_JSON_CREDENTIALS=<copy-from-main-env>
+JWT_SECRET=PASTE_SECRET_KEY_VALUE_HERE
+TWILIO_ACCOUNT_SID=PASTE_TWILIO_SID_HERE
+TWILIO_AUTH_TOKEN=PASTE_TWILIO_TOKEN_HERE
+SENDGRID_API_KEY=PASTE_SENDGRID_KEY_HERE
+SENTRY_DSN=PASTE_SENTRY_DSN_HERE
+GCP_JSON_CREDENTIALS=PASTE_GCP_CREDENTIALS_HERE
 
 # BookVid configuration
 FROM_EMAIL=notifications@bookvid.com
