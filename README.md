@@ -16,17 +16,35 @@ Stream high-quality VR gameplay (1080p @ 30fps) from Quest headsets to web brows
 
 ## 🚀 Quick Start
 
-### For 3rd Party Developers (Deploy Your Own)
+### For Game Developers (Use Our Backend)
 
-**Complete deployment guide:** See [`DEVELOPER_SETUP.md`](DEVELOPER_SETUP.md)
+**Just want to add streaming to your Unity VR game?**
 
-**Quick overview:**
-1. Set up services (Supabase, Twilio, SendGrid) - 60-90 min
-2. Deploy to Railway - 30 min  
-3. Configure Unity - 15 min
-4. Build and test on Quest - 30 min
+See: [`SDK_INTEGRATION_GUIDE.md`](SDK_INTEGRATION_GUIDE.md)
 
-**Total: 2-3 hours to production deployment**
+**Steps:**
+1. Install Unity Render Streaming package (5 min)
+2. Copy `RenderStreamControl.cs` to your project (2 min)
+3. Configure backend URL we provide (3 min)
+4. Test streaming (5 min)
+
+**Total: ~15-20 minutes to working streaming in your game!**
+
+We host the backend - you just integrate the SDK.
+
+---
+
+### For Platform Owners (Deploy Your Own Backend)
+
+**Want to run your own streaming infrastructure?**
+
+See: [`DEVELOPER_SETUP.md`](DEVELOPER_SETUP.md)
+
+Complete guide for deploying backend with Railway, Supabase, etc.
+
+**Total: 2-3 hours to full production deployment**
+
+---
 
 ### For Development Testing (This Repo)
 
