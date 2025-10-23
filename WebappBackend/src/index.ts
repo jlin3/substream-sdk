@@ -1,3 +1,7 @@
+// Load environment variables from .env file
+import * as dotenv from 'dotenv';
+dotenv.config();
+
 import { Command } from 'commander';
 import * as express from 'express';
 import * as https from 'https';

@@ -1,7 +1,7 @@
-import * as express from 'express';
+import express from 'express';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as morgan from 'morgan';
+import morgan from 'morgan';
 import * as Sentry from '@sentry/node';
 import rateLimit from 'express-rate-limit';
 import signaling from './signaling';
