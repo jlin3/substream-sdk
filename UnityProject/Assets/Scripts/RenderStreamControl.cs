@@ -2,17 +2,36 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System;
 using UnityEngine;
+using UnityEngine.Networking;
 using Unity.RenderStreaming;
 using TMPro;
 using UnityEngine.Events;
 
 public class RenderStreamControl : MonoBehaviour
 {
+    [Header("UI References")]
     public TMP_Text _errors;
+    public GameObject _recordingText;
+    
+    [Header("Backend Configuration")]
+    [Tooltip("Backend API URL (e.g., https://your-backend.up.railway.app)")]
+    public string backendUrl = "https://substream-sdk-test.up.railway.app";
+    
+    [Tooltip("Auth token for API calls (set via PlayerPrefs or Inspector)")]
+    public string authToken = "";
+    
+    [Header("Events")]
+    public UnityEvent OnStartStreaming;
+    public UnityEvent OnStopStreaming;
+    
+    // Private fields
     private SignalingManager signalingManager;
     private List<MonoBehaviour> autoAudioFilters = new List<MonoBehaviour>();
     private bool isStreaming = false;
+    private string currentSessionId;
+    private string currentConnectionId;
 
     // Stream camera setup (1920x1080, single eye)
     private Camera streamCamera;
@@ -20,13 +39,20 @@ public class RenderStreamControl : MonoBehaviour
     private VideoStreamSender videoStreamSender;
     private AudioStreamSender audioStreamSender;
     private Broadcast broadcast;
-    public GameObject _recordingText;
-
-    public UnityEvent OnStartStreaming;
-    public UnityEvent OnStopStreaming;
     
     void Start()
     {
+        // Load auth token from PlayerPrefs if not set in Inspector
+        if (string.IsNullOrEmpty(authToken))
+        {
+            authToken = PlayerPrefs.GetString("AuthToken", "");
+            if (string.IsNullOrEmpty(authToken))
+            {
+                Debug.LogWarning("⚠️  No auth token configured. Set in Inspector or PlayerPrefs.");
+                Debug.LogWarning("   Streaming will work but without backend session tracking.");
+            }
+        }
+        
         signalingManager = FindObjectOfType<SignalingManager>();
         if (signalingManager == null)
         {
@@ -225,9 +251,19 @@ public class RenderStreamControl : MonoBehaviour
         {
             signalingManager.Run();
             isStreaming = true;
+            
+            // Generate connection ID for this session
+            currentConnectionId = System.Guid.NewGuid().ToString();
+            
 #if UNITY_EDITOR
-            Debug.Log("Render Streaming started at 1920x1080.");
+            Debug.Log($"Render Streaming started at 1920x1080. ConnectionID: {currentConnectionId}");
 #endif
+            
+            // Call backend API to create session (async)
+            if (!string.IsNullOrEmpty(authToken))
+            {
+                StartCoroutine(CreateStreamSession(currentConnectionId));
+            }
             
             OnStartStreaming.Invoke();
         }
@@ -251,6 +287,12 @@ public class RenderStreamControl : MonoBehaviour
 
     private IEnumerator StopStreamingCoroutine()
     {
+        // Call backend API to end session before stopping
+        if (!string.IsNullOrEmpty(currentSessionId) && !string.IsNullOrEmpty(authToken))
+        {
+            yield return StartCoroutine(EndStreamSession(currentSessionId));
+        }
+        
         // Disable stream camera
         if (streamCamera != null) streamCamera.enabled = false;
         if (videoStreamSender != null) videoStreamSender.enabled = false;
@@ -261,6 +303,7 @@ public class RenderStreamControl : MonoBehaviour
 
         signalingManager.Stop();
         isStreaming = false;
+        
 #if UNITY_EDITOR
         Debug.Log("Render Streaming stopped.");
 #endif
@@ -384,5 +427,161 @@ public class RenderStreamControl : MonoBehaviour
     {
         Debug.Log($"❌ WebRTC Connection STOPPED with ID: {connectionId}");
         if (_errors != null) _errors.text = $"Disconnected: {connectionId}";
+    }
+    
+    // ====================================================================================
+    // BACKEND API INTEGRATION
+    // ====================================================================================
+    
+    [System.Serializable]
+    private class SessionStartRequest
+    {
+        public string connectionId;
+        public object metadata;
+    }
+    
+    [System.Serializable]
+    private class SessionStartResponse
+    {
+        public string sessionId;
+        public string roomName;
+        public string connectionId;
+    }
+    
+    [System.Serializable]
+    private class SessionEndResponse
+    {
+        public bool success;
+        public int duration;
+    }
+    
+    /// <summary>
+    /// Call backend API to create a new streaming session
+    /// </summary>
+    private IEnumerator CreateStreamSession(string connectionId)
+    {
+        if (string.IsNullOrEmpty(backendUrl) || string.IsNullOrEmpty(authToken))
+        {
+            Debug.LogWarning("Backend URL or auth token not configured, skipping session creation");
+            yield break;
+        }
+        
+        string url = $"{backendUrl}/api/sessions/start";
+        
+        var requestData = new SessionStartRequest
+        {
+            connectionId = connectionId,
+            metadata = new { 
+                platform = Application.platform.ToString(),
+                version = Application.version,
+                deviceModel = SystemInfo.deviceModel
+            }
+        };
+        
+        string json = JsonUtility.ToJson(requestData);
+        
+        using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
+        {
+            byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(json);
+            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader("Authorization", $"Bearer {authToken}");
+            
+            yield return request.SendWebRequest();
+            
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                try
+                {
+                    var response = JsonUtility.FromJson<SessionStartResponse>(request.downloadHandler.text);
+                    currentSessionId = response.sessionId;
+                    Debug.Log($"✅ Stream session created: {currentSessionId}");
+                    Debug.Log($"   Room: {response.roomName}");
+                    
+                    if (_errors != null) _errors.text = $"Session: {currentSessionId}";
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"Failed to parse session start response: {e.Message}");
+                }
+            }
+            else
+            {
+                Debug.LogError($"❌ Failed to create stream session: {request.error}");
+                Debug.LogError($"   Response: {request.downloadHandler?.text}");
+                if (_errors != null) _errors.text = "Session creation failed";
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Call backend API to end the streaming session
+    /// </summary>
+    private IEnumerator EndStreamSession(string sessionId)
+    {
+        if (string.IsNullOrEmpty(backendUrl) || string.IsNullOrEmpty(authToken))
+        {
+            yield break;
+        }
+        
+        string url = $"{backendUrl}/api/sessions/end/{sessionId}";
+        
+        using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
+        {
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader("Authorization", $"Bearer {authToken}");
+            
+            yield return request.SendWebRequest();
+            
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                try
+                {
+                    var response = JsonUtility.FromJson<SessionEndResponse>(request.downloadHandler.text);
+                    Debug.Log($"✅ Stream session ended: {sessionId}");
+                    Debug.Log($"   Duration: {response.duration} seconds");
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"Failed to parse session end response: {e.Message}");
+                }
+            }
+            else
+            {
+                Debug.LogError($"❌ Failed to end stream session: {request.error}");
+            }
+        }
+        
+        // Clear session ID
+        currentSessionId = null;
+    }
+    
+    /// <summary>
+    /// Set auth token programmatically (for integration with main app)
+    /// </summary>
+    public void SetAuthToken(string token)
+    {
+        authToken = token;
+        PlayerPrefs.SetString("AuthToken", token);
+        PlayerPrefs.Save();
+        Debug.Log("✅ Auth token configured");
+    }
+    
+    /// <summary>
+    /// Get current session info
+    /// </summary>
+    public string GetCurrentSessionId()
+    {
+        return currentSessionId;
+    }
+    
+    /// <summary>
+    /// Check if currently streaming
+    /// </summary>
+    public bool IsCurrentlyStreaming()
+    {
+        return isStreaming;
     }
 }

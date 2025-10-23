@@ -10,6 +10,10 @@ let playButton;
 let renderstreaming;
 /** @type {boolean} */
 let useWebSocket;
+/** @type {StreamRecorder} */
+let recorder;
+/** @type {string} */
+let currentSessionId;
 
 const codecPreferences = document.getElementById('codecPreferences');
 const supportsSetCodecPreferences = window.RTCRtpTransceiver &&
@@ -91,12 +95,46 @@ function onConnect() {
   const channel = renderstreaming.createDataChannel("input");
   videoPlayer.setupInput(channel);
   showStatsMessage();
+  
+  // Start recording if enabled
+  const urlParams = new URLSearchParams(window.location.search);
+  const enableRecording = urlParams.get('record') !== 'false'; // Record by default
+  currentSessionId = urlParams.get('session') || `session-${Date.now()}`;
+  
+  if (enableRecording && typeof StreamRecorder !== 'undefined') {
+    try {
+      // Get the media stream from video element
+      const videoElement = playerDiv.querySelector('video');
+      if (videoElement && videoElement.srcObject) {
+        const authToken = urlParams.get('token') || '';
+        recorder = new StreamRecorder(videoElement.srcObject, currentSessionId, window.location.origin, authToken);
+        recorder.start();
+        console.log('✅ Recording started for session:', currentSessionId);
+      }
+    } catch (err) {
+      console.error('Failed to start recording:', err);
+    }
+  }
 }
 
 async function onDisconnect(connectionId) {
   clearStatsMessage();
   messageDiv.style.display = 'block';
   messageDiv.innerText = `Disconnect peer on ${connectionId}.`;
+  
+  // Stop recording if active
+  if (recorder && recorder.getState().isRecording) {
+    try {
+      messageDiv.innerText = 'Uploading recording...';
+      const result = await recorder.stop();
+      console.log('✅ Recording uploaded:', result);
+      messageDiv.innerText = 'Recording saved! Disconnected.';
+    } catch (err) {
+      console.error('Failed to save recording:', err);
+      messageDiv.innerText = 'Disconnected (recording upload failed).';
+    }
+    recorder = null;
+  }
 
   await renderstreaming.stop();
   renderstreaming = null;
