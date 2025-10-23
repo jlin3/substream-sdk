@@ -22,6 +22,16 @@ public class RenderStreamControl : MonoBehaviour
     [Tooltip("Auth token for API calls (set via PlayerPrefs or Inspector)")]
     public string authToken = "";
     
+    [Header("Quality Settings")]
+    [Tooltip("Enable high-quality local recording (requires Unity Recorder package)")]
+    public bool enableHighQualityRecording = true;
+    
+    [Tooltip("Stream bitrate in kbps (3000-15000). Higher = better quality but more bandwidth")]
+    public int streamBitrate = 8000; // 8 Mbps for high quality
+    
+    [Tooltip("Stream frame rate (30 or 60)")]
+    public int streamFrameRate = 60; // 60fps for smooth playback
+    
     [Header("Events")]
     public UnityEvent OnStartStreaming;
     public UnityEvent OnStopStreaming;
@@ -350,16 +360,18 @@ public class RenderStreamControl : MonoBehaviour
         
         try
         {
-            // Try advanced settings for both Editor and Quest (with error handling)
+            // High-quality settings for maximum quality recording
 #if UNITY_EDITOR
-            Debug.Log("Applying advanced video stream settings (Editor)");
+            Debug.Log($"Applying HIGH QUALITY video settings: {streamBitrate}kbps @ {streamFrameRate}fps");
 #endif
             
-            // Set 30 FPS target (safe on Quest)
-            videoStreamSender.SetFrameRate(30f);
+            // Set frame rate (30 or 60 based on quality settings)
+            videoStreamSender.SetFrameRate((float)streamFrameRate);
             
-            // Set higher bitrate for better quality (3-8 Mbps - Quest compatible)
-            videoStreamSender.SetBitrate(3000, 8000); // 3-8 Mbps for high quality
+            // Set high bitrate for excellent quality (5-15 Mbps)
+            int minBitrate = Mathf.Max(5000, streamBitrate - 2000);
+            int maxBitrate = Mathf.Min(15000, streamBitrate + 2000);
+            videoStreamSender.SetBitrate(minBitrate, maxBitrate);
             
             // Ensure no resolution downscaling (safe on Quest)
             videoStreamSender.SetScaleResolutionDown(1.0f); // 1.0 = no downscaling
@@ -369,7 +381,7 @@ public class RenderStreamControl : MonoBehaviour
             {
                 videoStreamSender.SetTextureSize(new Vector2Int(1920, 1080));
 #if UNITY_EDITOR
-                Debug.Log("Set video: 1920x1080, 30fps, 3-8Mbps bitrate, no downscaling");
+                Debug.Log($"✅ HIGH QUALITY: 1920x1080, {streamFrameRate}fps, {minBitrate}-{maxBitrate}kbps bitrate");
 #endif
             }
             catch (System.Exception)
@@ -385,17 +397,19 @@ public class RenderStreamControl : MonoBehaviour
         {
 #if UNITY_EDITOR
             Debug.LogWarning($"Advanced video settings partially failed: {e.Message}");
-            Debug.Log("Falling back to basic configuration");
+            Debug.Log("Falling back to high-quality basic configuration");
 #endif
-            // Basic settings that should work on all platforms
+            // Basic settings with high quality that should work on all platforms
             try 
             {
-                videoStreamSender.SetFrameRate(30f);
+                videoStreamSender.SetFrameRate((float)streamFrameRate);
                 videoStreamSender.SetScaleResolutionDown(1.0f);
+                videoStreamSender.SetBitrate(minBitrate, maxBitrate);
             }
             catch
             {
                 // Even basic settings failed - use defaults
+                Debug.LogWarning("Using default video settings");
             }
         }
     }

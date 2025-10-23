@@ -12,24 +12,28 @@ class StreamRecorder {
     this.isRecording = false;
     this.uploadedChunks = 0;
     
-    // Try to use the best codec available
+    // Try to use the best codec available (VP9 is best quality)
     const mimeTypes = [
-      'video/webm;codecs=vp9,opus',
-      'video/webm;codecs=vp8,opus',
-      'video/webm;codecs=h264,opus',
+      'video/webm;codecs=vp9,opus',  // Best quality
+      'video/webm;codecs=vp8,opus',  // Good fallback
+      'video/webm;codecs=h264,opus', // Compatibility
       'video/webm'
     ];
     
     this.mimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || 'video/webm';
-    console.log('Using codec:', this.mimeType);
+    console.log('🎥 Recording codec:', this.mimeType);
     
-    // Initialize MediaRecorder
+    // Initialize MediaRecorder with HIGH QUALITY settings
     try {
       this.mediaRecorder = new MediaRecorder(stream, {
         mimeType: this.mimeType,
-        videoBitsPerSecond: 3000000, // 3 Mbps
-        audioBitsPerSecond: 128000   // 128 kbps
+        videoBitsPerSecond: 10000000, // 10 Mbps for excellent quality
+        audioBitsPerSecond: 256000    // 256 kbps for high-fidelity audio
       });
+      
+      console.log('✅ High-quality recording initialized:');
+      console.log('   Video: 10 Mbps');
+      console.log('   Audio: 256 kbps');
       
       this.mediaRecorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
@@ -72,9 +76,12 @@ class StreamRecorder {
     this.uploadedChunks = 0;
     this.isRecording = true;
     
-    // Collect data every second
-    this.mediaRecorder.start(1000);
-    console.log('✅ Recording started');
+    // Collect data every 10 seconds for better quality
+    // Longer chunks = better compression efficiency = higher quality
+    this.mediaRecorder.start(10000);
+    console.log('✅ HIGH QUALITY Recording started');
+    console.log('   Video: 10 Mbps, Audio: 256 kbps');
+    console.log('   Chunk interval: 10 seconds');
   }
   
   /**
