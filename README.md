@@ -16,9 +16,19 @@ Stream high-quality VR gameplay (1080p @ 30fps) from Quest headsets to web brows
 
 ## 🚀 Quick Start
 
-**Status:** Production infrastructure complete! See setup checklist for deployment.
+### For 3rd Party Developers (Deploy Your Own)
 
-### For Development Testing
+**Complete deployment guide:** See [`DEVELOPER_SETUP.md`](DEVELOPER_SETUP.md)
+
+**Quick overview:**
+1. Set up services (Supabase, Twilio, SendGrid) - 60-90 min
+2. Deploy to Railway - 30 min  
+3. Configure Unity - 15 min
+4. Build and test on Quest - 30 min
+
+**Total: 2-3 hours to production deployment**
+
+### For Development Testing (This Repo)
 
 1. **Clone repository**
    ```bash
