@@ -78,6 +78,9 @@ public class RenderStreamControl : MonoBehaviour
             Debug.Log("Created SignalingManager automatically");
 #endif
         }
+        
+        // Configure SignalingManager to use our backendUrl (converts https:// to wss://)
+        ConfigureSignalingManagerUrl();
 
         // Disable AutomaticStreaming components that cause the resolution error
         DisableAutomaticStreaming();
@@ -196,9 +199,9 @@ public class RenderStreamControl : MonoBehaviour
         broadcast.AddComponent(videoStreamSender);
         broadcast.AddComponent(audioStreamSender);
         
-        // Subscribe to connection events for debugging
-        broadcast.OnStartedConnection += OnConnectionStarted;
-        broadcast.OnStoppedConnection += OnConnectionStopped;
+        // Subscribe to connection events for debugging (Unity 6+ only - not available in 2022.3.x)
+        // These events are for logging only, not required for functionality
+        TrySubscribeToConnectionEvents();
         
         // Add broadcast to SignalingManager
         signalingManager.AddSignalingHandler(broadcast);
@@ -462,15 +465,80 @@ public class RenderStreamControl : MonoBehaviour
             DestroyImmediate(streamTexture);
         }
         
-        // Unsubscribe from events
-        if (broadcast != null)
+        // Unsubscribe from events (Unity 6+ only)
+        TryUnsubscribeFromConnectionEvents();
+    }
+    
+    /// <summary>
+    /// Subscribe to connection events if available (Unity 6+ only)
+    /// Uses reflection for compatibility with Unity 2022.3.x
+    /// </summary>
+    private void TrySubscribeToConnectionEvents()
+    {
+        if (broadcast == null) return;
+        
+        try
         {
-            broadcast.OnStartedConnection -= OnConnectionStarted;
-            broadcast.OnStoppedConnection -= OnConnectionStopped;
+            var broadcastType = broadcast.GetType();
+            var onStartedEvent = broadcastType.GetEvent("OnStartedConnection");
+            var onStoppedEvent = broadcastType.GetEvent("OnStoppedConnection");
+            
+            if (onStartedEvent != null && onStoppedEvent != null)
+            {
+                var startHandler = Delegate.CreateDelegate(onStartedEvent.EventHandlerType, this, "OnConnectionStarted");
+                var stopHandler = Delegate.CreateDelegate(onStoppedEvent.EventHandlerType, this, "OnConnectionStopped");
+                
+                onStartedEvent.AddEventHandler(broadcast, startHandler);
+                onStoppedEvent.AddEventHandler(broadcast, stopHandler);
+                
+#if UNITY_EDITOR
+                Debug.Log("✅ Connection event handlers subscribed");
+#endif
+            }
+            else
+            {
+#if UNITY_EDITOR
+                Debug.Log("⚠️  Connection events not available in Unity 2022.3.x (Unity 6+ feature)");
+#endif
+            }
+        }
+        catch (Exception e)
+        {
+#if UNITY_EDITOR
+            Debug.Log($"⚠️  Could not subscribe to connection events: {e.Message}");
+#endif
         }
     }
     
-    // Connection event handlers for debugging
+    /// <summary>
+    /// Unsubscribe from connection events if available (Unity 6+ only)
+    /// </summary>
+    private void TryUnsubscribeFromConnectionEvents()
+    {
+        if (broadcast == null) return;
+        
+        try
+        {
+            var broadcastType = broadcast.GetType();
+            var onStartedEvent = broadcastType.GetEvent("OnStartedConnection");
+            var onStoppedEvent = broadcastType.GetEvent("OnStoppedConnection");
+            
+            if (onStartedEvent != null && onStoppedEvent != null)
+            {
+                var startHandler = Delegate.CreateDelegate(onStartedEvent.EventHandlerType, this, "OnConnectionStarted");
+                var stopHandler = Delegate.CreateDelegate(onStoppedEvent.EventHandlerType, this, "OnConnectionStopped");
+                
+                onStartedEvent.RemoveEventHandler(broadcast, startHandler);
+                onStoppedEvent.RemoveEventHandler(broadcast, stopHandler);
+            }
+        }
+        catch
+        {
+            // Ignore errors during cleanup
+        }
+    }
+    
+    // Connection event handlers for debugging (Unity 6+ only)
     private void OnConnectionStarted(string connectionId)
     {
         Debug.Log($"✅ WebRTC Connection STARTED with ID: {connectionId}");
@@ -481,6 +549,52 @@ public class RenderStreamControl : MonoBehaviour
     {
         Debug.Log($"❌ WebRTC Connection STOPPED with ID: {connectionId}");
         if (_errors != null) _errors.text = $"Disconnected: {connectionId}";
+    }
+    
+    /// <summary>
+    /// Configure SignalingManager to use backendUrl from MonoBehaviour
+    /// Converts https:// to wss:// for WebSocket connection
+    /// </summary>
+    private void ConfigureSignalingManagerUrl()
+    {
+        if (signalingManager == null || string.IsNullOrEmpty(backendUrl))
+        {
+#if UNITY_EDITOR
+            Debug.LogWarning("⚠️  SignalingManager or backendUrl not configured");
+#endif
+            return;
+        }
+        
+        try
+        {
+            // Convert https:// to wss:// for WebSocket
+            string websocketUrl = backendUrl.Replace("https://", "wss://").Replace("http://", "ws://");
+            
+            // Use reflection to set the URL on SignalingManager (compatible across Unity versions)
+            var signalingType = signalingManager.GetType();
+            var urlField = signalingType.GetField("url", BindingFlags.Public | BindingFlags.Instance);
+            
+            if (urlField != null)
+            {
+                urlField.SetValue(signalingManager, websocketUrl);
+#if UNITY_EDITOR
+                Debug.Log($"✅ SignalingManager URL configured: {websocketUrl}");
+#endif
+            }
+            else
+            {
+#if UNITY_EDITOR
+                Debug.LogWarning("⚠️  Could not set SignalingManager URL - please configure Stream-Settings.asset manually");
+#endif
+            }
+        }
+        catch (Exception e)
+        {
+#if UNITY_EDITOR
+            Debug.LogWarning($"⚠️  Failed to configure SignalingManager URL: {e.Message}");
+            Debug.LogWarning("   Please set WebSocket URL in Stream-Settings.asset manually");
+#endif
+        }
     }
     
     // ====================================================================================
