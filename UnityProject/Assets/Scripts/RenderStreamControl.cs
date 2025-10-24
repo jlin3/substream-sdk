@@ -394,8 +394,9 @@ public class RenderStreamControl : MonoBehaviour
         // may not be available in Unity 2022.3.x and are only in Unity 6+
         // We try to call them via reflection for maximum compatibility
         
-        int minBitrate = Mathf.Max(5000, streamBitrate - 2000);
-        int maxBitrate = Mathf.Min(15000, streamBitrate + 2000);
+        // Use uint for bitrate parameters (required by Unity APIs)
+        uint minBitrate = (uint)Mathf.Max(5000, streamBitrate - 2000);
+        uint maxBitrate = (uint)Mathf.Min(15000, streamBitrate + 2000);
         
 #if UNITY_EDITOR
         Debug.Log($"Configuring video settings: {streamBitrate}kbps @ {streamFrameRate}fps");
@@ -406,7 +407,7 @@ public class RenderStreamControl : MonoBehaviour
         // Try SetFrameRate (may not exist in Unity 2022.3.x)
         TryInvokeMethod(senderType, videoStreamSender, "SetFrameRate", new object[] { (float)streamFrameRate });
         
-        // Try SetBitrate (may not exist in Unity 2022.3.x)
+        // Try SetBitrate with uint parameters (may not exist in Unity 2022.3.x)
         TryInvokeMethod(senderType, videoStreamSender, "SetBitrate", new object[] { minBitrate, maxBitrate });
         
         // Try SetScaleResolutionDown (may not exist in Unity 2022.3.x)
