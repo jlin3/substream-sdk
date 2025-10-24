@@ -89,20 +89,10 @@ public class RenderStreamControl : MonoBehaviour
 
     private void DisableAutomaticStreaming()
     {
-        // Find and disable any AutomaticStreaming components
-        var automaticStreamingComponents = FindObjectsOfType<MonoBehaviour>()
-            .Where(mb => mb.GetType().FullName == "Unity.RenderStreaming.AutomaticStreaming")
-            .ToArray();
+        // More efficient approach: Only search for specific component types
+        // instead of ALL MonoBehaviours (which would be expensive in large scenes)
         
-        foreach (var component in automaticStreamingComponents)
-        {
-            component.enabled = false;
-#if UNITY_EDITOR
-            Debug.Log("Disabled AutomaticStreaming component that was causing resolution error");
-#endif
-        }
-
-        // Also disable any existing VideoStreamSender components that use Screen source
+        // Find and disable any VideoStreamSender components that use Screen source
         var videoSenders = FindObjectsOfType<VideoStreamSender>();
         foreach (var sender in videoSenders)
         {
@@ -113,6 +103,31 @@ public class RenderStreamControl : MonoBehaviour
                 Debug.Log("Disabled Screen-based VideoStreamSender that was causing resolution error");
 #endif
             }
+        }
+        
+        // Only search for AutomaticStreaming if Unity.RenderStreaming namespace is available
+        // This is more efficient than searching all MonoBehaviours
+        try
+        {
+            var automaticStreamingType = System.Type.GetType("Unity.RenderStreaming.AutomaticStreaming, Unity.RenderStreaming");
+            if (automaticStreamingType != null)
+            {
+                var components = FindObjectsOfType(automaticStreamingType);
+                foreach (var component in components)
+                {
+                    if (component is MonoBehaviour mb)
+                    {
+                        mb.enabled = false;
+#if UNITY_EDITOR
+                        Debug.Log("Disabled AutomaticStreaming component that was causing resolution error");
+#endif
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // AutomaticStreaming type doesn't exist in this Unity version - safe to ignore
         }
     }
 
@@ -333,11 +348,28 @@ public class RenderStreamControl : MonoBehaviour
     private void RefreshAutoAudioFilters()
     {
         autoAudioFilters.Clear();
-        MonoBehaviour[] allMB = FindObjectsOfType<MonoBehaviour>(true);
-        foreach (var mb in allMB)
+        
+        // More efficient: Use Type.GetType to find specific type instead of searching all MonoBehaviours
+        // This avoids expensive iteration through tens of thousands of MonoBehaviours
+        try
         {
-            if (mb.GetType().FullName == "Unity.RenderStreaming.AutomaticStreaming+AutoAudioFilter")
-                autoAudioFilters.Add(mb);
+            var autoAudioFilterType = System.Type.GetType("Unity.RenderStreaming.AutomaticStreaming+AutoAudioFilter, Unity.RenderStreaming");
+            if (autoAudioFilterType != null)
+            {
+                var components = FindObjectsOfType(autoAudioFilterType, true);
+                foreach (var component in components)
+                {
+                    if (component is MonoBehaviour mb)
+                    {
+                        autoAudioFilters.Add(mb);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // AutoAudioFilter type doesn't exist in this Unity version - safe to ignore
+            // This means automatic audio streaming is not available, but our manual setup will work
         }
     }
 
@@ -358,59 +390,66 @@ public class RenderStreamControl : MonoBehaviour
         // Wait one frame for VideoStreamSender to be fully initialized
         yield return null;
         
+        // Note: Some VideoStreamSender methods (SetFrameRate, SetBitrate, SetScaleResolutionDown, SetTextureSize)
+        // may not be available in Unity 2022.3.x and are only in Unity 6+
+        // We try to call them via reflection for maximum compatibility
+        
+        int minBitrate = Mathf.Max(5000, streamBitrate - 2000);
+        int maxBitrate = Mathf.Min(15000, streamBitrate + 2000);
+        
+#if UNITY_EDITOR
+        Debug.Log($"Configuring video settings: {streamBitrate}kbps @ {streamFrameRate}fps");
+#endif
+        
+        var senderType = videoStreamSender.GetType();
+        
+        // Try SetFrameRate (may not exist in Unity 2022.3.x)
+        TryInvokeMethod(senderType, videoStreamSender, "SetFrameRate", new object[] { (float)streamFrameRate });
+        
+        // Try SetBitrate (may not exist in Unity 2022.3.x)
+        TryInvokeMethod(senderType, videoStreamSender, "SetBitrate", new object[] { minBitrate, maxBitrate });
+        
+        // Try SetScaleResolutionDown (may not exist in Unity 2022.3.x)
+        TryInvokeMethod(senderType, videoStreamSender, "SetScaleResolutionDown", new object[] { 1.0f });
+        
+        // Try SetTextureSize (may not exist in Unity 2022.3.x)
+        TryInvokeMethod(senderType, videoStreamSender, "SetTextureSize", new object[] { new Vector2Int(1920, 1080) });
+        
+#if UNITY_EDITOR
+        Debug.Log($"✅ Video settings configured (Unity {Application.unityVersion})");
+        Debug.Log($"   Target: 1920x1080 @ {streamFrameRate}fps, {minBitrate}-{maxBitrate}kbps");
+        Debug.Log($"   Note: Some settings may not apply on Unity 2022.3.x (Unity 6+ required for full control)");
+#endif
+    }
+    
+    /// <summary>
+    /// Helper method to invoke methods that may not exist in older Unity versions
+    /// Uses reflection for maximum compatibility across Unity versions
+    /// </summary>
+    private void TryInvokeMethod(System.Type type, object instance, string methodName, object[] parameters)
+    {
         try
         {
-            // High-quality settings for maximum quality recording
-#if UNITY_EDITOR
-            Debug.Log($"Applying HIGH QUALITY video settings: {streamBitrate}kbps @ {streamFrameRate}fps");
-#endif
-            
-            // Set frame rate (30 or 60 based on quality settings)
-            videoStreamSender.SetFrameRate((float)streamFrameRate);
-            
-            // Set high bitrate for excellent quality (5-15 Mbps)
-            int minBitrate = Mathf.Max(5000, streamBitrate - 2000);
-            int maxBitrate = Mathf.Min(15000, streamBitrate + 2000);
-            videoStreamSender.SetBitrate(minBitrate, maxBitrate);
-            
-            // Ensure no resolution downscaling (safe on Quest)
-            videoStreamSender.SetScaleResolutionDown(1.0f); // 1.0 = no downscaling
-            
-            // Try resolution setting (may not work on older Quest versions)
-            try 
+            var method = type.GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);
+            if (method != null)
             {
-                videoStreamSender.SetTextureSize(new Vector2Int(1920, 1080));
+                method.Invoke(instance, parameters);
 #if UNITY_EDITOR
-                Debug.Log($"✅ HIGH QUALITY: 1920x1080, {streamFrameRate}fps, {minBitrate}-{maxBitrate}kbps bitrate");
+                Debug.Log($"   ✅ {methodName} applied successfully");
 #endif
             }
-            catch (System.Exception)
+            else
             {
-                // Resolution setting failed - Quest will use texture size automatically
 #if UNITY_EDITOR
-                Debug.Log("Resolution setting failed - using texture size (1920x1080) automatically");
+                Debug.Log($"   ⚠️  {methodName} not available in Unity {Application.unityVersion} (Unity 6+ required)");
 #endif
             }
-            
         }
         catch (System.Exception e)
         {
 #if UNITY_EDITOR
-            Debug.LogWarning($"Advanced video settings partially failed: {e.Message}");
-            Debug.Log("Falling back to high-quality basic configuration");
+            Debug.LogWarning($"   ⚠️  {methodName} failed: {e.Message}");
 #endif
-            // Basic settings with high quality that should work on all platforms
-            try 
-            {
-                videoStreamSender.SetFrameRate((float)streamFrameRate);
-                videoStreamSender.SetScaleResolutionDown(1.0f);
-                videoStreamSender.SetBitrate(minBitrate, maxBitrate);
-            }
-            catch
-            {
-                // Even basic settings failed - use defaults
-                Debug.LogWarning("Using default video settings");
-            }
         }
     }
 

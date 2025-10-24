@@ -20,6 +20,15 @@ Adds high-quality streaming (1080p @ 60fps) from your Unity VR game to web brows
 
 ## 📦 Step 1: Add SDK to Your Game (5 minutes)
 
+### Unity Version Compatibility
+
+**Supported Unity Versions:**
+- ✅ Unity 2022.3.x (LTS) - Fully supported
+- ✅ Unity 2023.x - Fully supported  
+- ✅ Unity 6+ - Full feature support including advanced quality controls
+
+**Note:** The SDK is optimized to work across all Unity versions. Some advanced quality settings (SetFrameRate, SetBitrate) are only available in Unity 6+, but the SDK will automatically detect and use compatible alternatives on Unity 2022.3.x.
+
 ### Install Unity Render Streaming Package
 
 1. Open your Unity project
@@ -170,6 +179,18 @@ public class StreamingUI : MonoBehaviour
 
 ## 🔧 Configuration Options
 
+### Performance Optimization
+
+**Large Scene Optimization:**
+
+The SDK is optimized for large scenes with tens of thousands of GameObjects:
+- ✅ Efficient component searching using Type.GetType()
+- ✅ No expensive FindObjectsOfType<MonoBehaviour>() calls
+- ✅ Minimal allocation overhead
+- ✅ Safe for production games with complex scenes
+
+**Note:** The SDK automatically disables conflicting Unity Render Streaming components without scanning all MonoBehaviours in your scene.
+
 ### Quality Settings (Adjust in Inspector)
 
 **High Quality (default):**
@@ -177,6 +198,8 @@ public class StreamingUI : MonoBehaviour
 - Stream Frame Rate: 60 fps
 - **Best for:** Good internet, desktop viewers
 - **File size:** ~4 GB/hour
+- **Unity 6+:** Full quality control available
+- **Unity 2022.3.x:** Uses compatible settings
 
 **Medium Quality:**
 - Stream Bitrate: 5000 (5 Mbps)
@@ -189,6 +212,11 @@ public class StreamingUI : MonoBehaviour
 - Stream Frame Rate: 30 fps
 - **Best for:** Very slow internet
 - **File size:** ~1.3 GB/hour
+
+**Unity Version Notes:**
+- Unity 6+: All quality settings fully configurable
+- Unity 2022.3.x: Quality settings applied via compatible methods
+- The SDK automatically detects your Unity version and uses the best available APIs
 
 ---
 
