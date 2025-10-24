@@ -554,6 +554,7 @@ public class RenderStreamControl : MonoBehaviour
     /// <summary>
     /// Configure SignalingManager to use backendUrl from MonoBehaviour
     /// Converts https:// to wss:// for WebSocket connection
+    /// Creates WebSocketSignalingSettings programmatically
     /// </summary>
     private void ConfigureSignalingManagerUrl()
     {
@@ -570,29 +571,88 @@ public class RenderStreamControl : MonoBehaviour
             // Convert https:// to wss:// for WebSocket
             string websocketUrl = backendUrl.Replace("https://", "wss://").Replace("http://", "ws://");
             
-            // Use reflection to set the URL on SignalingManager (compatible across Unity versions)
-            var signalingType = signalingManager.GetType();
-            var urlField = signalingType.GetField("url", BindingFlags.Public | BindingFlags.Instance);
-            
-            if (urlField != null)
+            // Create WebSocketSignalingSettings programmatically using reflection
+            var webSocketSettingsType = System.Type.GetType("Unity.RenderStreaming.WebSocketSignalingSettings, Unity.RenderStreaming");
+            if (webSocketSettingsType == null)
             {
-                urlField.SetValue(signalingManager, websocketUrl);
 #if UNITY_EDITOR
-                Debug.Log($"✅ SignalingManager URL configured: {websocketUrl}");
+                Debug.LogWarning("⚠️  WebSocketSignalingSettings type not found - please configure Stream-Settings.asset manually");
+#endif
+                return;
+            }
+            
+            // Create instance of WebSocketSignalingSettings
+            var settings = System.Activator.CreateInstance(webSocketSettingsType);
+            
+            // Set the URL using reflection
+            var urlProperty = webSocketSettingsType.GetProperty("Url", BindingFlags.Public | BindingFlags.Instance);
+            if (urlProperty != null && urlProperty.CanWrite)
+            {
+                urlProperty.SetValue(settings, websocketUrl);
+            }
+            
+            // Add default ICE servers (STUN/TURN)
+            var iceServersProperty = webSocketSettingsType.GetProperty("IceServers", BindingFlags.Public | BindingFlags.Instance);
+            if (iceServersProperty != null && iceServersProperty.CanWrite)
+            {
+                var iceServerType = System.Type.GetType("Unity.WebRTC.IceServer, Unity.WebRTC");
+                if (iceServerType != null)
+                {
+                    // Create default ICE servers
+                    var stunServer = System.Activator.CreateInstance(iceServerType);
+                    var stunUrlsField = iceServerType.GetField("urls", BindingFlags.Public | BindingFlags.Instance);
+                    if (stunUrlsField != null)
+                    {
+                        stunUrlsField.SetValue(stunServer, new string[] { "stun:stun.l.google.com:19302" });
+                    }
+                    
+                    var turnServer = System.Activator.CreateInstance(iceServerType);
+                    var turnUrlsField = iceServerType.GetField("urls", BindingFlags.Public | BindingFlags.Instance);
+                    var turnUsernameField = iceServerType.GetField("username", BindingFlags.Public | BindingFlags.Instance);
+                    var turnCredentialField = iceServerType.GetField("credential", BindingFlags.Public | BindingFlags.Instance);
+                    
+                    if (turnUrlsField != null && turnUsernameField != null && turnCredentialField != null)
+                    {
+                        turnUrlsField.SetValue(turnServer, new string[] { 
+                            "turn:openrelay.metered.ca:80",
+                            "turn:openrelay.metered.ca:443",
+                            "turn:openrelay.metered.ca:443?transport=tcp"
+                        });
+                        turnUsernameField.SetValue(turnServer, "openrelayproject");
+                        turnCredentialField.SetValue(turnServer, "openrelayproject");
+                    }
+                    
+                    var iceServersArray = System.Array.CreateInstance(iceServerType, 2);
+                    iceServersArray.SetValue(stunServer, 0);
+                    iceServersArray.SetValue(turnServer, 1);
+                    iceServersProperty.SetValue(settings, iceServersArray);
+                }
+            }
+            
+            // Set the settings on SignalingManager
+            var managerType = signalingManager.GetType();
+            var settingsProperty = managerType.GetProperty("Settings", BindingFlags.Public | BindingFlags.Instance);
+            if (settingsProperty != null && settingsProperty.CanWrite)
+            {
+                settingsProperty.SetValue(signalingManager, settings);
+#if UNITY_EDITOR
+                Debug.Log($"✅ SignalingManager URL configured programmatically: {websocketUrl}");
 #endif
             }
             else
             {
 #if UNITY_EDITOR
-                Debug.LogWarning("⚠️  Could not set SignalingManager URL - please configure Stream-Settings.asset manually");
+                Debug.LogWarning("⚠️  Could not set SignalingManager.Settings - please configure Stream-Settings.asset manually");
+                Debug.LogWarning($"   Set WebSocket URL to: {websocketUrl}");
 #endif
             }
         }
         catch (Exception e)
         {
 #if UNITY_EDITOR
-            Debug.LogWarning($"⚠️  Failed to configure SignalingManager URL: {e.Message}");
+            Debug.LogWarning($"⚠️  Failed to configure SignalingManager URL programmatically: {e.Message}");
             Debug.LogWarning("   Please set WebSocket URL in Stream-Settings.asset manually");
+            Debug.LogWarning($"   Target URL: {backendUrl.Replace("https://", "wss://").Replace("http://", "ws://")}");
 #endif
         }
     }

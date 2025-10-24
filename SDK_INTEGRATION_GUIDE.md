@@ -77,8 +77,14 @@ Adds high-quality streaming (1080p @ 60fps) from your Unity VR game to web brows
 3. Select it in Project window
 4. In Inspector, set:
    - **WebSocket URL:** `wss://your-backend.up.railway.app`  
-     _(We'll provide this)_
+     _(We'll provide this - convert your Backend URL from `https://` to `wss://`)_
    - **ICE Servers:** Already configured ✅
+
+**IMPORTANT:** The Stream-Settings.asset WebSocket URL must match your Backend URL:
+- Backend URL: `https://your-backend.up.railway.app`
+- Stream-Settings URL: `wss://your-backend.up.railway.app` (https → wss)
+
+The RenderStreamControl script will attempt to configure this automatically, but if you see connection issues, verify both URLs match.
 
 ---
 
