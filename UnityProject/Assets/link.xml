@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<linker>
+  <!--
+    IL2CPP Code Stripping Prevention for Unity WebRTC Streaming
+    
+    This file prevents IL2CPP from stripping Unity.RenderStreaming and Unity.WebRTC
+    assemblies during builds. Required because RenderStreamControl.cs uses reflection
+    to call WebRTC APIs for Unity 2022.3 compatibility.
+    
+    Without this file, video streaming will fail on IL2CPP builds (Quest, iOS, etc)
+    with "black screen" - audio works but video is stripped.
+    
+    Place this file at: Assets/link.xml in your Unity project root
+  -->
+  
+  <assembly fullname="Unity.RenderStreaming" preserve="all"/>
+  <assembly fullname="Unity.WebRTC" preserve="all"/>
+</linker>
+

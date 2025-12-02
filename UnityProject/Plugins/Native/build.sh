@@ -95,8 +95,12 @@ build_android() {
     info "Building for Android..."
     
     if [[ -z "${ANDROID_NDK_HOME}" ]]; then
-        # Try to find NDK
-        if [[ -d "$HOME/Library/Android/sdk/ndk" ]]; then
+        # Try to find NDK - check Unity's bundled NDK first
+        UNITY_NDK="/Applications/Unity/Hub/Editor/6000.2.1f1/PlaybackEngines/AndroidPlayer/NDK"
+        if [[ -d "$UNITY_NDK" ]]; then
+            export ANDROID_NDK_HOME="$UNITY_NDK"
+            info "Using Unity's bundled NDK"
+        elif [[ -d "$HOME/Library/Android/sdk/ndk" ]]; then
             export ANDROID_NDK_HOME=$(ls -d "$HOME/Library/Android/sdk/ndk"/* | tail -1)
         elif [[ -d "$HOME/Android/Sdk/ndk" ]]; then
             export ANDROID_NDK_HOME=$(ls -d "$HOME/Android/Sdk/ndk"/* | tail -1)
