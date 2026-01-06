@@ -1,0 +1,268 @@
+// Prisma schema for IVS Streaming Infrastructure
+// "Private Twitch" architecture for families - kids stream, parents watch
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// USER & RELATIONSHIP MODELS
+// ============================================
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String?
+  role          UserRole
+  displayName   String?
+  avatarUrl     String?
+  
+  // k-ID verified status
+  kidVerified   Boolean  @default(false)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  parentProfile   ParentProfile?
+  childProfile    ChildProfile?
+  
+  @@index([email])
+  @@index([role])
+}
+
+enum UserRole {
+  PARENT
+  CHILD
+  ADMIN
+}
+
+model ParentProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Parent settings
+  notificationsEnabled Boolean @default(true)
+  maxConcurrentViews   Int     @default(5)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  children  ParentChildRelation[]
+  
+  @@index([userId])
+}
+
+model ChildProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Child settings
+  streamingEnabled    Boolean @default(true)
+  maxStreamDuration   Int     @default(120) // minutes
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  parents       ParentChildRelation[]
+  streamChannel ChildStreamChannel?
+  
+  @@index([userId])
+}
+
+model ParentChildRelation {
+  id        String   @id @default(uuid())
+  parentId  String
+  childId   String
+  
+  parent    ParentProfile @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  child     ChildProfile  @relation(fields: [childId], references: [id], onDelete: Cascade)
+  
+  // Permissions
+  canWatch      Boolean @default(true)
+  canViewVods   Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([parentId, childId])
+  @@index([parentId])
+  @@index([childId])
+}
+
+// ============================================
+// IVS STREAMING MODELS
+// ============================================
+
+model ChildStreamChannel {
+  id                    String   @id @default(uuid())
+  childId               String   @unique
+  child                 ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+  
+  // IVS Channel Info
+  ivsChannelArn         String   @unique
+  ivsChannelName        String
+  ivsPlaybackUrl        String
+  ivsIngestEndpoint     String
+  
+  // Stream Key (encrypted in production)
+  ivsStreamKeyArn       String?
+  ivsStreamKeyValue     String?  // Should be encrypted
+  
+  // Recording Configuration
+  ivsRecordingConfigArn String?
+  
+  // Channel Status
+  status                ChannelStatus @default(INACTIVE)
+  lastLiveAt            DateTime?
+  lastErrorMessage      String?
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  // Relations
+  sessions              ChildStreamSession[]
+  
+  @@index([childId])
+  @@index([status])
+  @@index([ivsChannelArn])
+}
+
+enum ChannelStatus {
+  INACTIVE      // Channel exists but not streaming
+  LIVE          // Currently streaming
+  ERROR         // Channel has an error
+  DISABLED      // Administratively disabled
+}
+
+model ChildStreamSession {
+  id                String   @id @default(uuid())
+  channelId         String
+  channel           ChildStreamChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  childId           String
+  
+  // IVS Stream Info
+  ivsStreamId       String?  @unique
+  
+  // Session Timing
+  startedAt         DateTime @default(now())
+  endedAt           DateTime?
+  
+  // Session Status
+  status            SessionStatus @default(IN_PROGRESS)
+  
+  // Metrics
+  maxViewers        Int?
+  avgBitrateKbps    Int?
+  totalWatchMinutes Int?
+  
+  // VOD Recording
+  vodMasterUrl      String?  // S3/CloudFront URL to HLS playlist
+  vodThumbnailUrl   String?
+  vodDurationSeconds Int?
+  vodSizeBytes      BigInt?
+  
+  // Error tracking
+  errorMessage      String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  viewerSessions    ViewerSession[]
+  
+  @@index([channelId])
+  @@index([childId])
+  @@index([status])
+  @@index([startedAt])
+  @@index([ivsStreamId])
+}
+
+enum SessionStatus {
+  IN_PROGRESS   // Currently streaming
+  COMPLETED     // Stream ended normally
+  FAILED        // Stream failed with error
+  PROCESSING    // VOD is being processed
+}
+
+model ViewerSession {
+  id                String   @id @default(uuid())
+  streamSessionId   String
+  streamSession     ChildStreamSession @relation(fields: [streamSessionId], references: [id], onDelete: Cascade)
+  
+  viewerUserId      String   // Parent's user ID
+  
+  // Viewer Timing
+  joinedAt          DateTime @default(now())
+  leftAt            DateTime?
+  
+  // Metrics
+  watchDurationSeconds Int?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([streamSessionId])
+  @@index([viewerUserId])
+}
+
+// ============================================
+// PLAYBACK AUTHORIZATION
+// ============================================
+
+model PlaybackKeyPair {
+  id              String   @id @default(uuid())
+  
+  // IVS Key Pair Info
+  ivsKeyPairArn   String   @unique
+  publicKeyPem    String   @db.Text
+  
+  // Key fingerprint for identification
+  fingerprint     String   @unique
+  
+  // Status
+  isActive        Boolean  @default(true)
+  
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime?
+  
+  @@index([isActive])
+  @@index([fingerprint])
+}
+
+// ============================================
+// ADMIN & AUDIT
+// ============================================
+
+model StreamingAuditLog {
+  id          String   @id @default(uuid())
+  
+  // Who
+  userId      String?
+  
+  // What
+  action      String   // e.g., "channel.created", "stream.started", "playback.authorized"
+  resourceType String  // e.g., "channel", "session", "vod"
+  resourceId  String
+  
+  // Details
+  details     Json?
+  ipAddress   String?
+  userAgent   String?
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([userId])
+  @@index([action])
+  @@index([resourceType, resourceId])
+  @@index([createdAt])
+}

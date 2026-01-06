@@ -1,295 +1,240 @@
 # Substream SDK - Production VR Streaming
 
-**Production-ready Unity WebRTC streaming for VR applications** with automatic recording, parent notifications, and enterprise-grade infrastructure.
+**Production-ready Unity streaming for VR applications** with automatic recording, notifications, and enterprise-grade infrastructure.
 
-Stream high-quality VR gameplay (1080p @ 30fps) from Quest headsets to web browsers with automatic recording to S3 and email notifications.
+Stream high-quality VR gameplay (1080p @ 30fps) from Quest headsets to web browsers.
 
-## 🎯 Features
+## Streaming Approaches
 
-- ✅ **High-Quality Streaming** - 1080p @ 30fps with adaptive bitrate
-- ✅ **Automatic Recording** - Streams recorded and saved to S3
-- ✅ **Parent Notifications** - Email alerts when streaming starts/ends
-- ✅ **Multi-Viewer** - Unlimited concurrent viewers per stream
-- ✅ **Secure** - JWT authentication for all connections
-- ✅ **Scalable** - Production-grade infrastructure
-- ✅ **Quest VR Ready** - Optimized for Meta Quest headsets
+This SDK supports **two streaming approaches**:
 
-## 🚀 Quick Start
+| Feature | WebRTC (main branch) | IVS (feature/ivs-streaming) |
+|---------|---------------------|---------------------------|
+| **Latency** | < 500ms | 2-5 seconds |
+| **Recording** | Client-side | Automatic to S3 |
+| **Scaling** | Self-managed TURN | AWS-managed |
+| **Cost** | TURN servers expensive | Pay-per-use |
+| **Best For** | Real-time interaction | VOD, reliability |
 
-### For Game Developers (Use Our Backend)
+**Choose WebRTC** if you need sub-second latency for interactive features.
 
-**Just want to add streaming to your Unity VR game?**
-
-See: [`SDK_INTEGRATION_GUIDE.md`](SDK_INTEGRATION_GUIDE.md)
-
-**Steps:**
-1. Install Unity Render Streaming package (5 min)
-2. Copy `RenderStreamControl.cs` to your project (2 min)
-3. Configure backend URL we provide (3 min)
-4. Test streaming (5 min)
-
-**Total: ~15-20 minutes to working streaming in your game!**
-
-We host the backend - you just integrate the SDK.
+**Choose IVS** if you need automatic recording and enterprise reliability.
 
 ---
 
-### For Platform Owners (Deploy Your Own Backend)
+## Branch Structure
 
-**Want to run your own streaming infrastructure?**
+- **`main`** - WebRTC-based streaming (original approach)
+- **`feature/ivs-streaming`** - AWS IVS-based streaming (recommended for production)
 
-See: [`DEVELOPER_SETUP.md`](DEVELOPER_SETUP.md)
+```bash
+# For WebRTC streaming
+git checkout main
 
-Complete guide for deploying backend with Railway, Supabase, etc.
-
-**Total: 2-3 hours to full production deployment**
-
----
-
-### For Development Testing (This Repo)
-
-1. **Clone repository**
-   ```bash
-   git clone https://github.com/jlin3/substream-sdk.git
-   cd substream-sdk
-   ```
-
-2. **Start backend** (minimal config for testing)
-   ```bash
-   cd WebappBackend
-   npm install
-   npm run dev
-   # Server runs on http://localhost
-   ```
-
-3. **Open receiver page**
-   - Open `WebappBackend/client/public/receiver/index.html` in browser
-   - Click Play button
-
-4. **Start Unity streaming**
-   - Open `UnityProject` in Unity 2023+
-   - Open `Stream-test` scene
-   - Press Play → Press `L` key to stream
-   - Video should appear in browser!
-
-### For Production Deployment
-
-**See:** [`docs/SETUP_CHECKLIST.md`](docs/SETUP_CHECKLIST.md) for complete 3-week deployment plan.
-
-**Quick overview:**
-1. Set up external services (Supabase, AWS, Twilio, SendGrid) - 90 minutes
-2. Deploy backend to Railway - 30 minutes
-3. Configure Unity with production settings - 15 minutes
-4. Integrate into your web app - 2-3 days
-5. Test and launch - 2-3 days
-
----
-
-## 📚 Documentation
-
-### Essential Guides
-- **[PRODUCTION_READY_SUMMARY.md](PRODUCTION_READY_SUMMARY.md)** - What's done and what remains
-- **[docs/SETUP_CHECKLIST.md](docs/SETUP_CHECKLIST.md)** - Day-by-day deployment checklist
-- **[docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md)** - Complete deployment guide
-- **[docs/WEB_APP_INTEGRATION.md](docs/WEB_APP_INTEGRATION.md)** - React/TypeScript integration examples
-
-### Technical Guides
-- **[docs/TURN_SERVER_SETUP.md](docs/TURN_SERVER_SETUP.md)** - Configure TURN servers (Twilio/self-hosted)
-- **[docs/data-channel-guide.md](docs/data-channel-guide.md)** - Send game data to browsers
-- **[docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md)** - Detailed implementation tracking
-
-### Alternative Approaches
-- **[docs/LIVEKIT_TEST.md](docs/LIVEKIT_TEST.md)** - Test LiveKit as alternative
-- **[docs/livekit-migration-plan.md](docs/livekit-migration-plan.md)** - Full LiveKit migration guide
-- **[docs/hybrid-unity-livekit-approach.md](docs/hybrid-unity-livekit-approach.md)** - Hybrid approach analysis
-
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────┐
-│   Unity VR Quest    │
-│  RenderStreamControl │
-│   - 1080p stream    │
-│   - Auth token      │
-│   - Session API     │
-└──────────┬──────────┘
-           │ WebSocket (authenticated)
-           ↓
-┌──────────────────────┐      ┌─────────────────┐
-│   Backend (Railway)  │─────▶│  Supabase DB    │
-│  - JWT auth          │      │  - Sessions     │
-│  - Session API       │      │  - Viewers      │
-│  - WebRTC signaling  │      │  - Recordings   │
-│  - Rate limiting     │      └─────────────────┘
-│  - Sentry tracking   │
-└──────────┬───────────┘
-           │
-     ┌─────┴──────┐
-     │            │
-     ↓            ↓
-┌──────────┐  ┌──────────────┐
-│ AWS S3   │  │  SendGrid    │
-│ Record-  │  │  Email       │
-│ ings     │  │  Notifica-   │
-└──────────┘  │  tions       │
-              └──────────────┘
-     ↓
-┌──────────────────────┐
-│  Web Viewers         │
-│  - Browser clients   │
-│  - Auto-recording    │
-│  - React components  │
-└──────────────────────┘
+# For IVS streaming (recommended)
+git checkout feature/ivs-streaming
 ```
 
 ---
 
-## 🛠️ Tech Stack
+## Quick Start - IVS Streaming (Recommended)
 
-**Unity:**
-- Unity 2023+
-- Unity Render Streaming v3.1.0-exp7
-- WebRTC for Unity
+### 1. Switch to IVS branch
+```bash
+git checkout feature/ivs-streaming
+```
 
-**Backend:**
-- Node.js + TypeScript + Express
-- WebSocket (ws package)
-- Supabase (PostgreSQL database)
-- AWS S3 (recording storage)
-- SendGrid (email notifications)
-- Sentry (error tracking)
+### 2. Start IVS Backend
+```bash
+cd IVSBackend
+pnpm install
 
-**Frontend:**
-- Vanilla JS receiver (provided)
-- React integration examples (documented)
-- MediaRecorder API for recording
+# Copy and configure environment
+cp env.example.txt .env
+# Edit .env with your credentials (see IVS_SETUP.md)
 
----
+pnpm db:generate
+pnpm db:migrate
+pnpm dev
+```
 
-## 💰 Cost Estimate
+### 3. Test API
+```bash
+curl http://localhost:3000/api/health
+```
 
-**Development/Testing:**
-- Free tier services sufficient
-- ~$20-50/month
+### 4. Configure Unity
+1. Open `UnityProject/` in Unity 2023+
+2. Add `IVSStreamControl` component to a GameObject
+3. Set Backend URL: `http://localhost:3000`
+4. Press Play and press `U` to stream
 
-**Production (20-50 concurrent streams):**
-- Railway: $20-50/month
-- AWS S3: $20-50/month
-- Twilio TURN: $100-200/month
-- SendGrid: $15-20/month
-- Supabase: $0-25/month
-- Sentry: $0-26/month
-
-**Total: $155-371/month**
+See [IVS_SETUP.md](IVS_SETUP.md) for complete instructions.
 
 ---
 
-## 🧪 Testing
+## Quick Start - WebRTC Streaming
 
-### Local Development
+### 1. Start WebRTC Backend
 ```bash
 cd WebappBackend
 npm install
 npm run dev
-# Open receiver/index.html in browser
-# Start Unity and press 'L' to stream
 ```
 
-### Production Testing
-After deployment, verify:
-```bash
-# Health check
-curl https://your-backend.up.railway.app/health
+### 2. Open Receiver
+Open `WebappBackend/client/public/receiver/index.html` in browser
 
-# Should return all features: true
+### 3. Start Unity
+1. Open `UnityProject/` in Unity 2023+
+2. Open `Stream-test` scene
+3. Press Play → Press `L` key
+4. Video appears in browser!
+
+---
+
+## Features
+
+- **High-Quality Streaming** - 1080p @ 30fps with adaptive bitrate
+- **Automatic Recording** - Streams recorded to S3 (IVS) or client-side (WebRTC)
+- **Parent Notifications** - Email alerts when streaming starts/ends
+- **Multi-Viewer** - Concurrent viewers per stream
+- **Secure** - JWT authentication for all connections
+- **Quest VR Ready** - Optimized for Meta Quest headsets
+
+---
+
+## Project Structure
+
+```
+substream-sdk/
+├── IVSBackend/              # IVS streaming backend (Next.js)
+│   ├── src/
+│   │   ├── app/api/streams/ # API routes
+│   │   └── lib/streaming/   # IVS service layer
+│   └── prisma/              # Database schema
+│
+├── WebappBackend/           # WebRTC streaming backend (Express)
+│   ├── src/                 # Server code
+│   ├── client/              # Web receiver
+│   └── database/            # SQL schema
+│
+├── UnityProject/            # Unity VR project
+│   ├── Assets/Scripts/
+│   │   ├── IVSStreamControl.cs    # IVS streaming
+│   │   └── RenderStreamControl.cs # WebRTC streaming
+│   └── Plugins/             # Native libraries
+│
+└── docs/                    # Additional documentation
 ```
 
 ---
 
-## 🔒 Security
+## Documentation
 
-- JWT authentication for all API calls
-- WebSocket token validation
-- CORS restricted to allowed origins
-- Rate limiting (100 req/15min)
-- Presigned S3 URLs for downloads
-- Row-level security in database
-- Environment-based configuration
+### IVS Streaming (feature/ivs-streaming branch)
+- **[IVS_SETUP.md](IVS_SETUP.md)** - Complete IVS setup guide
+- **[IVS_MIGRATION.md](IVS_MIGRATION.md)** - Migrating from WebRTC to IVS
+- **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Testing the IVS system
 
----
+### WebRTC Streaming (main branch)
+- **[DEVELOPER_SETUP.md](DEVELOPER_SETUP.md)** - Full deployment guide
+- **[SDK_INTEGRATION_GUIDE.md](SDK_INTEGRATION_GUIDE.md)** - Unity integration
+- **[docs/SETUP_CHECKLIST.md](docs/SETUP_CHECKLIST.md)** - Deployment checklist
 
-## 📦 What's Included
-
-### Unity Project (`UnityProject/`)
-- `RenderStreamControl.cs` - Main streaming controller with auth & API integration
-- `Stream-Settings.asset` - WebRTC configuration
-- Test scene with VR camera setup
-
-### Backend (`WebappBackend/`)
-- Complete REST API for sessions and recordings
-- WebSocket signaling server with authentication
-- Database integration (Supabase)
-- Storage integration (S3)
-- Email notifications (SendGrid)
-- Browser recording system
-- Production deployment config
-
-### Documentation (`docs/`)
-- Complete setup and deployment guides
-- React/TypeScript integration examples
-- API reference and code samples
-- Security best practices
-- Troubleshooting guides
+### General
+- **[docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md)** - Production guide
+- **[docs/WEB_APP_INTEGRATION.md](docs/WEB_APP_INTEGRATION.md)** - Frontend integration
 
 ---
 
-## 🚦 Current Status
+## Architecture - IVS Streaming
 
-**✅ Production Infrastructure: COMPLETE**
-- All backend code implemented and tested
-- Database schema ready
-- Authentication system ready
-- Recording system ready
-- Notification system ready
+```
+┌─────────────────┐     RTMPS      ┌─────────────────┐
+│   Unity VR      │ ─────────────> │  AWS IVS        │
+│  (IVSStream-    │                │  Channel        │
+│   Control.cs)   │                └────────┬────────┘
+└─────────────────┘                         │
+                                   Auto-Record to S3
+                                            │
+                                            v
+┌─────────────────┐     HLS        ┌─────────────────┐
+│  IVSBackend     │ <───────────── │  S3 Bucket      │
+│  (API Server)   │                │  (VOD Storage)  │
+└────────┬────────┘                └─────────────────┘
+         │
+         v
+┌─────────────────┐
+│  Web Viewer     │
+│  (IVS Player)   │
+└─────────────────┘
+```
 
-**🔄 Deployment: READY (needs external service setup)**
-- Need 90 minutes to configure Supabase, AWS, Twilio, SendGrid
-- Then deploy to Railway in 30 minutes
+## Architecture - WebRTC Streaming
 
-**⏳ Integration: IN PROGRESS**
-- Unity code updated with API integration
-- Need to test with production backend
-- Frontend integration examples provided
-
-**Timeline:** 2-3 weeks to full production launch
+```
+┌─────────────────┐
+│   Unity VR      │
+│  (RenderStream- │
+│   Control.cs)   │
+└────────┬────────┘
+         │ WebSocket
+         v
+┌─────────────────┐      ┌─────────────────┐
+│  WebappBackend  │─────>│  Supabase DB    │
+│  (Signaling)    │      └─────────────────┘
+└────────┬────────┘
+         │ WebRTC
+         v
+┌─────────────────┐
+│  Web Viewer     │
+│  (Browser)      │
+└─────────────────┘
+```
 
 ---
 
-## 🆘 Support
+## Cost Estimates
 
-- Review [SETUP_CHECKLIST.md](docs/SETUP_CHECKLIST.md) for guided setup
-- Check [PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) for deployment help
-- See [WEB_APP_INTEGRATION.md](docs/WEB_APP_INTEGRATION.md) for frontend integration
-- Check Railway logs for backend issues
-- Review Sentry for error tracking
+### IVS Streaming
+- IVS Basic: ~$0.20/hour of streaming
+- S3 Storage: ~$0.023/GB
+- Total: $50-150/month for moderate usage
+
+### WebRTC Streaming
+- Railway: $20-50/month
+- Twilio TURN: $100-200/month
+- AWS S3: $20-50/month
+- Total: $155-371/month
 
 ---
 
-## 📄 License
+## Getting Help
+
+1. Check the relevant setup guide:
+   - IVS: [IVS_SETUP.md](IVS_SETUP.md)
+   - WebRTC: [DEVELOPER_SETUP.md](DEVELOPER_SETUP.md)
+
+2. Review troubleshooting sections in guides
+
+3. Check backend logs:
+   - IVS: `cd IVSBackend && pnpm dev`
+   - WebRTC: `cd WebappBackend && npm run dev`
+
+---
+
+## License
 
 [Your License Here]
 
 ---
 
-## 🙏 Credits
+## Credits
 
 Built with:
 - Unity Render Streaming
-- WebRTC
-- Railway
-- Supabase
-- AWS S3
-- Twilio
-- SendGrid
+- AWS IVS
+- Next.js / Express
+- Prisma / Supabase
+- FFmpeg

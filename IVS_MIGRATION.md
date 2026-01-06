@@ -1,6 +1,45 @@
-# Migration Guide: WebRTC → IVS (RTMPS)
+# Migration Guide: WebRTC to IVS (RTMPS)
 
 This guide explains how to migrate from the WebRTC-based `RenderStreamControl.cs` to the new IVS-based `IVSStreamControl.cs`.
+
+## What's Already Done (No Action Needed)
+
+The following components are **already implemented** in this branch:
+
+### Unity Components
+
+| Component | Status | Location |
+|-----------|--------|----------|
+| `IVSStreamControl.cs` | Complete | `UnityProject/Assets/Scripts/` |
+| `NativeFFmpegBridge.cs` | Complete | `UnityProject/Assets/Scripts/Substream/` |
+| `FFmpegRTMPPublisher.cs` | Complete | `UnityProject/Assets/Scripts/Substream/` |
+| Stub RTMP publisher | Complete | Built into `IVSStreamControl.cs` |
+| Native plugin structure | Complete | `UnityProject/Plugins/` |
+
+### Backend Components
+
+| Component | Status | Location |
+|-----------|--------|----------|
+| IVS streaming API routes | Complete | `IVSBackend/src/app/api/streams/` |
+| Stream service layer | Complete | `IVSBackend/src/lib/streaming/` |
+| Database schema (Prisma) | Complete | `IVSBackend/prisma/schema.prisma` |
+| Playback authorization | Complete | `IVSBackend/src/lib/streaming/playback-auth.ts` |
+| Stream key encryption | Complete | `IVSBackend/src/lib/streaming/encryption.ts` |
+
+## What You Need to Do
+
+### Required Steps
+
+1. **Set up environment variables** - Copy `IVSBackend/env.example.txt` to `.env` and fill in credentials
+2. **Run database migrations** - `cd IVSBackend && pnpm db:migrate`
+3. **Start the backend** - `cd IVSBackend && pnpm dev`
+
+### Optional Steps
+
+- **Build native FFmpeg library** - Only needed for actual RTMPS streaming (the stub works for testing)
+- **Set up AWS IVS** - Only if self-hosting (otherwise use test credentials from project owner)
+
+---
 
 ## Why Migrate?
 
@@ -67,62 +106,30 @@ public int keyframeInterval = 2;                      // IVS requirement
 
 ---
 
-## RTMP Library Required
+## RTMP Library Status
 
-Unity doesn't have built-in RTMP support. You need a native library.
+The native FFmpeg library enables real RTMP streaming. Here's the current status:
 
-### Recommended Options
+### Stub Publisher (Default)
 
-#### 1. AVPro Live Camera (Commercial) - **Recommended for Quest**
-- $200 one-time purchase
-- Native Quest support
-- Hardware encoding
-- Professional support
-- [Asset Store Link](https://assetstore.unity.com/packages/tools/video/avpro-live-camera-3683)
+When native library is not available, the stub publisher:
+- Logs all API calls correctly
+- Shows RTMPS credentials in console
+- Does NOT actually stream video
+- Useful for testing API integration
 
-```csharp
-// Example integration
-public class AVProRTMPPublisher : IRTMPPublisher
-{
-    private AVProLiveCamera camera;
-    
-    public void Connect(string url)
-    {
-        camera.SetOutputPath(url);
-        camera.StartCapture();
-    }
-    
-    public void StartPublishing()
-    {
-        camera.StartEncoding();
-    }
-}
-```
+### Native Publisher
 
-#### 2. FFmpeg Native Plugin (Free, Complex)
-- Requires native Android/iOS compilation
-- More control, more work
-- [FFmpeg Unity Tutorial](https://github.com/FFmpeg/FFmpeg)
+When native library is built and available:
+- Real RTMPS streaming to IVS
+- Hardware encoding where available
+- Full frame transmission
 
-#### 3. Custom Native Plugin
-- Write Android/iOS native code
-- Use platform RTMP libraries
-- Most complex but most flexible
+### Building Native Library
 
-### Testing Without Native Library
+See `UnityProject/Plugins/README.md` for build instructions.
 
-You can test the backend using OBS or FFmpeg:
-
-```bash
-# The API returns RTMPS credentials
-curl -X POST http://localhost:3000/api/streams/children/child-profile-001/ingest \
-  -H "Authorization: Bearer child-profile-001"
-
-# Use credentials with FFmpeg
-ffmpeg -f lavfi -i testsrc=size=1280x720:rate=30 \
-  -c:v libx264 -g 60 -c:a aac \
-  -f flv "rtmps://ENDPOINT/STREAMKEY"
-```
+**Alternative for Testing**: Use OBS or FFmpeg directly with the credentials from the API.
 
 ---
 
@@ -153,28 +160,34 @@ GET /api/streams/children/:childId/vods        # List recordings
 
 ## Backend Changes
 
-### What You Can Remove
+### What You Can Remove (WebRTC Backend)
 
-The following backend code is no longer needed:
-- `src/signaling.ts` - WebRTC signaling routes
-- `src/websocket.ts` - WebSocket server
-- `src/class/offer.ts`, `answer.ts`, `candidate.ts` - SDP handling
+The following backend code is no longer needed for IVS:
+- `WebappBackend/src/signaling.ts` - WebRTC signaling routes
+- `WebappBackend/src/websocket.ts` - WebSocket server
+- `WebappBackend/src/class/offer.ts`, `answer.ts`, `candidate.ts` - SDP handling
 - TURN server configuration
 
 ### What You Keep
 
-- Authentication (`src/middleware/auth.ts`)
-- Session tracking (now via new API)
-- Recording storage (now automatic via IVS)
+- Authentication patterns (adapt to your system)
+- Session tracking concepts (now via IVS API)
+- Recording storage concepts (now automatic via IVS)
 
-### New Backend
+### New Backend Location
 
-The new IVS backend is located at:
+The IVS backend is now included in this repository:
+
 ```
-/Users/jesselinson/Substream/substream/
-├── src/app/api/streams/     # New API routes
-├── src/lib/streaming/       # IVS service layer
-└── docs/STREAMING_SETUP.md  # Setup guide
+substream-sdk/
+├── IVSBackend/           # NEW - IVS streaming backend
+│   ├── src/
+│   │   ├── app/api/streams/
+│   │   └── lib/streaming/
+│   ├── prisma/
+│   └── package.json
+├── WebappBackend/        # OLD - WebRTC backend (legacy)
+└── UnityProject/
 ```
 
 ---
@@ -184,59 +197,56 @@ The new IVS backend is located at:
 ### Step 1: Set Up New Backend
 
 ```bash
-cd /Users/jesselinson/Substream/substream
+cd IVSBackend
 
-# Already done: PostgreSQL, Prisma, AWS IVS setup
-# Just start the server:
+# Install dependencies
+pnpm install
+
+# Create .env from template
+cp env.example.txt .env
+
+# Edit .env with credentials (from project owner or your AWS setup)
+nano .env
+
+# Generate Prisma client
+pnpm db:generate
+
+# Run database migrations
+pnpm db:migrate
+
+# Start the dev server
 pnpm dev
 ```
 
 ### Step 2: Update Unity Project
 
-1. Copy `IVSStreamControl.cs` to your project
-2. Add to your streaming GameObject
-3. Configure:
-   - `Backend URL`: `http://localhost:3000` (or production URL)
-   - `Child ID`: From your user system
-   - `Auth Token`: JWT from your auth system
+1. Open Unity project in `UnityProject/`
+2. Remove `RenderStreamControl` component (if present)
+3. Add `IVSStreamControl` component to your streaming GameObject
+4. Configure:
+   - **Backend URL**: `http://localhost:3000`
+   - **Child ID**: From your user system
+   - **Auth Token**: JWT from your auth system
 
-### Step 3: Implement RTMP Publisher
-
-Replace the `StubRTMPPublisher` with your chosen library:
-
-```csharp
-// In IVSStreamControl.cs, InitializeRTMPPublisher()
-private void InitializeRTMPPublisher()
-{
-    // Replace this line:
-    rtmpPublisher = new StubRTMPPublisher();
-    
-    // With your implementation:
-    rtmpPublisher = new AVProRTMPPublisher(); // Or your library
-}
-```
-
-### Step 4: Test
+### Step 3: Test API Integration
 
 1. Start backend: `pnpm dev`
-2. Open http://localhost:3000/streaming-demo
-3. Get credentials on "Streamer" tab
-4. Test with OBS/FFmpeg first
-5. Then test Unity integration
+2. Press Play in Unity
+3. Press `U` to toggle streaming
+4. Check console for API responses
 
-### Step 5: Update Viewer
+### Step 4: Update Viewer (Web)
 
 Replace WebRTC viewer with IVS Player:
 
 ```typescript
 // React/Web viewer
-import { IVSPlayer } from '@/components/streaming';
+import { IVSPlayer } from 'amazon-ivs-player';
 
-<IVSPlayer
-  playbackUrl={playbackData.url}
-  playbackToken={playbackData.token}
-  autoplay
-/>
+const player = IVSPlayer.create();
+player.attachHTMLVideoElement(videoElement);
+player.load(playbackUrl);
+player.play();
 ```
 
 ---
@@ -284,17 +294,16 @@ IVS has specific requirements:
 
 ### Unity Project
 - **Added**: `Assets/Scripts/IVSStreamControl.cs`
+- **Added**: `Assets/Scripts/Substream/NativeFFmpegBridge.cs`
+- **Added**: `Assets/Scripts/Substream/FFmpegRTMPPublisher.cs`
 - **Deprecated**: `Assets/Scripts/RenderStreamControl.cs` (keep for reference)
 
-### Backend (New Repo)
-- Location: `/Users/jesselinson/Substream/substream/`
-- API: `src/app/api/streams/`
-- Services: `src/lib/streaming/`
-- Components: `src/components/streaming/`
+### Backend
+- **Added**: `IVSBackend/` - Complete IVS backend
+- **Legacy**: `WebappBackend/` - WebRTC backend (still works if needed)
 
 ---
 
 ## Questions?
 
-Test the demo page at http://localhost:3000/streaming-demo to see the full flow working.
-
+See the main setup guide at `IVS_SETUP.md` for complete instructions.
