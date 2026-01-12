@@ -80,3 +80,6 @@ IVSBackend/.next/
 IVSBackend/src/generated/
 IVSBackend/.env
 
+
+# All node_modules directories
+**/node_modules/
