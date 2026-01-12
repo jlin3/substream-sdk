@@ -1,5 +1,10 @@
-# Ignore WebappBackend (WebRTC backend) when building IVSBackend
+# Ignore WebappBackend - we're only deploying IVSBackend
 WebappBackend/
-UnityProject/
-docs/
-*.md
+
+# Standard ignores
+node_modules/
+.git/
+*.log
+.env
+.env.*
+!.env.example
