@@ -1,0 +1,5 @@
+# Ignore WebappBackend (WebRTC backend) when building IVSBackend
+WebappBackend/
+UnityProject/
+docs/
+*.md
