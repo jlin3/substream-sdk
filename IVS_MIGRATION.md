@@ -306,4 +306,4 @@ IVS has specific requirements:
 
 ## Questions?
 
-See the main setup guide at `IVS_SETUP.md` for complete instructions.
+See the main setup guide at `IVS_BACKEND_SETUP.md` for complete instructions.

@@ -1,15 +1,101 @@
 /**
  * Seed test data for demo purposes
- * Run: npx tsx scripts/seed-test-data.ts
+ * 
+ * Creates two sets of credentials:
+ * 1. Demo credentials (for SDK users to test immediately)
+ * 2. Test credentials (for internal testing)
+ * 
+ * Run: pnpm db:seed
  */
 
 import { prisma } from '../src/lib/prisma';
 
 async function seed() {
-  console.log('🌱 Seeding test data...\n');
+  console.log('🌱 Seeding database...\n');
 
-  // Create test child user
-  const childUser = await prisma.user.upsert({
+  // =========================================================================
+  // DEMO CREDENTIALS - For SDK users to test immediately
+  // =========================================================================
+  console.log('📦 Creating demo credentials for SDK users...\n');
+
+  // Demo child user (the streamer)
+  const demoChildUser = await prisma.user.upsert({
+    where: { email: 'demo@substream.dev' },
+    update: {},
+    create: {
+      id: 'demo-user-001',
+      email: 'demo@substream.dev',
+      role: 'CHILD',
+      displayName: 'Demo Streamer',
+      kidVerified: true,
+    },
+  });
+  console.log('✅ Demo child user:', demoChildUser.id);
+
+  // Demo child profile
+  const demoChildProfile = await prisma.childProfile.upsert({
+    where: { userId: demoChildUser.id },
+    update: {},
+    create: {
+      id: 'demo-child-001',
+      userId: demoChildUser.id,
+      streamingEnabled: true,
+      maxStreamDuration: 60, // 1 hour max for demo
+    },
+  });
+  console.log('✅ Demo child profile:', demoChildProfile.id);
+
+  // Demo parent user (the viewer)
+  const demoParentUser = await prisma.user.upsert({
+    where: { email: 'demo-viewer@substream.dev' },
+    update: {},
+    create: {
+      id: 'demo-viewer-001',
+      email: 'demo-viewer@substream.dev',
+      role: 'PARENT',
+      displayName: 'Demo Viewer',
+    },
+  });
+  console.log('✅ Demo parent user:', demoParentUser.id);
+
+  // Demo parent profile
+  const demoParentProfile = await prisma.parentProfile.upsert({
+    where: { userId: demoParentUser.id },
+    update: {},
+    create: {
+      id: 'demo-parent-001',
+      userId: demoParentUser.id,
+      notificationsEnabled: false,
+    },
+  });
+  console.log('✅ Demo parent profile:', demoParentProfile.id);
+
+  // Link demo parent to demo child
+  await prisma.parentChildRelation.upsert({
+    where: {
+      parentId_childId: {
+        parentId: demoParentProfile.id,
+        childId: demoChildProfile.id,
+      },
+    },
+    update: {},
+    create: {
+      id: 'demo-relation-001',
+      parentId: demoParentProfile.id,
+      childId: demoChildProfile.id,
+      canWatch: true,
+      canViewVods: true,
+    },
+  });
+  console.log('✅ Linked demo parent to demo child\n');
+
+  // =========================================================================
+  // TEST CREDENTIALS - For internal testing
+  // =========================================================================
+  console.log('🧪 Creating test credentials for internal use...\n');
+
+  // Test child user
+  const testChildUser = await prisma.user.upsert({
     where: { email: 'test-child@example.com' },
     update: {},
     create: {
@@ -20,23 +106,23 @@ async function seed() {
       kidVerified: true,
     },
   });
-  console.log('✅ Created child user:', childUser.id);
+  console.log('✅ Test child user:', testChildUser.id);
 
-  // Create child profile
-  const childProfile = await prisma.childProfile.upsert({
-    where: { userId: childUser.id },
+  // Test child profile
+  const testChildProfile = await prisma.childProfile.upsert({
+    where: { userId: testChildUser.id },
     update: {},
     create: {
       id: 'test-child-id',
-      userId: childUser.id,
+      userId: testChildUser.id,
       streamingEnabled: true,
       maxStreamDuration: 120,
     },
   });
-  console.log('✅ Created child profile:', childProfile.id);
+  console.log('✅ Test child profile:', testChildProfile.id);
 
-  // Create test parent user
-  const parentUser = await prisma.user.upsert({
+  // Test parent user
+  const testParentUser = await prisma.user.upsert({
     where: { email: 'test-parent@example.com' },
     update: {},
     create: {
@@ -46,44 +132,67 @@ async function seed() {
       displayName: 'Test Parent',
     },
   });
-  console.log('✅ Created parent user:', parentUser.id);
+  console.log('✅ Test parent user:', testParentUser.id);
 
-  // Create parent profile
-  const parentProfile = await prisma.parentProfile.upsert({
-    where: { userId: parentUser.id },
+  // Test parent profile
+  const testParentProfile = await prisma.parentProfile.upsert({
+    where: { userId: testParentUser.id },
     update: {},
     create: {
       id: 'test-parent-id',
-      userId: parentUser.id,
+      userId: testParentUser.id,
       notificationsEnabled: true,
     },
   });
-  console.log('✅ Created parent profile:', parentProfile.id);
+  console.log('✅ Test parent profile:', testParentProfile.id);
 
-  // Link parent to child
+  // Link test parent to test child
   await prisma.parentChildRelation.upsert({
     where: {
       parentId_childId: {
-        parentId: parentProfile.id,
-        childId: childProfile.id,
+        parentId: testParentProfile.id,
+        childId: testChildProfile.id,
       },
     },
     update: {},
     create: {
       id: 'test-relation-id',
-      parentId: parentProfile.id,
-      childId: childProfile.id,
+      parentId: testParentProfile.id,
+      childId: testChildProfile.id,
       canWatch: true,
       canViewVods: true,
     },
   });
-  console.log('✅ Linked parent to child\n');
+  console.log('✅ Linked test parent to test child\n');
 
-  console.log('📋 Test IDs for API calls:');
-  console.log('   Child ID:  test-child-id');
-  console.log('   User ID:   test-user-id (for Authorization header)');
-  console.log('   Parent ID: test-parent-user-id (for playback)');
-  console.log('\n🎉 Seed complete!');
+  // =========================================================================
+  // SUMMARY
+  // =========================================================================
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('');
+  console.log('  🎮 DEMO CREDENTIALS (for SDK users)');
+  console.log('');
+  console.log('  Use these in your Unity project to test streaming:');
+  console.log('');
+  console.log('    Child ID:    demo-child-001');
+  console.log('    Auth Token:  demo-token');
+  console.log('');
+  console.log('  Viewer credentials:');
+  console.log('');
+  console.log('    Parent ID:   demo-viewer-001');
+  console.log('    Auth Token:  demo-viewer-token');
+  console.log('');
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('');
+  console.log('  🧪 TEST CREDENTIALS (for internal testing)');
+  console.log('');
+  console.log('    Child ID:    test-child-id');
+  console.log('    User ID:     test-user-id');
+  console.log('    Parent ID:   test-parent-user-id');
+  console.log('');
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('');
+  console.log('🎉 Seed complete!');
 }
 
 seed()

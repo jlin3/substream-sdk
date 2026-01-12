@@ -1,6 +1,14 @@
-# IVS Streaming Setup Guide
+# IVS Backend Setup Guide
 
-This guide walks you through setting up the AWS IVS (Amazon Interactive Video Service) streaming system for Unity VR applications.
+> **⚠️ FOR SERVICE OPERATORS ONLY (k-ID/Bezi)**
+>
+> This guide is for operators who need to set up and host the IVS streaming infrastructure.
+>
+> **If you are a game developer** integrating streaming into your Unity project, see the [SDK Streaming Guide](SDK_STREAMING_GUIDE.md) instead - you don't need to set up any of this.
+
+---
+
+This guide walks you through setting up the AWS IVS (Amazon Interactive Video Service) backend infrastructure.
 
 ## Overview
 

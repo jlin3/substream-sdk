@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Viewer</title>
+    <script src="https://player.live-video.net/1.24.0/amazon-ivs-player.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tertiary: #1a1a25;
+            --accent: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.3);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --success: #22c55e;
+            --error: #ef4444;
+            --border: rgba(255, 255, 255, 0.08);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(ellipse at 50% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 40%);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+        
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+        
+        .config-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .config-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 1rem;
+        }
+        
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+        
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .input-group label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        
+        .input-group input {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        
+        .input-group input::placeholder {
+            color: var(--text-muted);
+        }
+        
+        .btn-row {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem 1.5rem;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            box-shadow: 0 4px 20px var(--accent-glow);
+            transform: translateY(-1px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button.secondary {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+        }
+        
+        button.secondary:hover {
+            background: var(--bg-secondary);
+            box-shadow: none;
+        }
+        
+        .video-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .video-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        
+        .status-badge.live {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--error);
+        }
+        
+        .status-badge.live::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: var(--error);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .status-badge.offline {
+            background: rgba(100, 116, 139, 0.15);
+            color: var(--text-muted);
+        }
+        
+        .status-badge.connecting {
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent);
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .viewer-count {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+        
+        .video-wrapper {
+            position: relative;
+            aspect-ratio: 16 / 9;
+            background: #000;
+        }
+        
+        #video-player {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        .video-placeholder {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            color: var(--text-muted);
+        }
+        
+        .video-placeholder svg {
+            width: 64px;
+            height: 64px;
+            opacity: 0.5;
+        }
+        
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--error);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+        }
+        
+        .stats-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            padding: 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 0.25rem;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        @media (max-width: 640px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            h1 {
+                font-size: 1.75rem;
+            }
+            
+            .config-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .btn-row {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Stream Viewer</h1>
+            <p class="subtitle">Watch live streams from the Substream SDK</p>
+        </header>
+        
+        <div class="config-panel">
+            <div class="config-title">Stream Configuration</div>
+            <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1rem;">
+                Pre-filled with demo credentials. Start streaming from Unity, then click Connect!
+            </p>
+            <div class="config-grid">
+                <div class="input-group">
+                    <label for="api-endpoint">API Endpoint</label>
+                    <input type="text" id="api-endpoint" placeholder="https://substream-ivs.up.railway.app" value="https://substream-ivs.up.railway.app">
+                </div>
+                <div class="input-group">
+                    <label for="child-id">Child ID</label>
+                    <input type="text" id="child-id" placeholder="demo-child-001" value="demo-child-001">
+                </div>
+                <div class="input-group">
+                    <label for="auth-token">Auth Token</label>
+                    <input type="text" id="auth-token" placeholder="demo-token" value="demo-token">
+                </div>
+            </div>
+            <div class="btn-row">
+                <button onclick="loadStream()">Connect to Stream</button>
+                <button class="secondary" onclick="stopStream()">Disconnect</button>
+            </div>
+        </div>
+        
+        <div class="video-container">
+            <div class="video-header">
+                <span class="status-badge offline" id="status-badge">Offline</span>
+                <span class="viewer-count" id="viewer-count"></span>
+            </div>
+            
+            <div class="video-wrapper">
+                <video id="video-player" playsinline controls></video>
+                <div class="video-placeholder" id="placeholder">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+                    </svg>
+                    <span id="placeholder-text">Enter stream details and click Connect</span>
+                </div>
+            </div>
+            
+            <div class="stats-panel hidden" id="stats-panel">
+                <div class="stat">
+                    <div class="stat-value" id="stat-latency">--</div>
+                    <div class="stat-label">Latency</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="stat-quality">--</div>
+                    <div class="stat-label">Quality</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="stat-buffer">--</div>
+                    <div class="stat-label">Buffer</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="stat-bitrate">--</div>
+                    <div class="stat-label">Bitrate</div>
+                </div>
+            </div>
+            
+            <div class="error-message hidden" id="error-message"></div>
+        </div>
+    </div>
+    
+    <script>
+        let player = null;
+        let statsInterval = null;
+        
+        function updateStatus(status, text) {
+            const badge = document.getElementById('status-badge');
+            badge.className = `status-badge ${status}`;
+            badge.textContent = text || status.charAt(0).toUpperCase() + status.slice(1);
+        }
+        
+        function showError(message) {
+            const errorEl = document.getElementById('error-message');
+            errorEl.textContent = message;
+            errorEl.classList.remove('hidden');
+        }
+        
+        function hideError() {
+            document.getElementById('error-message').classList.add('hidden');
+        }
+        
+        function showPlaceholder(text) {
+            const placeholder = document.getElementById('placeholder');
+            const placeholderText = document.getElementById('placeholder-text');
+            placeholder.classList.remove('hidden');
+            placeholderText.textContent = text;
+        }
+        
+        function hidePlaceholder() {
+            document.getElementById('placeholder').classList.add('hidden');
+        }
+        
+        async function loadStream() {
+            hideError();
+            updateStatus('connecting', 'Connecting...');
+            showPlaceholder('Connecting to stream...');
+            
+            const apiEndpoint = document.getElementById('api-endpoint').value.trim();
+            const childId = document.getElementById('child-id').value.trim();
+            const authToken = document.getElementById('auth-token').value.trim();
+            
+            if (!apiEndpoint || !childId) {
+                showError('Please enter API endpoint and Child ID');
+                updateStatus('offline');
+                showPlaceholder('Enter stream details and click Connect');
+                return;
+            }
+            
+            try {
+                // Fetch playback URL from API
+                const response = await fetch(
+                    `${apiEndpoint}/api/streams/children/${childId}/playback`,
+                    {
+                        headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+                    }
+                );
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Playback data:', data);
+                
+                if (!data.status?.isLive) {
+                    updateStatus('offline', 'Stream Offline');
+                    showPlaceholder('Stream is not currently live. Check back later!');
+                    return;
+                }
+                
+                // Initialize IVS player
+                if (!IVSPlayer.isPlayerSupported) {
+                    throw new Error('IVS Player is not supported in this browser');
+                }
+                
+                // Clean up existing player
+                if (player) {
+                    player.delete();
+                }
+                
+                player = IVSPlayer.create();
+                player.attachHTMLVideoElement(document.getElementById('video-player'));
+                
+                // Set up event handlers
+                player.addEventListener(IVSPlayer.PlayerState.PLAYING, () => {
+                    updateStatus('live', 'LIVE');
+                    hidePlaceholder();
+                    document.getElementById('stats-panel').classList.remove('hidden');
+                    startStatsUpdate();
+                });
+                
+                player.addEventListener(IVSPlayer.PlayerState.ENDED, () => {
+                    updateStatus('offline', 'Stream Ended');
+                    showPlaceholder('Stream has ended');
+                    stopStatsUpdate();
+                });
+                
+                player.addEventListener(IVSPlayer.PlayerEventType.ERROR, (err) => {
+                    console.error('Player error:', err);
+                    showError(`Player error: ${err.message || 'Unknown error'}`);
+                });
+                
+                // Load stream
+                player.load(data.playback.url);
+                
+                // Set playback token if private channel
+                if (data.playback.token) {
+                    // Note: IVS player handles auth via URL params for basic channels
+                    // For private channels, token is embedded in URL
+                }
+                
+                player.play();
+                
+            } catch (error) {
+                console.error('Failed to load stream:', error);
+                showError(`Failed to connect: ${error.message}`);
+                updateStatus('offline');
+                showPlaceholder('Failed to connect. Check your settings and try again.');
+            }
+        }
+        
+        function stopStream() {
+            if (player) {
+                player.pause();
+                player.delete();
+                player = null;
+            }
+            stopStatsUpdate();
+            updateStatus('offline');
+            showPlaceholder('Disconnected');
+            document.getElementById('stats-panel').classList.add('hidden');
+            hideError();
+        }
+        
+        function startStatsUpdate() {
+            stopStatsUpdate();
+            statsInterval = setInterval(updateStats, 1000);
+        }
+        
+        function stopStatsUpdate() {
+            if (statsInterval) {
+                clearInterval(statsInterval);
+                statsInterval = null;
+            }
+        }
+        
+        function updateStats() {
+            if (!player) return;
+            
+            try {
+                const quality = player.getQuality();
+                const buffer = player.getBufferDuration();
+                const latency = player.getLiveLatency();
+                
+                document.getElementById('stat-latency').textContent = 
+                    latency ? `${latency.toFixed(1)}s` : '--';
+                document.getElementById('stat-quality').textContent = 
+                    quality ? `${quality.height}p` : '--';
+                document.getElementById('stat-buffer').textContent = 
+                    buffer ? `${buffer.toFixed(1)}s` : '--';
+                document.getElementById('stat-bitrate').textContent = 
+                    quality?.bitrate ? `${(quality.bitrate / 1000).toFixed(0)} kbps` : '--';
+            } catch (e) {
+                // Stats not available yet
+            }
+        }
+        
+        // Check for URL parameters
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('endpoint')) {
+            document.getElementById('api-endpoint').value = params.get('endpoint');
+        }
+        if (params.get('childId')) {
+            document.getElementById('child-id').value = params.get('childId');
+        }
+        if (params.get('token')) {
+            document.getElementById('auth-token').value = params.get('token');
+        }
+        if (params.get('autoplay')) {
+            loadStream();
+        }
+    </script>
+</body>
+</html>

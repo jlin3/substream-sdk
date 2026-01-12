@@ -4,92 +4,144 @@
 
 Stream high-quality VR gameplay (1080p @ 30fps) from Quest headsets to web browsers.
 
+---
+
+## Who Is This For?
+
+### Game Developers (SDK Users)
+
+**Want to add streaming to your Unity game?** You're in the right place!
+
+```
+You integrate the SDK → Your users stream → Parents watch on web
+```
+
+**Start here:** [SDK_STREAMING_GUIDE.md](SDK_STREAMING_GUIDE.md)
+
+You do NOT need to:
+- Set up any backend servers
+- Configure AWS or databases
+- Run the `IVSBackend/` or `WebappBackend/` code
+
+Just import the SDK, configure your API credentials, and start streaming!
+
+---
+
+### Service Operators (k-ID/Bezi)
+
+**Hosting the streaming infrastructure?** See the backend setup guides.
+
+| Backend | Guide | Description |
+|---------|-------|-------------|
+| **IVS** (Recommended) | [IVS_BACKEND_SETUP.md](IVS_BACKEND_SETUP.md) | AWS IVS + automatic recording |
+| **WebRTC** | [DEVELOPER_SETUP.md](DEVELOPER_SETUP.md) | WebRTC signaling server |
+
+The `IVSBackend/` and `WebappBackend/` directories contain server code that SDK users do NOT run.
+
+---
+
+## Quick Start (Game Developers)
+
+### 1. Import the SDK
+
+Copy to your Unity project:
+```
+UnityProject/Assets/Scripts/  →  YourProject/Assets/Scripts/
+UnityProject/Plugins/         →  YourProject/Plugins/
+```
+
+### 2. Add Streaming Component
+
+1. Add `IVSStreamControl` component to a GameObject
+2. Configure:
+   - **Backend URL**: Your k-ID API endpoint
+   - **Child ID**: User ID from your auth system
+   - **Auth Token**: Auth token from your auth system
+
+### 3. Start Streaming
+
+```csharp
+// Start streaming
+streamControl.StartStreaming();
+
+// Stop streaming
+streamControl.StopStreaming();
+
+// Or use keyboard shortcut: Press 'U' to toggle
+```
+
+### 4. Watch the Stream
+
+Open the web viewer: `examples/web-viewer/index.html`
+
+**Full guide:** [SDK_STREAMING_GUIDE.md](SDK_STREAMING_GUIDE.md)
+
+---
+
 ## Streaming Approaches
 
 This SDK supports **two streaming approaches**:
 
-| Feature | WebRTC (main branch) | IVS (feature/ivs-streaming) |
-|---------|---------------------|---------------------------|
-| **Latency** | < 500ms | 2-5 seconds |
-| **Recording** | Client-side | Automatic to S3 |
-| **Scaling** | Self-managed TURN | AWS-managed |
-| **Cost** | TURN servers expensive | Pay-per-use |
-| **Best For** | Real-time interaction | VOD, reliability |
-
-**Choose WebRTC** if you need sub-second latency for interactive features.
+| Feature | IVS (Recommended) | WebRTC |
+|---------|-------------------|--------|
+| **Latency** | 2-5 seconds | < 500ms |
+| **Recording** | Automatic to S3 | Client-side |
+| **Scaling** | AWS-managed | Self-managed TURN |
+| **Cost** | Pay-per-use | TURN servers expensive |
+| **Best For** | VOD, reliability | Real-time interaction |
 
 **Choose IVS** if you need automatic recording and enterprise reliability.
 
----
-
-## Branch Structure
-
-- **`main`** - WebRTC-based streaming (original approach)
-- **`feature/ivs-streaming`** - AWS IVS-based streaming (recommended for production)
-
-```bash
-# For WebRTC streaming
-git checkout main
-
-# For IVS streaming (recommended)
-git checkout feature/ivs-streaming
-```
+**Choose WebRTC** if you need sub-second latency for interactive features.
 
 ---
 
-## Quick Start - IVS Streaming (Recommended)
+## Project Structure
 
-### 1. Switch to IVS branch
-```bash
-git checkout feature/ivs-streaming
 ```
-
-### 2. Start IVS Backend
-```bash
-cd IVSBackend
-pnpm install
-
-# Copy and configure environment
-cp env.example.txt .env
-# Edit .env with your credentials (see IVS_SETUP.md)
-
-pnpm db:generate
-pnpm db:migrate
-pnpm dev
+substream-sdk/
+├── SDK_STREAMING_GUIDE.md    # ← START HERE (Game Developers)
+├── examples/
+│   └── web-viewer/           # Simple stream viewer page
+│
+├── UnityProject/             # Unity SDK components
+│   ├── Assets/Scripts/
+│   │   ├── IVSStreamControl.cs    # IVS streaming (recommended)
+│   │   └── RenderStreamControl.cs # WebRTC streaming
+│   └── Plugins/              # Native libraries
+│
+├── IVSBackend/               # [OPERATORS ONLY] IVS backend server
+│   ├── src/app/api/streams/  # API routes
+│   ├── src/lib/streaming/    # IVS service layer
+│   └── prisma/               # Database schema
+│
+├── WebappBackend/            # [OPERATORS ONLY] WebRTC backend server
+│   ├── src/                  # Server code
+│   ├── client/               # Web receiver
+│   └── database/             # SQL schema
+│
+└── docs/                     # Additional documentation
 ```
-
-### 3. Test API
-```bash
-curl http://localhost:3000/api/health
-```
-
-### 4. Configure Unity
-1. Open `UnityProject/` in Unity 2023+
-2. Add `IVSStreamControl` component to a GameObject
-3. Set Backend URL: `http://localhost:3000`
-4. Press Play and press `U` to stream
-
-See [IVS_SETUP.md](IVS_SETUP.md) for complete instructions.
 
 ---
 
-## Quick Start - WebRTC Streaming
+## Documentation
 
-### 1. Start WebRTC Backend
-```bash
-cd WebappBackend
-npm install
-npm run dev
-```
+### For Game Developers
 
-### 2. Open Receiver
-Open `WebappBackend/client/public/receiver/index.html` in browser
+| Guide | Description |
+|-------|-------------|
+| **[SDK_STREAMING_GUIDE.md](SDK_STREAMING_GUIDE.md)** | Complete SDK integration guide |
+| **[examples/web-viewer/](examples/web-viewer/)** | Ready-to-use stream viewer |
 
-### 3. Start Unity
-1. Open `UnityProject/` in Unity 2023+
-2. Open `Stream-test` scene
-3. Press Play → Press `L` key
-4. Video appears in browser!
+### For Service Operators
+
+| Guide | Description |
+|-------|-------------|
+| **[IVS_BACKEND_SETUP.md](IVS_BACKEND_SETUP.md)** | AWS IVS backend setup |
+| **[IVS_MIGRATION.md](IVS_MIGRATION.md)** | Migrating from WebRTC to IVS |
+| **[DEVELOPER_SETUP.md](DEVELOPER_SETUP.md)** | WebRTC backend setup |
+| **[docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md)** | Production deployment |
 
 ---
 
@@ -104,123 +156,49 @@ Open `WebappBackend/client/public/receiver/index.html` in browser
 
 ---
 
-## Project Structure
+## Architecture
 
 ```
-substream-sdk/
-├── IVSBackend/              # IVS streaming backend (Next.js)
-│   ├── src/
-│   │   ├── app/api/streams/ # API routes
-│   │   └── lib/streaming/   # IVS service layer
-│   └── prisma/              # Database schema
-│
-├── WebappBackend/           # WebRTC streaming backend (Express)
-│   ├── src/                 # Server code
-│   ├── client/              # Web receiver
-│   └── database/            # SQL schema
-│
-├── UnityProject/            # Unity VR project
-│   ├── Assets/Scripts/
-│   │   ├── IVSStreamControl.cs    # IVS streaming
-│   │   └── RenderStreamControl.cs # WebRTC streaming
-│   └── Plugins/             # Native libraries
-│
-└── docs/                    # Additional documentation
-```
-
----
-
-## Documentation
-
-### IVS Streaming (feature/ivs-streaming branch)
-- **[IVS_SETUP.md](IVS_SETUP.md)** - Complete IVS setup guide
-- **[IVS_MIGRATION.md](IVS_MIGRATION.md)** - Migrating from WebRTC to IVS
-- **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Testing the IVS system
-
-### WebRTC Streaming (main branch)
-- **[DEVELOPER_SETUP.md](DEVELOPER_SETUP.md)** - Full deployment guide
-- **[SDK_INTEGRATION_GUIDE.md](SDK_INTEGRATION_GUIDE.md)** - Unity integration
-- **[docs/SETUP_CHECKLIST.md](docs/SETUP_CHECKLIST.md)** - Deployment checklist
-
-### General
-- **[docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md)** - Production guide
-- **[docs/WEB_APP_INTEGRATION.md](docs/WEB_APP_INTEGRATION.md)** - Frontend integration
-
----
-
-## Architecture - IVS Streaming
-
-```
-┌─────────────────┐     RTMPS      ┌─────────────────┐
-│   Unity VR      │ ─────────────> │  AWS IVS        │
-│  (IVSStream-    │                │  Channel        │
-│   Control.cs)   │                └────────┬────────┘
-└─────────────────┘                         │
-                                   Auto-Record to S3
-                                            │
-                                            v
-┌─────────────────┐     HLS        ┌─────────────────┐
-│  IVSBackend     │ <───────────── │  S3 Bucket      │
-│  (API Server)   │                │  (VOD Storage)  │
-└────────┬────────┘                └─────────────────┘
-         │
-         v
-┌─────────────────┐
-│  Web Viewer     │
-│  (IVS Player)   │
-└─────────────────┘
-```
-
-## Architecture - WebRTC Streaming
-
-```
-┌─────────────────┐
-│   Unity VR      │
-│  (RenderStream- │
-│   Control.cs)   │
-└────────┬────────┘
-         │ WebSocket
-         v
-┌─────────────────┐      ┌─────────────────┐
-│  WebappBackend  │─────>│  Supabase DB    │
-│  (Signaling)    │      └─────────────────┘
-└────────┬────────┘
-         │ WebRTC
-         v
-┌─────────────────┐
-│  Web Viewer     │
-│  (Browser)      │
-└─────────────────┘
+┌─────────────────┐                      ┌─────────────────┐
+│   Unity Game    │    ← SDK Users       │  Web Viewer     │
+│  (Your App)     │    integrate this    │  (Parents)      │
+└────────┬────────┘                      └────────┬────────┘
+         │                                        │
+         │ RTMPS                           HLS    │
+         │                                        │
+         v                                        v
+┌─────────────────────────────────────────────────────────┐
+│                   k-ID Hosted Service                   │
+│                                                         │
+│   ┌─────────────┐    ┌─────────────┐    ┌───────────┐  │
+│   │  API Server │    │  AWS IVS    │    │    S3     │  │
+│   │  (Backend)  │───>│  (Stream)   │───>│  (VODs)   │  │
+│   └─────────────┘    └─────────────┘    └───────────┘  │
+│                                                         │
+│   ← Service Operators manage this                       │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Cost Estimates
+## Platform Support
 
-### IVS Streaming
-- IVS Basic: ~$0.20/hour of streaming
-- S3 Storage: ~$0.023/GB
-- Total: $50-150/month for moderate usage
-
-### WebRTC Streaming
-- Railway: $20-50/month
-- Twilio TURN: $100-200/month
-- AWS S3: $20-50/month
-- Total: $155-371/month
+| Platform | Status | Notes |
+|----------|--------|-------|
+| Windows (Editor) | ✅ | Full streaming |
+| macOS (Editor) | ✅ | Full streaming |
+| Quest 2/3/Pro | ✅ | Android ARM64 |
+| iOS | 🔄 | Coming soon |
+| WebGL | ❌ | No native plugins |
 
 ---
 
 ## Getting Help
 
-1. Check the relevant setup guide:
-   - IVS: [IVS_SETUP.md](IVS_SETUP.md)
-   - WebRTC: [DEVELOPER_SETUP.md](DEVELOPER_SETUP.md)
-
-2. Review troubleshooting sections in guides
-
-3. Check backend logs:
-   - IVS: `cd IVSBackend && pnpm dev`
-   - WebRTC: `cd WebappBackend && npm run dev`
+1. **Game Developers**: Check [SDK_STREAMING_GUIDE.md](SDK_STREAMING_GUIDE.md)
+2. **Service Operators**: Check [IVS_BACKEND_SETUP.md](IVS_BACKEND_SETUP.md)
+3. Review Unity Console logs (filter by `[IVS]`)
+4. Contact k-ID support
 
 ---
 

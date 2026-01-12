@@ -2,7 +2,7 @@
 
 This guide helps you create the `.env` file for the **WebRTC backend** (`WebappBackend/`).
 
-> **Note**: If you're using the IVS streaming system, see `IVS_SETUP.md` in the repository root instead. This guide is for the WebRTC-based streaming approach.
+> **Note**: If you're using the IVS streaming system, see `IVS_BACKEND_SETUP.md` in the repository root instead. This guide is for the WebRTC-based streaming approach.
 
 ## Quick Setup
 

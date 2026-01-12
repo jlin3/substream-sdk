@@ -35,7 +35,7 @@ pnpm dev`}
       </pre>
       
       <h2>Documentation</h2>
-      <p>See <code>IVS_SETUP.md</code> in the repository root for complete setup instructions.</p>
+      <p>See <code>IVS_BACKEND_SETUP.md</code> in the repository root for setup instructions.</p>
     </main>
   );
 }

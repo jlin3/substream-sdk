@@ -1,0 +1,23 @@
+# Railway deployment configuration for IVS Streaming Backend
+# https://docs.railway.app/reference/config-as-code
+
+[build]
+builder = "nixpacks"
+buildCommand = "pnpm install && pnpm db:generate && pnpm build"
+
+[deploy]
+startCommand = "pnpm start"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+# Environment variables are configured in Railway dashboard
+# Required:
+#   DATABASE_URL - PostgreSQL connection string
+#   AWS_REGION - AWS region (e.g., us-east-1)
+#   AWS_ACCESS_KEY_ID - AWS IAM access key
+#   AWS_SECRET_ACCESS_KEY - AWS IAM secret key
+#   IVS_RECORDING_CONFIG_ARN - IVS recording configuration ARN
+#   IVS_PLAYBACK_KEY_PAIR_ID - IVS playback key pair ID
+#   IVS_PLAYBACK_PRIVATE_KEY - EC private key for playback auth
