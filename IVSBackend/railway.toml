@@ -3,10 +3,10 @@
 
 [build]
 builder = "nixpacks"
-buildCommand = "npm install -g pnpm && pnpm install && pnpm db:generate && pnpm build"
+buildCommand = "corepack enable && pnpm install && pnpm db:generate && pnpm build"
 
 [deploy]
-startCommand = "pnpm start"
+startCommand = "corepack enable && pnpm start"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 60
 restartPolicyType = "on_failure"

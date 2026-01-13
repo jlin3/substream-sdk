@@ -2,10 +2,10 @@
 # Root directory should be set to IVSBackend in Railway
 
 [phases.setup]
-nixPkgs = ["nodejs_20"]
+nixPkgs = ["nodejs_20", "nodePackages.pnpm"]
 
 [phases.install]
-cmds = ["npm install -g pnpm && pnpm install"]
+cmds = ["pnpm install"]
 
 [phases.build]  
 cmds = ["pnpm db:generate && pnpm build"]
