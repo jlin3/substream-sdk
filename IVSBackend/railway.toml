@@ -3,10 +3,10 @@
 
 [build]
 builder = "nixpacks"
-buildCommand = "corepack enable && pnpm install && pnpm db:generate && pnpm build"
+buildCommand = "npm install && npx prisma generate && npm run build"
 
 [deploy]
-startCommand = "corepack enable && pnpm start"
+startCommand = "npm start"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 60
 restartPolicyType = "on_failure"
