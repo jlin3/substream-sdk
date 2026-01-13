@@ -66,8 +66,17 @@ export async function GET(
 
 function extractUserIdFromAuth(authHeader: string): string | null {
   const match = authHeader.match(/^Bearer\s+(.+)$/);
-  if (match) {
-    return match[1];
-  }
-  return null;
+  if (!match) return null;
+  
+  const token = match[1];
+  
+  // Demo token mapping for SDK users to test immediately
+  const demoTokens: Record<string, string> = {
+    'demo-token': 'demo-user-001',
+    'demo-viewer-token': 'demo-viewer-001',
+    'test-token': 'test-user-id',
+    'test-parent-token': 'test-parent-user-id',
+  };
+  
+  return demoTokens[token] || token;
 }

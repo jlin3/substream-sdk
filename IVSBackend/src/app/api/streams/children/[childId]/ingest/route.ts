@@ -58,20 +58,28 @@ export async function POST(
 }
 
 /**
- * Placeholder for auth extraction
- * Replace with your actual auth implementation
+ * Extract user ID from auth header
+ * Supports demo tokens for SDK testing
  */
 function extractUserIdFromAuth(authHeader: string): string | null {
-  // Example: Bearer <token>
-  // In production, verify the JWT and extract the user ID
-  
-  // For development, accept a simple Bearer userId format
   const match = authHeader.match(/^Bearer\s+(.+)$/);
-  if (match) {
-    // TODO: Verify JWT and extract user ID
-    // For now, return the token as the user ID (development only!)
-    return match[1];
+  if (!match) return null;
+  
+  const token = match[1];
+  
+  // Demo token mapping for SDK users to test immediately
+  const demoTokens: Record<string, string> = {
+    'demo-token': 'demo-user-001',           // Demo child (streamer)
+    'demo-viewer-token': 'demo-viewer-001',  // Demo parent (viewer)
+    'test-token': 'test-user-id',            // Test child
+    'test-parent-token': 'test-parent-user-id', // Test parent
+  };
+  
+  if (demoTokens[token]) {
+    return demoTokens[token];
   }
   
-  return null;
+  // TODO: In production, verify JWT and extract user ID
+  // For now, treat the token as a user ID (development only)
+  return token;
 }
