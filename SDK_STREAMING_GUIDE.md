@@ -22,24 +22,24 @@ Want to test streaming immediately? Use our demo credentials:
 
 | Setting | Value |
 |---------|-------|
-| **Demo API** | `https://substream-ivs.up.railway.app` |
+| **Demo API** | `https://substream-sdk-production.up.railway.app` |
 | **Demo Child ID** | `demo-child-001` |
 | **Demo Auth Token** | `demo-token` |
-| **Demo Viewer** | `https://substream-viewer.up.railway.app` |
+| **Demo Viewer** | Open `examples/web-viewer/index.html` in your browser |
 
-> **Note**: Demo URLs are placeholders - check the [Substream website](https://substream.dev) for current demo endpoints.
+> **Note**: Demo credentials allow you to test streaming immediately. For production use, integrate with k-ID authentication.
 
 ### Quick Test Steps
 
 1. Import the SDK into Unity (see Step 1 below)
 2. Add `IVSStreamControl` component to a GameObject
 3. Set these values in the Inspector:
-   - **Backend URL**: `https://substream-ivs.up.railway.app`
+   - **Backend URL**: `https://substream-sdk-production.up.railway.app`
    - **Child ID**: `demo-child-001`
    - **Auth Token**: `demo-token`
 4. Press Play in Unity
 5. Press `U` to start streaming
-6. Open the Demo Viewer URL to watch your stream!
+6. Open `examples/web-viewer/index.html` in your browser to watch your stream!
 
 ---
 
