@@ -1,0 +1,14 @@
+# Nixpacks configuration for IVS Streaming Backend
+# Root directory should be set to IVSBackend in Railway
+
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["npm install -g pnpm && pnpm install"]
+
+[phases.build]  
+cmds = ["pnpm db:generate && pnpm build"]
+
+[start]
+cmd = "pnpm start"
