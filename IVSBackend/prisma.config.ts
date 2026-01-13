@@ -7,7 +7,6 @@ import 'dotenv/config';
 const connectionString = process.env.DATABASE_URL || 'postgresql://localhost:5432/substream';
 
 export default defineConfig({
-  earlyAccess: true,
   schema: path.join(__dirname, 'prisma/schema.prisma'),
   migrate: {
     adapter: async () => {
