@@ -1,12 +1,18 @@
 /**
  * Ingest Provisioning API
- * Provides RTMPS ingest credentials for a child's Stream SDK
+ * Provides streaming credentials for a child's Stream SDK
  * 
  * POST /api/streams/children/:childId/ingest
+ * 
+ * Query parameters:
+ *   mode: 'webrtc' (default) | 'rtmps'
+ *     - webrtc: IVS Real-Time for WebRTC streaming (recommended)
+ *     - rtmps: Legacy RTMPS streaming (requires FFmpeg native library)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getIngestProvisioning, StreamingError } from '@/lib/streaming';
+import { getRealTimeIngestProvisioning } from '@/lib/streaming/stream-realtime-service';
 
 export async function POST(
   request: NextRequest,
@@ -14,6 +20,10 @@ export async function POST(
 ) {
   try {
     const { childId } = await params;
+    
+    // Check ingest mode (webrtc is default)
+    const searchParams = request.nextUrl.searchParams;
+    const mode = searchParams.get('mode') || 'webrtc';
     
     // TODO: Replace with actual auth extraction from session/token
     // This should come from your auth system
@@ -34,9 +44,21 @@ export async function POST(
       );
     }
 
-    const result = await getIngestProvisioning(childId, requestingUserId);
-
-    return NextResponse.json(result);
+    if (mode === 'webrtc') {
+      // New WebRTC mode using IVS Real-Time
+      const result = await getRealTimeIngestProvisioning(childId, requestingUserId);
+      return NextResponse.json({
+        mode: 'webrtc',
+        ...result,
+      });
+    } else {
+      // Legacy RTMPS mode (requires FFmpeg native library)
+      const result = await getIngestProvisioning(childId, requestingUserId);
+      return NextResponse.json({
+        mode: 'rtmps',
+        ...result,
+      });
+    }
   } catch (error) {
     console.error('Ingest provisioning error:', error);
     console.error('Error stack:', error instanceof Error ? error.stack : 'no stack');

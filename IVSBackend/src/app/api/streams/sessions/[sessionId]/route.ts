@@ -4,10 +4,14 @@
  * 
  * GET /api/streams/sessions/:sessionId - Get session info
  * DELETE /api/streams/sessions/:sessionId - End session
+ * 
+ * Query parameters for DELETE:
+ *   mode: 'webrtc' (default) | 'rtmps'
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionInfo, endStreamSession, StreamingError } from '@/lib/streaming';
+import { endRealTimeSession } from '@/lib/streaming/stream-realtime-service';
 
 export async function GET(
   request: NextRequest,
@@ -50,6 +54,10 @@ export async function DELETE(
   try {
     const { sessionId } = await params;
     
+    // Check session mode
+    const searchParams = request.nextUrl.searchParams;
+    const mode = searchParams.get('mode') || 'webrtc';
+    
     // Auth check
     const authHeader = request.headers.get('authorization');
     if (!authHeader) {
@@ -67,7 +75,13 @@ export async function DELETE(
       );
     }
 
-    await endStreamSession(sessionId, requestingUserId);
+    if (mode === 'webrtc') {
+      // WebRTC mode - also stops compositions
+      await endRealTimeSession(sessionId, requestingUserId);
+    } else {
+      // Legacy RTMPS mode
+      await endStreamSession(sessionId, requestingUserId);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
