@@ -5,9 +5,9 @@
  * POST /api/streams/children/:childId/ingest
  * 
  * Query parameters:
- *   mode: 'webrtc' (default) | 'rtmps'
- *     - webrtc: IVS Real-Time for WebRTC streaming (recommended)
- *     - rtmps: Legacy RTMPS streaming (requires FFmpeg native library)
+ *   mode: 'rtmps' (default) | 'webrtc'
+ *     - rtmps: RTMPS streaming via IVS Low-Latency (current, requires FFmpeg)
+ *     - webrtc: IVS Real-Time WebRTC streaming (experimental)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,9 +21,9 @@ export async function POST(
   try {
     const { childId } = await params;
     
-    // Check ingest mode (webrtc is default)
+    // Check ingest mode (rtmps is default for backward compatibility)
     const searchParams = request.nextUrl.searchParams;
-    const mode = searchParams.get('mode') || 'webrtc';
+    const mode = searchParams.get('mode') || 'rtmps';
     
     // TODO: Replace with actual auth extraction from session/token
     // This should come from your auth system

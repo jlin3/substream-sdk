@@ -21,9 +21,9 @@ export async function GET(
   try {
     const { childId } = await params;
     
-    // Check playback mode
+    // Check playback mode (rtmps/hls is default for backward compatibility)
     const searchParams = request.nextUrl.searchParams;
-    const mode = searchParams.get('mode') || 'webrtc';
+    const mode = searchParams.get('mode') || 'hls';
     
     // TODO: Replace with actual auth extraction from session/token
     const authHeader = request.headers.get('authorization');

@@ -54,9 +54,9 @@ export async function DELETE(
   try {
     const { sessionId } = await params;
     
-    // Check session mode
+    // Check session mode (rtmps is default for backward compatibility)
     const searchParams = request.nextUrl.searchParams;
-    const mode = searchParams.get('mode') || 'webrtc';
+    const mode = searchParams.get('mode') || 'rtmps';
     
     // Auth check
     const authHeader = request.headers.get('authorization');
