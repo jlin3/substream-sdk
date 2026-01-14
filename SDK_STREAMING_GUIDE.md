@@ -24,10 +24,11 @@ Want to test streaming immediately? Use our demo credentials:
 |---------|-------|
 | **Demo API** | `https://substream-sdk-production.up.railway.app` |
 | **Demo Child ID** | `demo-child-001` |
-| **Demo Auth Token** | `demo-token` |
+| **Streaming Token** | `demo-token` (for Unity - starts the stream) |
+| **Viewer Token** | `demo-viewer-token` (for web viewer - watches the stream) |
 | **Demo Viewer** | Open `examples/web-viewer/index.html` in your browser |
 
-> **Note**: Demo credentials allow you to test streaming immediately. For production use, integrate with k-ID authentication.
+> **Note**: Demo credentials allow you to test streaming immediately. The streaming token is for the Unity child, the viewer token is for the parent watching. For production use, integrate with k-ID authentication.
 
 ### Quick Test Steps
 
