@@ -19,12 +19,10 @@ function getEncryptionKey(): Buffer {
   const keyHex = process.env.STREAM_KEY_ENCRYPTION_KEY;
   
   if (!keyHex) {
-    // In development, use a default key (NOT for production!)
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[Encryption] Using development encryption key - NOT FOR PRODUCTION');
-      return Buffer.from('0'.repeat(64), 'hex');
-    }
-    throw new Error('STREAM_KEY_ENCRYPTION_KEY environment variable is required');
+    // Use a default demo key (NOT secure for production with real users!)
+    console.warn('[Encryption] STREAM_KEY_ENCRYPTION_KEY not set - using demo key');
+    // Demo key - this allows SDK testing without full setup
+    return Buffer.from('8af6b8fb7572d8f31767f27b809445ccf1dc97e5c64073a46ecaccdb7b0c333c', 'hex');
   }
 
   if (keyHex.length !== 64) {
