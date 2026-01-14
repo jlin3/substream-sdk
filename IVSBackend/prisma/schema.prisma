@@ -109,7 +109,7 @@ model ChildStreamChannel {
   child                 ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
   
   // IVS Real-Time Stage Info (WebRTC streaming)
-  ivsStageArn           String?
+  ivsStageArn           String?  @map("ivsstagearn")
   
   // IVS Low-Latency Channel Info (legacy RTMPS or HLS output)
   ivsChannelArn         String   @unique
