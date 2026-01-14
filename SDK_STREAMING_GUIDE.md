@@ -79,9 +79,9 @@ UnityProject/Plugins/            →  YourProject/Plugins/
 
 | Setting | Value | Description |
 |---------|-------|-------------|
-| **Backend URL** | `https://api.kid.com` | Your k-ID API endpoint |
-| **Child ID** | *(from your app)* | User ID from your authentication |
-| **Auth Token** | *(from your app)* | Auth token from your authentication |
+| **Backend URL** | `https://substream-sdk-production.up.railway.app` | API endpoint (use demo URL or your own) |
+| **Child ID** | `demo-child-001` | Use demo ID or your user's ID |
+| **Auth Token** | `demo-token` | Use demo token or your user's auth token |
 
 ![Inspector Configuration](docs/images/ivs-inspector.png)
 
