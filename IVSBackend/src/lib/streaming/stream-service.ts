@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   createChannel,
   createStreamKey,
+  listStreamKeys,
   getStream,
   stopStream,
 } from './ivs-client';
@@ -80,8 +81,27 @@ export async function ensureChannelForChild(childId: string): Promise<{
     },
   });
 
-  // Create stream key
-  const streamKey = await createStreamKey(ivsChannel.arn);
+  // Get or create stream key
+  let streamKey;
+  try {
+    // First check if any stream keys already exist for this channel
+    const existingKeys = await listStreamKeys(ivsChannel.arn);
+    if (existingKeys.length > 0) {
+      streamKey = existingKeys[0];
+    } else {
+      // Create new stream key
+      streamKey = await createStreamKey(ivsChannel.arn);
+    }
+  } catch (error) {
+    // If stream key creation fails due to quota, try to list and use existing
+    console.error('Stream key creation error, checking for existing keys:', error);
+    const existingKeys = await listStreamKeys(ivsChannel.arn);
+    if (existingKeys.length > 0) {
+      streamKey = existingKeys[0];
+    } else {
+      throw error; // Re-throw if we can't find any existing keys
+    }
+  }
 
   // Store in database
   const dbChannel = await prisma.childStreamChannel.create({
