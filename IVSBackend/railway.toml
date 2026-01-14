@@ -3,7 +3,8 @@
 
 [build]
 builder = "nixpacks"
-buildCommand = "npm install && npx prisma generate && npm run build"
+# Note: prisma db push applies schema changes to the database during build
+buildCommand = "npm install && npx prisma generate && npx prisma db push --skip-generate && npm run build"
 
 [deploy]
 startCommand = "npm start"
