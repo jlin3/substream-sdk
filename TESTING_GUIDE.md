@@ -280,9 +280,7 @@ SELECT * FROM "ChildStreamSession" ORDER BY "startedAt" DESC LIMIT 5;
 
 ## Test Data Setup
 
-If you need to create test users in the database:
-
-```sql
+If you need to create test users in the database:```sql
 -- Create test user
 INSERT INTO "User" (id, email, role, "displayName", "kidVerified", "createdAt", "updatedAt")
 VALUES ('test-user-id', 'test@example.com', 'CHILD', 'Test Child', true, NOW(), NOW());-- Create child profile
