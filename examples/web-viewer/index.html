@@ -481,7 +481,13 @@
                     throw new Error('No playback URL received');
                 }
                 
-                await loadHLSStream(data.playback.url);
+                // Append auth token if provided (required for private channels)
+                let playbackUrl = data.playback.url;
+                if (data.playback.token) {
+                    playbackUrl += `?token=${data.playback.token}`;
+                }
+                
+                await loadHLSStream(playbackUrl);
                 
             } catch (error) {
                 console.error('Failed to load stream:', error);
