@@ -95,6 +95,23 @@ namespace Substream.Streaming
                 Debug.LogError($"[FFmpegRTMP] Init failed: {LastError}");
                 return false;
             }
+            
+            // Early stub detection - check error buffer after init
+            string initError = NativeFFmpegBridge.GetError();
+            if (!string.IsNullOrEmpty(initError) && (initError.Contains("Stub") || initError.Contains("stub")))
+            {
+                Debug.LogWarning("╔════════════════════════════════════════════════════════════════╗");
+                Debug.LogWarning("║  ⚠️  STUB LIBRARY DETECTED - STREAMING WILL NOT WORK!          ║");
+                Debug.LogWarning("║                                                                ║");
+                Debug.LogWarning("║  The native FFmpeg library is a placeholder stub.             ║");
+                Debug.LogWarning("║  Frames will appear to send but no data reaches IVS.          ║");
+                Debug.LogWarning("║                                                                ║");
+                Debug.LogWarning("║  To fix: Build the real library:                              ║");
+                Debug.LogWarning("║    cd UnityProject/Plugins/Native                             ║");
+                Debug.LogWarning("║    ./build.sh macos                                           ║");
+                Debug.LogWarning("║  Then restart Unity.                                          ║");
+                Debug.LogWarning("╚════════════════════════════════════════════════════════════════╝");
+            }
 
             // Create readback texture for GPU -> CPU transfer
             _readbackTexture = new Texture2D(width, height, TextureFormat.RGBA32, false);
@@ -155,7 +172,24 @@ namespace Substream.Streaming
             }
 
             IsConnected = true;
-            Debug.Log("[FFmpegRTMP] Connected successfully");
+            
+            // Diagnostic: Check if stub library is being used
+            int state = NativeFFmpegBridge.rtmp_get_state();
+            string error = NativeFFmpegBridge.GetError();
+            Debug.Log($"[FFmpegRTMP] Connected successfully. Native state: {state}");
+            if (!string.IsNullOrEmpty(error))
+            {
+                if (error.Contains("Stub") || error.Contains("stub"))
+                {
+                    Debug.LogWarning("[FFmpegRTMP] ⚠️ STUB LIBRARY DETECTED - Streaming will NOT work!");
+                    Debug.LogWarning("[FFmpegRTMP] Build the real native library: cd UnityProject/Plugins/Native && ./build.sh macos");
+                }
+                else
+                {
+                    Debug.Log($"[FFmpegRTMP] Native error buffer: {error}");
+                }
+            }
+            
             return true;
         }
 
