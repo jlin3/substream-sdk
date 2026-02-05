@@ -1,0 +1,375 @@
+'use client';
+
+import { useEffect, useRef, useState, useCallback } from 'react';
+
+/**
+ * IVS Real-Time Viewer Component
+ * 
+ * Uses the Amazon IVS Web Broadcast SDK to subscribe to a stage
+ * and display the publisher's video stream.
+ * 
+ * @see https://docs.aws.amazon.com/ivs/latest/RealTimeUserGuide/web-subscribe.html
+ */
+
+interface IvsRealTimeViewerProps {
+  token: string;
+  stageArn: string;
+  participantId: string;
+}
+
+type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+// Type definitions for IVS SDK (loaded dynamically)
+interface StageParticipantInfo {
+  id: string;
+  userId?: string;
+  isLocal: boolean;
+  attributes?: Record<string, string>;
+}
+
+interface StageStream {
+  streamType: 'video' | 'audio';
+  mediaStreamTrack: MediaStreamTrack;
+}
+
+interface StageStrategy {
+  stageStreamsToPublish(): StageStream[];
+  shouldPublishParticipant(info: StageParticipantInfo): boolean;
+  shouldSubscribeToParticipant(info: StageParticipantInfo): boolean;
+}
+
+interface StageEvents {
+  STAGE_CONNECTION_STATE_CHANGED: string;
+  STAGE_PARTICIPANT_JOINED: string;
+  STAGE_PARTICIPANT_LEFT: string;
+  STAGE_PARTICIPANT_STREAMS_ADDED: string;
+  STAGE_PARTICIPANT_STREAMS_REMOVED: string;
+}
+
+interface IVSBroadcastClient {
+  Stage: new (token: string, strategy: StageStrategy) => {
+    join(): Promise<void>;
+    leave(): void;
+    on(event: string, callback: (...args: unknown[]) => void): void;
+    off(event: string, callback: (...args: unknown[]) => void): void;
+  };
+  StageEvents: StageEvents;
+  SubscribeType: {
+    AUDIO_VIDEO: string;
+    AUDIO_ONLY: string;
+    NONE: string;
+  };
+}
+
+export default function IvsRealTimeViewer({ 
+  token, 
+  stageArn, 
+  participantId 
+}: IvsRealTimeViewerProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const stageRef = useRef<ReturnType<InstanceType<IVSBroadcastClient['Stage']>['join']> extends Promise<infer T> ? T : never>(null);
+  const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
+  const [error, setError] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [stats, setStats] = useState<{
+    bitrate?: number;
+    resolution?: string;
+    fps?: number;
+  }>({});
+
+  // Handle participant streams
+  const handleStreamsAdded = useCallback((participant: StageParticipantInfo, streams: StageStream[]) => {
+    console.log('[IVS Viewer] Streams added from:', participant.id, streams);
+    
+    // Only handle remote participants (publisher)
+    if (participant.isLocal) return;
+    
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
+
+    // Create a MediaStream from the received tracks
+    const mediaStream = new MediaStream();
+    
+    streams.forEach((stream) => {
+      console.log('[IVS Viewer] Adding track:', stream.streamType);
+      mediaStream.addTrack(stream.mediaStreamTrack);
+      
+      // Track stats for video
+      if (stream.streamType === 'video') {
+        const track = stream.mediaStreamTrack;
+        const settings = track.getSettings();
+        setStats(prev => ({
+          ...prev,
+          resolution: `${settings.width}x${settings.height}`,
+          fps: settings.frameRate,
+        }));
+      }
+    });
+
+    // Set the stream on the video element
+    videoEl.srcObject = mediaStream;
+    videoEl.play()
+      .then(() => {
+        setIsPlaying(true);
+        console.log('[IVS Viewer] Video playback started');
+      })
+      .catch((err) => {
+        console.error('[IVS Viewer] Autoplay failed:', err);
+        // Autoplay may be blocked - show play button
+        setIsPlaying(false);
+      });
+  }, []);
+
+  // Handle participant leaving (stream ended)
+  const handleStreamsRemoved = useCallback((participant: StageParticipantInfo) => {
+    console.log('[IVS Viewer] Streams removed from:', participant.id);
+    
+    if (participant.isLocal) return;
+    
+    const videoEl = videoRef.current;
+    if (videoEl) {
+      videoEl.srcObject = null;
+      setIsPlaying(false);
+    }
+  }, []);
+
+  // Initialize IVS SDK and connect to stage
+  useEffect(() => {
+    let stage: {
+      join(): Promise<void>;
+      leave(): void;
+      on(event: string, callback: (...args: unknown[]) => void): void;
+      off(event: string, callback: (...args: unknown[]) => void): void;
+    } | null = null;
+    let mounted = true;
+
+    async function initializeStage() {
+      try {
+        setConnectionState('connecting');
+        setError(null);
+
+        // Dynamically import the IVS Web Broadcast SDK
+        // This is required because it uses browser-only APIs
+        const IVSBroadcastClient = await import('amazon-ivs-web-broadcast') as unknown as IVSBroadcastClient;
+        
+        if (!mounted) return;
+
+        console.log('[IVS Viewer] SDK loaded, creating stage...');
+
+        // Create stage strategy (subscribe-only, no publishing)
+        const strategy: StageStrategy = {
+          stageStreamsToPublish: () => [], // We don't publish anything
+          shouldPublishParticipant: () => false, // Never publish
+          shouldSubscribeToParticipant: (info) => {
+            // Subscribe to all non-local participants
+            console.log('[IVS Viewer] Should subscribe to:', info.id, !info.isLocal);
+            return !info.isLocal;
+          },
+        };
+
+        // Create and join the stage
+        stage = new IVSBroadcastClient.Stage(token, strategy);
+
+        // Set up event handlers (cast to unknown[] for SDK compatibility)
+        stage.on(IVSBroadcastClient.StageEvents.STAGE_CONNECTION_STATE_CHANGED, 
+          (...args: unknown[]) => {
+            const state = args[0] as string;
+            console.log('[IVS Viewer] Connection state:', state);
+            if (state === 'connected') {
+              setConnectionState('connected');
+            } else if (state === 'disconnected') {
+              setConnectionState('disconnected');
+            }
+          }
+        );
+
+        stage.on(IVSBroadcastClient.StageEvents.STAGE_PARTICIPANT_JOINED,
+          (...args: unknown[]) => {
+            const info = args[0] as StageParticipantInfo;
+            console.log('[IVS Viewer] Participant joined:', info.id);
+          }
+        );
+
+        stage.on(IVSBroadcastClient.StageEvents.STAGE_PARTICIPANT_LEFT,
+          (...args: unknown[]) => {
+            const info = args[0] as StageParticipantInfo;
+            console.log('[IVS Viewer] Participant left:', info.id);
+            if (!info.isLocal) {
+              // Publisher left - stream ended
+              setError('Stream ended');
+            }
+          }
+        );
+
+        stage.on(IVSBroadcastClient.StageEvents.STAGE_PARTICIPANT_STREAMS_ADDED,
+          (...args: unknown[]) => {
+            const info = args[0] as StageParticipantInfo;
+            const streams = args[1] as StageStream[];
+            handleStreamsAdded(info, streams);
+          }
+        );
+
+        stage.on(IVSBroadcastClient.StageEvents.STAGE_PARTICIPANT_STREAMS_REMOVED,
+          (...args: unknown[]) => {
+            const info = args[0] as StageParticipantInfo;
+            handleStreamsRemoved(info);
+          }
+        );
+
+        // Join the stage
+        console.log('[IVS Viewer] Joining stage...');
+        await stage.join();
+        console.log('[IVS Viewer] Successfully joined stage');
+
+        if (mounted) {
+          stageRef.current = stage as unknown as null;
+        }
+      } catch (err) {
+        console.error('[IVS Viewer] Failed to initialize:', err);
+        if (mounted) {
+          setConnectionState('error');
+          setError(err instanceof Error ? err.message : 'Failed to connect to stream');
+        }
+      }
+    }
+
+    initializeStage();
+
+    // Cleanup on unmount
+    return () => {
+      mounted = false;
+      if (stage) {
+        console.log('[IVS Viewer] Leaving stage...');
+        stage.leave();
+      }
+    };
+  }, [token, handleStreamsAdded, handleStreamsRemoved]);
+
+  // Manual play button handler (for autoplay blocked scenarios)
+  const handlePlayClick = async () => {
+    const videoEl = videoRef.current;
+    if (videoEl && videoEl.srcObject) {
+      try {
+        await videoEl.play();
+        setIsPlaying(true);
+      } catch (err) {
+        console.error('[IVS Viewer] Play failed:', err);
+      }
+    }
+  };
+
+  return (
+    <div style={styles.container}>
+      {/* Video container */}
+      <div style={styles.videoWrapper}>
+        <video
+          ref={videoRef}
+          style={styles.video}
+          autoPlay
+          playsInline
+          muted={false}
+        />
+        
+        {/* Loading overlay */}
+        {connectionState === 'connecting' && (
+          <div style={styles.overlay}>
+            <div style={styles.spinner} />
+            <p>Connecting to stream...</p>
+          </div>
+        )}
+        
+        {/* Error overlay */}
+        {connectionState === 'error' && (
+          <div style={styles.overlay}>
+            <p style={{ color: '#ef4444' }}>{error || 'Connection error'}</p>
+          </div>
+        )}
+        
+        {/* Play button for autoplay blocked */}
+        {connectionState === 'connected' && !isPlaying && (
+          <div style={styles.overlay}>
+            <button onClick={handlePlayClick} style={styles.playButton}>
+              ▶ Play
+            </button>
+          </div>
+        )}
+        
+        {/* Stream ended overlay */}
+        {error === 'Stream ended' && (
+          <div style={styles.overlay}>
+            <p>The stream has ended</p>
+          </div>
+        )}
+      </div>
+      
+      {/* Stats bar */}
+      {isPlaying && (
+        <div style={styles.statsBar}>
+          {stats.resolution && <span>📺 {stats.resolution}</span>}
+          {stats.fps && <span>🎬 {stats.fps.toFixed(0)} fps</span>}
+          <span style={{ color: '#22c55e' }}>● Connected</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const styles: Record<string, React.CSSProperties> = {
+  container: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    backgroundColor: '#000',
+  },
+  videoWrapper: {
+    flex: 1,
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000',
+    minHeight: '300px',
+  },
+  video: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain',
+    backgroundColor: '#000',
+  },
+  overlay: {
+    position: 'absolute',
+    inset: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    gap: '1rem',
+  },
+  spinner: {
+    width: '48px',
+    height: '48px',
+    border: '4px solid #333',
+    borderTopColor: '#fff',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
+  playButton: {
+    padding: '1rem 2rem',
+    fontSize: '1.5rem',
+    backgroundColor: '#3b82f6',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    transition: 'transform 0.2s, background-color 0.2s',
+  },
+  statsBar: {
+    display: 'flex',
+    gap: '1rem',
+    padding: '0.5rem 1rem',
+    backgroundColor: '#111',
+    fontSize: '0.75rem',
+    color: '#888',
+  },
+};
