@@ -20,12 +20,12 @@ Add live streaming from your Unity game to a web viewer in 3 simple steps.
 
 The SDK supports two streaming modes:
 
-| Mode | Component | Protocol | Latency | Platform Support |
-|------|-----------|----------|---------|------------------|
-| **WebRTC** (Recommended) | `IVSRealTimeStreamControl` | WebRTC | <1 second | All platforms |
-| **RTMPS** (Legacy) | `IVSStreamControl` | RTMPS | 2-5 seconds | Requires native libs |
+| Mode | Component | Protocol | Latency | Platform Support | Status |
+|------|-----------|----------|---------|------------------|--------|
+| **RTMPS** (Stable) | `IVSStreamControl` | RTMPS | 2-5 seconds | Windows/macOS (native libs) | ✅ Production Ready |
+| **WebRTC** (Experimental) | `IVSRealTimeStreamControl` | WebRTC | <1 second | All platforms | ⚠️ Requires IVS Setup |
 
-> **Use WebRTC mode** - It uses Unity's built-in WebRTC package, works out of the box, and has lower latency!
+> **Current Recommendation**: Use **RTMPS mode** (`IVSStreamControl`) for reliable streaming. The WebRTC path requires additional IVS Real-Time setup that may not be available on the demo backend.
 
 ---
 
@@ -43,17 +43,20 @@ Want to test streaming immediately? Use our demo credentials:
 
 > **Note**: Demo credentials allow you to test streaming immediately. The streaming token is for the Unity child, the viewer token is for the parent watching. For production use, integrate with k-ID authentication.
 
-### Quick Test Steps (WebRTC Mode - Recommended)
+### Quick Test Steps (RTMPS Mode - Stable)
 
 1. Import the SDK into Unity (see Step 1 below)
-2. Add `IVSRealTimeStreamControl` component to a GameObject
+2. Add `IVSStreamControl` component to a GameObject
 3. Set these values in the Inspector:
    - **Backend URL**: `https://substream-sdk-production.up.railway.app`
    - **Child ID**: `demo-child-001`
    - **Auth Token**: `demo-token`
-4. Press Play in Unity
-5. Press `U` to start streaming
-6. Open `examples/web-viewer/index.html` in your browser to watch your stream!
+4. **Windows only**: Copy FFmpeg DLLs to `Plugins/x86_64/` (see Native Library Setup below)
+5. Press Play in Unity
+6. Press `U` to start streaming
+7. Open `examples/web-viewer/index.html` in your browser to watch your stream!
+
+> **Note for Windows**: The native FFmpeg library needs FFmpeg DLLs to work. See the "Native Library Setup" section in Step 1.
 
 ---
 
@@ -72,16 +75,32 @@ Copy these folders from the SDK into your Unity project:
 UnityProject/Assets/Scripts/     →  YourProject/Assets/Scripts/
 ```
 
-**Required files for WebRTC mode (Recommended):**
-- `Scripts/IVSRealTimeStreamControl.cs` - WebRTC streaming component
-
-**Required files for RTMPS mode (Legacy):**
+**Required files for RTMPS mode (Stable - Recommended):**
 - `Scripts/IVSStreamControl.cs` - RTMPS streaming component
 - `Scripts/Streaming/FFmpegRTMPPublisher.cs` - Video encoding
 - `Scripts/Streaming/NativeFFmpegBridge.cs` - Native library interface
 - `Plugins/` - Native streaming libraries (per platform)
 
-**Also install Unity WebRTC package** (for WebRTC mode):
+**Required files for WebRTC mode (Experimental):**
+- `Scripts/IVSRealTimeStreamControl.cs` - WebRTC streaming component
+
+**Native Library Setup (RTMPS mode - Windows):**
+
+The RTMPS mode requires native FFmpeg libraries. On Windows:
+
+1. Download FFmpeg from https://www.gyan.dev/ffmpeg/builds/ (full build)
+2. Copy these DLLs from the `bin/` folder to `Plugins/x86_64/`:
+   - `avcodec-*.dll`
+   - `avformat-*.dll`
+   - `avutil-*.dll`
+   - `swscale-*.dll`
+   - `swresample-*.dll`
+3. Run `Plugins/verify-windows-deps.ps1` to verify setup
+4. Restart Unity
+
+On macOS, run: `cd UnityProject/Plugins/Native && ./build.sh macos`
+
+**For WebRTC mode** (experimental), install Unity WebRTC package:
 1. Open Window → Package Manager
 2. Click + → Add package from git URL
 3. Enter: `com.unity.webrtc@3.0.0-pre.7`
@@ -91,7 +110,30 @@ UnityProject/Assets/Scripts/     →  YourProject/Assets/Scripts/
 
 ## Step 2: Add Streaming to Your Scene
 
-### WebRTC Mode (Recommended)
+### RTMPS Mode (Stable - Recommended)
+
+1. **Create a GameObject** for streaming (or use an existing one)
+
+2. **Add the `IVSStreamControl` component**
+   - In Unity: `Add Component → IVSStreamControl`
+
+3. **Configure in the Inspector:**
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| **Backend URL** | `https://substream-sdk-production.up.railway.app` | API endpoint (use demo URL or your own) |
+| **Child ID** | `demo-child-001` | Use demo ID or your user's ID |
+| **Auth Token** | `demo-token` | Authentication token |
+
+4. **Set up your camera/render texture** (if using a specific source)
+
+5. **Press Play and press U** to start streaming
+
+---
+
+### WebRTC Mode (Experimental)
+
+> **Note**: WebRTC mode requires IVS Real-Time Stage to be configured on the backend. The demo backend may not have this set up. If you encounter "signaling not available" errors, use RTMPS mode instead.
 
 1. **Create a GameObject** for streaming (or use an existing one)
 

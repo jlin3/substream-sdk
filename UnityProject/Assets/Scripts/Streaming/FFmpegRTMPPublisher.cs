@@ -53,6 +53,7 @@ namespace Substream.Streaming
         
         private bool _disposed;
         private bool _asyncReadbackSupported;
+        private bool _warnedAboutStub;
 
         // ==========================================
         // INITIALIZATION
@@ -96,21 +97,9 @@ namespace Substream.Streaming
                 return false;
             }
             
-            // Early stub detection - check error buffer after init
-            string initError = NativeFFmpegBridge.GetError();
-            if (!string.IsNullOrEmpty(initError) && (initError.Contains("Stub") || initError.Contains("stub")))
+            if (NativeFFmpegBridge.IsStubLibrary(out string buildInfo))
             {
-                Debug.LogWarning("╔════════════════════════════════════════════════════════════════╗");
-                Debug.LogWarning("║  ⚠️  STUB LIBRARY DETECTED - STREAMING WILL NOT WORK!          ║");
-                Debug.LogWarning("║                                                                ║");
-                Debug.LogWarning("║  The native FFmpeg library is a placeholder stub.             ║");
-                Debug.LogWarning("║  Frames will appear to send but no data reaches IVS.          ║");
-                Debug.LogWarning("║                                                                ║");
-                Debug.LogWarning("║  To fix: Build the real library:                              ║");
-                Debug.LogWarning("║    cd UnityProject/Plugins/Native                             ║");
-                Debug.LogWarning("║    ./build.sh macos                                           ║");
-                Debug.LogWarning("║  Then restart Unity.                                          ║");
-                Debug.LogWarning("╚════════════════════════════════════════════════════════════════╝");
+                LogStubWarning("initialize", buildInfo);
             }
 
             // Create readback texture for GPU -> CPU transfer
@@ -175,19 +164,10 @@ namespace Substream.Streaming
             
             // Diagnostic: Check if stub library is being used
             int state = NativeFFmpegBridge.rtmp_get_state();
-            string error = NativeFFmpegBridge.GetError();
             Debug.Log($"[FFmpegRTMP] Connected successfully. Native state: {state}");
-            if (!string.IsNullOrEmpty(error))
+            if (NativeFFmpegBridge.IsStubLibrary(out string buildInfo))
             {
-                if (error.Contains("Stub") || error.Contains("stub"))
-                {
-                    Debug.LogWarning("[FFmpegRTMP] ⚠️ STUB LIBRARY DETECTED - Streaming will NOT work!");
-                    Debug.LogWarning("[FFmpegRTMP] Build the real native library: cd UnityProject/Plugins/Native && ./build.sh macos");
-                }
-                else
-                {
-                    Debug.Log($"[FFmpegRTMP] Native error buffer: {error}");
-                }
+                LogStubWarning("connect", buildInfo);
             }
             
             return true;
@@ -356,6 +336,42 @@ namespace Substream.Streaming
         private long GetTimestampMs()
         {
             return (long)(Time.realtimeSinceStartup * 1000);
+        }
+
+        private void LogStubWarning(string context, string buildInfo)
+        {
+            if (_warnedAboutStub) return;
+            _warnedAboutStub = true;
+
+            string buildSuffix = string.IsNullOrEmpty(buildInfo) ? string.Empty : $" Build info: {buildInfo}.";
+            Debug.LogWarning("╔════════════════════════════════════════════════════════════════╗");
+            Debug.LogWarning("║  WARNING: STUB LIBRARY DETECTED - STREAMING WILL NOT WORK.     ║");
+            Debug.LogWarning("║                                                                ║");
+            Debug.LogWarning("║  The native FFmpeg library is a placeholder stub.              ║");
+            Debug.LogWarning("║  Frames may appear to send but no data reaches IVS.            ║");
+            Debug.LogWarning($"║  Trigger: {context}.{buildSuffix.PadRight(53)}║");
+            Debug.LogWarning("║                                                                ║");
+            if (Application.platform == RuntimePlatform.WindowsEditor ||
+                Application.platform == RuntimePlatform.WindowsPlayer)
+            {
+                Debug.LogWarning("║  Windows: the bundled DLL is a stub placeholder.               ║");
+                Debug.LogWarning("║  Build a real DLL on Windows with FFmpeg:                      ║");
+                Debug.LogWarning("║    UnityProject/Plugins/Native/build.sh windows                ║");
+                Debug.LogWarning("║  Then replace Plugins/x86_64/ffmpeg_rtmp.dll and restart.      ║");
+            }
+            else if (Application.platform == RuntimePlatform.OSXEditor ||
+                     Application.platform == RuntimePlatform.OSXPlayer)
+            {
+                Debug.LogWarning("║  macOS: build the real library:                                ║");
+                Debug.LogWarning("║    cd UnityProject/Plugins/Native                              ║");
+                Debug.LogWarning("║    ./build.sh macos                                            ║");
+                Debug.LogWarning("║  Then restart Unity.                                           ║");
+            }
+            else
+            {
+                Debug.LogWarning("║  Build the real library for your platform (see Plugins/README).║");
+            }
+            Debug.LogWarning("╚════════════════════════════════════════════════════════════════╝");
         }
 
         // ==========================================

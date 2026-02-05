@@ -174,6 +174,18 @@ namespace Substream.Streaming
         private static extern IntPtr rtmp_get_error();
 
         /// <summary>
+        /// Check if this native library is a stub build (optional).
+        /// </summary>
+        [DllImport(LIBRARY_NAME, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int rtmp_is_stub();
+
+        /// <summary>
+        /// Get build info string (optional).
+        /// </summary>
+        [DllImport(LIBRARY_NAME, CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr rtmp_get_build_info();
+
+        /// <summary>
         /// Get last error as string.
         /// </summary>
         public static string GetError()
@@ -181,6 +193,54 @@ namespace Substream.Streaming
             IntPtr ptr = rtmp_get_error();
             if (ptr == IntPtr.Zero) return string.Empty;
             return Marshal.PtrToStringAnsi(ptr) ?? string.Empty;
+        }
+
+        /// <summary>
+        /// Try to read build info string from native library.
+        /// </summary>
+        public static bool TryGetBuildInfo(out string info)
+        {
+            info = string.Empty;
+            try
+            {
+                IntPtr ptr = rtmp_get_build_info();
+                if (ptr == IntPtr.Zero) return false;
+                info = Marshal.PtrToStringAnsi(ptr) ?? string.Empty;
+                return !string.IsNullOrEmpty(info);
+            }
+            catch (DllNotFoundException)
+            {
+                return false;
+            }
+            catch (EntryPointNotFoundException)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Determine if this native library is the stub build.
+        /// Falls back to error-buffer heuristics if optional export isn't present.
+        /// </summary>
+        public static bool IsStubLibrary(out string buildInfo)
+        {
+            buildInfo = string.Empty;
+            try
+            {
+                bool isStub = rtmp_is_stub() != 0;
+                TryGetBuildInfo(out buildInfo);
+                return isStub;
+            }
+            catch (DllNotFoundException)
+            {
+                return false;
+            }
+            catch (EntryPointNotFoundException)
+            {
+                // Optional symbol not present; fall back to error buffer.
+                string error = GetError();
+                return error.IndexOf("stub", StringComparison.OrdinalIgnoreCase) >= 0;
+            }
         }
 
         /// <summary>
@@ -210,18 +270,87 @@ namespace Substream.Streaming
         /// </summary>
         public static bool IsAvailable()
         {
+            return IsAvailable(out _);
+        }
+
+        /// <summary>
+        /// Check if native library is available, with diagnostic message.
+        /// </summary>
+        public static bool IsAvailable(out string diagnosticMessage)
+        {
+            diagnosticMessage = string.Empty;
             try
             {
                 rtmp_get_state();
                 return true;
             }
-            catch (DllNotFoundException)
+            catch (DllNotFoundException ex)
             {
+                diagnosticMessage = GetDllNotFoundDiagnostic(ex);
                 return false;
             }
-            catch (EntryPointNotFoundException)
+            catch (EntryPointNotFoundException ex)
             {
+                diagnosticMessage = $"Native library found but missing expected function: {ex.Message}";
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Generate helpful diagnostic message for DllNotFoundException.
+        /// On Windows, this often means FFmpeg dependency DLLs are missing.
+        /// </summary>
+        private static string GetDllNotFoundDiagnostic(DllNotFoundException ex)
+        {
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+            return $"Native library not found: {ex.Message}\n\n" +
+                   "On Windows, this usually means FFmpeg DLLs are missing.\n" +
+                   "Copy these from your FFmpeg bin/ folder to Plugins/x86_64/:\n" +
+                   "  - avcodec-*.dll\n" +
+                   "  - avformat-*.dll\n" +
+                   "  - avutil-*.dll\n" +
+                   "  - swscale-*.dll\n" +
+                   "  - swresample-*.dll\n" +
+                   "  - (and their dependencies like libx264, zlib, etc.)\n\n" +
+                   "Then restart Unity.\n" +
+                   "Run Plugins/verify-windows-deps.ps1 to check.";
+#elif UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
+            return $"Native library not found: {ex.Message}\n\n" +
+                   "On macOS, check:\n" +
+                   "  1. libffmpeg_rtmp.dylib exists in Plugins/macOS/\n" +
+                   "  2. Library is code-signed or allowed in Security settings\n" +
+                   "  3. FFmpeg is installed (brew install ffmpeg)\n" +
+                   "Then restart Unity.";
+#else
+            return $"Native library not found: {ex.Message}";
+#endif
+        }
+
+        /// <summary>
+        /// Log detailed library status to Unity console.
+        /// Call this during initialization to help diagnose issues.
+        /// </summary>
+        public static void LogLibraryStatus()
+        {
+            UnityEngine.Debug.Log("[FFmpegRTMP] Checking native library status...");
+            
+            if (IsAvailable(out string diagnostic))
+            {
+                if (IsStubLibrary(out string buildInfo))
+                {
+                    UnityEngine.Debug.LogWarning($"[FFmpegRTMP] Library loaded but is STUB build. Build info: {buildInfo}");
+                    UnityEngine.Debug.LogWarning("[FFmpegRTMP] Streaming will not work. Build real library with FFmpeg.");
+                }
+                else
+                {
+                    string info = string.Empty;
+                    TryGetBuildInfo(out info);
+                    UnityEngine.Debug.Log($"[FFmpegRTMP] Native library loaded successfully. Build: {(string.IsNullOrEmpty(info) ? "unknown" : info)}");
+                }
+            }
+            else
+            {
+                UnityEngine.Debug.LogError($"[FFmpegRTMP] Native library NOT available!\n{diagnostic}");
             }
         }
 

@@ -69,6 +69,7 @@ public class IVSRealTimeStreamControl : MonoBehaviour
     private bool isStreaming = false;
     private string currentSessionId;
     private RealTimeIngestConfig ingestConfig;
+    private bool iceGatheringComplete = false;
     
     // WebRTC components
     private RTCPeerConnection peerConnection;
@@ -144,7 +145,9 @@ public class IVSRealTimeStreamControl : MonoBehaviour
     private IEnumerator InitializeWebRTC()
     {
         // Initialize Unity WebRTC
-        WebRTC.Initialize();
+        // Note: In newer Unity WebRTC versions (3.0+), Initialize() is automatic
+        // For older versions, uncomment the line below:
+        // WebRTC.Initialize();
         
         // Wait a frame for initialization
         yield return null;
@@ -177,7 +180,9 @@ public class IVSRealTimeStreamControl : MonoBehaviour
         
         // Cleanup WebRTC
         CleanupWebRTC();
-        WebRTC.Dispose();
+        // Note: In newer Unity WebRTC versions (3.0+), Dispose() is automatic
+        // For older versions, uncomment the line below:
+        // WebRTC.Dispose();
         
         if (streamTexture != null)
         {
@@ -253,6 +258,19 @@ public class IVSRealTimeStreamControl : MonoBehaviour
     {
         var config = GetRTCConfiguration();
         peerConnection = new RTCPeerConnection(ref config);
+        
+        // Reset ICE gathering state
+        iceGatheringComplete = false;
+        
+        // Use callback for ICE gathering state (property access varies by Unity WebRTC version)
+        peerConnection.OnIceGatheringStateChange = state =>
+        {
+            Debug.Log($"[IVS-RT] ICE gathering state: {state}");
+            if (state == RTCIceGatheringState.Complete)
+            {
+                iceGatheringComplete = true;
+            }
+        };
         
         peerConnection.OnIceCandidate = OnIceCandidate;
         peerConnection.OnIceConnectionChange = OnIceConnectionChange;
@@ -411,39 +429,45 @@ public class IVSRealTimeStreamControl : MonoBehaviour
         
         UpdateStatus("Setting up WebRTC...");
         
-        // 3. Setup WebRTC peer connection
+        // 3. Setup WebRTC peer connection (no try-catch around yield)
+        // Enable stream camera
+        streamCamera.enabled = true;
+        
+        // Setup peer connection and media tracks
+        string setupError = null;
         try
         {
-            // Enable stream camera
-            streamCamera.enabled = true;
-            
-            // Setup peer connection and media tracks
             CleanupWebRTC(); // Cleanup any previous connection
             SetupPeerConnection();
             SetupMediaTracks();
-            
-            // 4. Connect to IVS Real-Time Stage
-            yield return StartCoroutine(ConnectToStage());
-            
-            isStreaming = true;
-            _framesSent = 0;
-            
-            // Start heartbeat
-            heartbeatCoroutine = StartCoroutine(HeartbeatLoop());
-            
-            UpdateStatus("🔴 LIVE (WebRTC)");
-            Debug.Log($"[IVS-RT] Streaming started. Session: {currentSessionId}");
-            Debug.Log($"[IVS-RT] Stage: {ingestConfig.stageArn}");
-            
-            OnStartStreaming?.Invoke();
         }
         catch (Exception e)
         {
-            ShowError($"Failed to start WebRTC: {e.Message}");
+            setupError = e.Message;
+        }
+        
+        if (setupError != null)
+        {
+            ShowError($"Failed to setup WebRTC: {setupError}");
             streamCamera.enabled = false;
             CleanupWebRTC();
             yield break;
         }
+        
+        // 4. Connect to IVS Real-Time Stage
+        yield return StartCoroutine(ConnectToStage());
+        
+        isStreaming = true;
+        _framesSent = 0;
+        
+        // Start heartbeat
+        heartbeatCoroutine = StartCoroutine(HeartbeatLoop());
+        
+        UpdateStatus("🔴 LIVE (WebRTC)");
+        Debug.Log($"[IVS-RT] Streaming started. Session: {currentSessionId}");
+        Debug.Log($"[IVS-RT] Stage: {ingestConfig.stageArn}");
+        
+        OnStartStreaming?.Invoke();
     }
     
     private IEnumerator ConnectToStage()
@@ -454,7 +478,8 @@ public class IVSRealTimeStreamControl : MonoBehaviour
         
         if (offerOp.IsError)
         {
-            throw new Exception($"Create offer failed: {offerOp.Error.message}");
+            Debug.LogError($"[IVS-RT] Create offer failed: {offerOp.Error.message}");
+            yield break;
         }
         
         var offer = offerOp.Desc;
@@ -463,21 +488,22 @@ public class IVSRealTimeStreamControl : MonoBehaviour
         
         if (setLocalOp.IsError)
         {
-            throw new Exception($"Set local description failed: {setLocalOp.Error.message}");
+            Debug.LogError($"[IVS-RT] Set local description failed: {setLocalOp.Error.message}");
+            yield break;
         }
         
         Debug.Log("[IVS-RT] Local description set, waiting for ICE gathering...");
         
-        // Wait for ICE gathering to complete
+        // Wait for ICE gathering to complete (using callback flag, not property)
         float timeout = 10f;
         float elapsed = 0f;
-        while (peerConnection.IceGatheringState != RTCIceGatheringState.Complete && elapsed < timeout)
+        while (!iceGatheringComplete && elapsed < timeout)
         {
             yield return new WaitForSeconds(0.1f);
             elapsed += 0.1f;
         }
         
-        Debug.Log($"[IVS-RT] ICE gathering state: {peerConnection.IceGatheringState}");
+        Debug.Log($"[IVS-RT] ICE gathering complete: {iceGatheringComplete}");
         
         // Send offer to IVS via WHIP-like endpoint
         // Note: IVS Real-Time uses participant tokens, not traditional WHIP
@@ -538,21 +564,44 @@ public class IVSRealTimeStreamControl : MonoBehaviour
                     
                     if (setRemoteOp.IsError)
                     {
-                        throw new Exception($"Set remote description failed: {setRemoteOp.Error.message}");
+                        Debug.LogError($"[IVS-RT] Set remote description failed: {setRemoteOp.Error.message}");
                     }
-                    
-                    Debug.Log("[IVS-RT] Remote description set, connection established");
+                    else
+                    {
+                        Debug.Log("[IVS-RT] Remote description set, connection established");
+                    }
+                }
+                else if (!string.IsNullOrEmpty(response.error))
+                {
+                    // Server returned helpful error info
+                    Debug.LogWarning($"[IVS-RT] Signaling response: {response.error}");
+                    ShowWebRTCLimitationWarning();
                 }
             }
             else
             {
-                // If signaling endpoint doesn't exist, fall back to local-only mode
-                Debug.LogWarning($"[IVS-RT] Signaling not available: {request.error}");
-                Debug.LogWarning("[IVS-RT] Running in demo mode - video capture is working but not streaming to IVS");
-                Debug.LogWarning("[IVS-RT] To enable real streaming, implement IVS signaling bridge");
+                // Handle different response codes
+                long responseCode = request.responseCode;
+                string responseBody = request.downloadHandler?.text ?? "";
                 
-                // For demo purposes, we still mark as streaming to show the capture is working
-                // In production, this would be an error
+                if (responseCode == 501)
+                {
+                    // 501 Not Implemented - signaling bridge exists but SDP exchange not available
+                    Debug.LogWarning("[IVS-RT] WebRTC signaling not fully implemented on backend");
+                    ShowWebRTCLimitationWarning();
+                }
+                else if (responseCode == 404)
+                {
+                    // Endpoint doesn't exist
+                    Debug.LogWarning("[IVS-RT] Signaling endpoint not found");
+                    ShowWebRTCLimitationWarning();
+                }
+                else
+                {
+                    Debug.LogWarning($"[IVS-RT] Signaling failed ({responseCode}): {request.error}");
+                    Debug.LogWarning($"[IVS-RT] Response: {responseBody}");
+                    ShowWebRTCLimitationWarning();
+                }
             }
         }
     }
@@ -821,6 +870,28 @@ public class IVSRealTimeStreamControl : MonoBehaviour
         }
         Debug.LogError($"[IVS-RT] Error: {error}");
         OnError?.Invoke(error);
+    }
+    
+    private void ShowWebRTCLimitationWarning()
+    {
+        Debug.LogWarning("╔══════════════════════════════════════════════════════════════════╗");
+        Debug.LogWarning("║  IVS Real-Time WebRTC: Signaling Limitation                      ║");
+        Debug.LogWarning("║                                                                  ║");
+        Debug.LogWarning("║  IVS Real-Time uses proprietary signaling (not standard WebRTC).║");
+        Debug.LogWarning("║  Direct Unity WebRTC -> IVS connection requires their SDK.      ║");
+        Debug.LogWarning("║                                                                  ║");
+        Debug.LogWarning("║  RECOMMENDED: Use RTMPS path instead (IVSStreamControl.cs)      ║");
+        Debug.LogWarning("║    - Works with FFmpeg native library                           ║");
+        Debug.LogWarning("║    - Reliable, battle-tested                                    ║");
+        Debug.LogWarning("║    - See SDK_STREAMING_GUIDE.md for setup                       ║");
+        Debug.LogWarning("║                                                                  ║");
+        Debug.LogWarning("║  This WebRTC component is experimental until IVS adds WHIP.     ║");
+        Debug.LogWarning("╚══════════════════════════════════════════════════════════════════╝");
+        
+        if (_errorText != null)
+        {
+            _errorText.text = "WebRTC signaling not available - use IVSStreamControl.cs instead";
+        }
     }
     
     // ==========================================

@@ -153,6 +153,18 @@ RTMP_API int64_t rtmp_get_bytes_sent(void);
 RTMP_API int rtmp_get_frames_sent(void);
 RTMP_API int rtmp_get_dropped_frames(void);
 
+/**
+ * Identify whether this build is the stub implementation.
+ * Returns 1 for stub, 0 for real implementation.
+ */
+RTMP_API int rtmp_is_stub(void);
+
+/**
+ * Optional build info string (e.g. "stub" or "ffmpeg-bridge").
+ * May return NULL or empty if not available.
+ */
+RTMP_API const char* rtmp_get_build_info(void);
+
 #ifdef __cplusplus
 }
 #endif

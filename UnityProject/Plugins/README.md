@@ -46,6 +46,35 @@ cd Plugins/Native
 # Or use CMake directly on Windows
 ```
 
+Note: The `Plugins/x86_64/ffmpeg_rtmp.dll` included in this repo is a stub
+placeholder to allow the Unity project to load. It will log
+"STUB LIBRARY DETECTED" and will not stream. Replace it with a real build.
+
+#### Windows Runtime Dependencies (IMPORTANT)
+
+When you build `ffmpeg_rtmp.dll`, it dynamically links against FFmpeg libraries.
+You **must** copy the FFmpeg DLLs to the same folder for streaming to work:
+
+```
+UnityProject/Plugins/x86_64/
+├── ffmpeg_rtmp.dll          # Your built library
+├── avcodec-61.dll           # FFmpeg (version numbers may vary)
+├── avformat-61.dll
+├── avutil-59.dll
+├── swscale-8.dll
+├── swresample-5.dll
+└── (other deps: libx264-*.dll, zlib1.dll, etc.)
+```
+
+**Where to find these DLLs:**
+- If you used vcpkg: `<vcpkg-root>/installed/x64-windows/bin/`
+- If you downloaded from gyan.dev: `ffmpeg-*-shared/bin/`
+
+**Quick verification:** Run `verify-windows-deps.ps1` in PowerShell to check.
+
+Without these DLLs, Unity will either fail to load the library or crash when
+calling FFmpeg functions. The stream will appear to start but no data reaches IVS.
+
 Alternatively, cross-compile from macOS using mingw-w64:
 ```bash
 brew install mingw-w64

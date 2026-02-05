@@ -111,3 +111,10 @@ int rtmp_get_dropped_frames(void) {
     return g_dropped_frames;
 }
 
+int rtmp_is_stub(void) {
+    return 1;
+}
+
+const char* rtmp_get_build_info(void) {
+    return "stub";
+}
