@@ -1,12 +1,18 @@
 /**
  * Playback API
- * Provides HLS playback URL and token for parents watching their children
+ * Provides playback URL and token for parents watching their children
  * 
  * GET /api/streams/children/:childId/playback
+ * 
+ * Query parameters:
+ *   mode: 'webrtc' (default) | 'hls'
+ *     - webrtc: IVS Real-Time WebRTC playback (low latency)
+ *     - hls: Traditional HLS playback (wider compatibility)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlaybackForParent, StreamingError } from '@/lib/streaming';
+import { getRealTimePlaybackForParent } from '@/lib/streaming/stream-realtime-service';
 
 export async function GET(
   request: NextRequest,
@@ -14,6 +20,10 @@ export async function GET(
 ) {
   try {
     const { childId } = await params;
+    
+    // Check playback mode (rtmps/hls is default for backward compatibility)
+    const searchParams = request.nextUrl.searchParams;
+    const mode = searchParams.get('mode') || 'hls';
     
     // TODO: Replace with actual auth extraction from session/token
     const authHeader = request.headers.get('authorization');
@@ -33,9 +43,21 @@ export async function GET(
       );
     }
 
-    const result = await getPlaybackForParent(parentUserId, childId);
-
-    return NextResponse.json(result);
+    if (mode === 'webrtc') {
+      // New WebRTC mode using IVS Real-Time
+      const result = await getRealTimePlaybackForParent(parentUserId, childId);
+      return NextResponse.json({
+        mode: 'webrtc',
+        ...result,
+      });
+    } else {
+      // Legacy HLS mode
+      const result = await getPlaybackForParent(parentUserId, childId);
+      return NextResponse.json({
+        mode: 'hls',
+        ...result,
+      });
+    }
   } catch (error) {
     console.error('Playback error:', error);
 
@@ -55,8 +77,17 @@ export async function GET(
 
 function extractUserIdFromAuth(authHeader: string): string | null {
   const match = authHeader.match(/^Bearer\s+(.+)$/);
-  if (match) {
-    return match[1];
-  }
-  return null;
+  if (!match) return null;
+  
+  const token = match[1];
+  
+  // Demo token mapping for SDK users to test immediately
+  const demoTokens: Record<string, string> = {
+    'demo-token': 'demo-user-001',
+    'demo-viewer-token': 'demo-viewer-001',
+    'test-token': 'test-user-id',
+    'test-parent-token': 'test-parent-user-id',
+  };
+  
+  return demoTokens[token] || token;
 }

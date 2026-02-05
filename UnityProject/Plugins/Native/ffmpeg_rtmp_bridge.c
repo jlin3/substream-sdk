@@ -754,3 +754,10 @@ RTMP_API int rtmp_get_dropped_frames(void) {
     return g_rtmp.dropped_frames;
 }
 
+RTMP_API int rtmp_is_stub(void) {
+    return 0;
+}
+
+RTMP_API const char* rtmp_get_build_info(void) {
+    return "ffmpeg-bridge";
+}

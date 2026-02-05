@@ -108,13 +108,16 @@ model ChildStreamChannel {
   childId               String   @unique
   child                 ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
   
-  // IVS Channel Info
+  // IVS Real-Time Stage Info (WebRTC streaming)
+  ivsStageArn           String?  @map("ivsstagearn")
+  
+  // IVS Low-Latency Channel Info (legacy RTMPS or HLS output)
   ivsChannelArn         String   @unique
   ivsChannelName        String
   ivsPlaybackUrl        String
   ivsIngestEndpoint     String
   
-  // Stream Key (encrypted in production)
+  // Stream Key (encrypted in production) - for RTMPS ingest
   ivsStreamKeyArn       String?
   ivsStreamKeyValue     String?  // Should be encrypted
   

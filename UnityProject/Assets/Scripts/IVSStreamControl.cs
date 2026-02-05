@@ -132,6 +132,21 @@ public class IVSStreamControl : MonoBehaviour
     
     void Start()
     {
+        // Check for duplicate FFmpegRTMPPublisherBehaviour components
+        var duplicatePublisher = FindObjectOfType<Substream.Streaming.FFmpegRTMPPublisherBehaviour>();
+        if (duplicatePublisher != null)
+        {
+            Debug.LogWarning("╔════════════════════════════════════════════════════════════════╗");
+            Debug.LogWarning("║  ⚠️  DUPLICATE COMPONENT DETECTED                               ║");
+            Debug.LogWarning("║                                                                ║");
+            Debug.LogWarning("║  FFmpegRTMPPublisherBehaviour found in scene.                  ║");
+            Debug.LogWarning("║  This is NOT needed - IVSStreamControl handles streaming.     ║");
+            Debug.LogWarning("║                                                                ║");
+            Debug.LogWarning("║  Please REMOVE FFmpegRTMPPublisherBehaviour from your scene.  ║");
+            Debug.LogWarning("║  Only IVSStreamControl should be used.                        ║");
+            Debug.LogWarning("╚════════════════════════════════════════════════════════════════╝");
+        }
+        
         // Load auth token from PlayerPrefs if not set
         if (string.IsNullOrEmpty(authToken))
         {
@@ -415,18 +430,38 @@ public class IVSStreamControl : MonoBehaviour
             // Use FFmpeg publisher if available, otherwise stub
             if (ffmpegPublisher != null)
             {
+                Debug.Log($"[IVS] Attempting RTMPS connection...");
+                Debug.Log($"[IVS] Target: {ingestConfig.ingest.endpoint}");
+                
                 if (!ffmpegPublisher.Connect(rtmpUrl))
                 {
+                    Debug.LogError($"[IVS] ❌ Connection FAILED");
+                    Debug.LogError($"[IVS] Error: {ffmpegPublisher.LastError}");
+                    Debug.LogError($"[IVS] Native State: {Substream.Streaming.NativeFFmpegBridge.rtmp_get_state()}");
+                    Debug.LogError($"[IVS] Possible causes:");
+                    Debug.LogError($"[IVS]   - Network/firewall blocking RTMPS (port 443)");
+                    Debug.LogError($"[IVS]   - Invalid RTMP URL or stream key");
+                    Debug.LogError($"[IVS]   - Stub library being used instead of real FFmpeg");
                     throw new Exception($"FFmpeg connect failed: {ffmpegPublisher.LastError}");
                 }
                 
+                Debug.Log($"[IVS] ✅ Connected to IVS");
+                Debug.Log($"[IVS] Native State: {Substream.Streaming.NativeFFmpegBridge.rtmp_get_state()}");
+                Debug.Log($"[IVS] IsConnected: {ffmpegPublisher.IsConnected}");
+                
                 if (!ffmpegPublisher.StartStreaming())
                 {
+                    Debug.LogError($"[IVS] ❌ StartStreaming FAILED");
+                    Debug.LogError($"[IVS] Error: {ffmpegPublisher.LastError}");
                     throw new Exception($"FFmpeg start streaming failed: {ffmpegPublisher.LastError}");
                 }
+                
+                Debug.Log($"[IVS] ✅ Streaming started successfully");
+                Debug.Log($"[IVS] IsStreaming: {ffmpegPublisher.IsStreaming}");
             }
             else if (stubPublisher != null)
             {
+                Debug.LogWarning("[IVS] ⚠️ Using STUB publisher - streaming will be simulated only!");
                 stubPublisher.Connect(rtmpUrl);
                 stubPublisher.StartPublishing();
             }
@@ -441,9 +476,12 @@ public class IVSStreamControl : MonoBehaviour
             heartbeatCoroutine = StartCoroutine(HeartbeatLoop());
             
             UpdateStatus("🔴 LIVE");
+            Debug.Log($"[IVS] ═══════════════════════════════════════════════");
             Debug.Log($"[IVS] Streaming started. Session: {currentSessionId}");
             Debug.Log($"[IVS] RTMP URL: {ingestConfig.ingest.endpoint}");
             Debug.Log($"[IVS] Stream Key: {ingestConfig.ingest.streamKey.Substring(0, Math.Min(20, ingestConfig.ingest.streamKey.Length))}...");
+            Debug.Log($"[IVS] Using Native FFmpeg: {(ffmpegPublisher != null ? "YES" : "NO (stub)")}");
+            Debug.Log($"[IVS] ═══════════════════════════════════════════════");
             
             OnStartStreaming?.Invoke();
         }

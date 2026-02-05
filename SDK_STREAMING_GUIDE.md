@@ -16,30 +16,47 @@ Add live streaming from your Unity game to a web viewer in 3 simple steps.
 
 ---
 
+## Streaming Modes
+
+The SDK supports two streaming modes:
+
+| Mode | Component | Protocol | Latency | Platform Support | Status |
+|------|-----------|----------|---------|------------------|--------|
+| **RTMPS** (Stable) | `IVSStreamControl` | RTMPS | 2-5 seconds | Windows/macOS (native libs) | ✅ Production Ready |
+| **WebRTC** (Experimental) | `IVSRealTimeStreamControl` | WebRTC | <1 second | All platforms | ⚠️ Requires IVS Setup |
+
+> **Current Recommendation**: Use **RTMPS mode** (`IVSStreamControl`) for reliable streaming. The WebRTC path requires additional IVS Real-Time setup that may not be available on the demo backend.
+
+---
+
 ## Quick Demo (Try It Now!)
 
 Want to test streaming immediately? Use our demo credentials:
 
 | Setting | Value |
 |---------|-------|
-| **Demo API** | `https://substream-ivs.up.railway.app` |
+| **Demo API** | `https://substream-sdk-production.up.railway.app` |
 | **Demo Child ID** | `demo-child-001` |
-| **Demo Auth Token** | `demo-token` |
-| **Demo Viewer** | `https://substream-viewer.up.railway.app` |
+| **Streaming Token** | `demo-token` (for Unity - starts the stream) |
+| **Viewer Token** | `demo-viewer-token` (for web viewer - watches the stream) |
+| **Demo Viewer** | Open `examples/web-viewer/index.html` in your browser |
 
-> **Note**: Demo URLs are placeholders - check the [Substream website](https://substream.dev) for current demo endpoints.
+> **Note**: Demo credentials allow you to test streaming immediately. The streaming token is for the Unity child, the viewer token is for the parent watching. For production use, integrate with k-ID authentication.
 
-### Quick Test Steps
+### Quick Test Steps (RTMPS Mode - Stable)
 
 1. Import the SDK into Unity (see Step 1 below)
 2. Add `IVSStreamControl` component to a GameObject
 3. Set these values in the Inspector:
-   - **Backend URL**: `https://substream-ivs.up.railway.app`
+   - **Backend URL**: `https://substream-sdk-production.up.railway.app`
    - **Child ID**: `demo-child-001`
    - **Auth Token**: `demo-token`
-4. Press Play in Unity
-5. Press `U` to start streaming
-6. Open the Demo Viewer URL to watch your stream!
+4. **Windows only**: Copy FFmpeg DLLs to `Plugins/x86_64/` (see Native Library Setup below)
+5. Press Play in Unity
+6. Press `U` to start streaming
+7. Open `examples/web-viewer/index.html` in your browser to watch your stream!
+
+> **Note for Windows**: The native FFmpeg library needs FFmpeg DLLs to work. See the "Native Library Setup" section in Step 1.
 
 ---
 
@@ -56,18 +73,44 @@ Copy these folders from the SDK into your Unity project:
 
 ```
 UnityProject/Assets/Scripts/     →  YourProject/Assets/Scripts/
-UnityProject/Plugins/            →  YourProject/Plugins/
 ```
 
-**Required files:**
-- `Scripts/IVSStreamControl.cs` - Main streaming component
-- `Scripts/FFmpegRTMPPublisher.cs` - Video encoding
-- `Scripts/NativeFFmpegBridge.cs` - Native library interface
+**Required files for RTMPS mode (Stable - Recommended):**
+- `Scripts/IVSStreamControl.cs` - RTMPS streaming component
+- `Scripts/Streaming/FFmpegRTMPPublisher.cs` - Video encoding
+- `Scripts/Streaming/NativeFFmpegBridge.cs` - Native library interface
 - `Plugins/` - Native streaming libraries (per platform)
+
+**Required files for WebRTC mode (Experimental):**
+- `Scripts/IVSRealTimeStreamControl.cs` - WebRTC streaming component
+
+**Native Library Setup (RTMPS mode - Windows):**
+
+The RTMPS mode requires native FFmpeg libraries. On Windows:
+
+1. Download FFmpeg from https://www.gyan.dev/ffmpeg/builds/ (full build)
+2. Copy these DLLs from the `bin/` folder to `Plugins/x86_64/`:
+   - `avcodec-*.dll`
+   - `avformat-*.dll`
+   - `avutil-*.dll`
+   - `swscale-*.dll`
+   - `swresample-*.dll`
+3. Run `Plugins/verify-windows-deps.ps1` to verify setup
+4. Restart Unity
+
+On macOS, run: `cd UnityProject/Plugins/Native && ./build.sh macos`
+
+**For WebRTC mode** (experimental), install Unity WebRTC package:
+1. Open Window → Package Manager
+2. Click + → Add package from git URL
+3. Enter: `com.unity.webrtc@3.0.0-pre.7`
+4. Click Add
 
 ---
 
 ## Step 2: Add Streaming to Your Scene
+
+### RTMPS Mode (Stable - Recommended)
 
 1. **Create a GameObject** for streaming (or use an existing one)
 
@@ -78,30 +121,58 @@ UnityProject/Plugins/            →  YourProject/Plugins/
 
 | Setting | Value | Description |
 |---------|-------|-------------|
-| **Backend URL** | `https://api.kid.com` | Your k-ID API endpoint |
-| **Child ID** | *(from your app)* | User ID from your authentication |
-| **Auth Token** | *(from your app)* | Auth token from your authentication |
+| **Backend URL** | `https://substream-sdk-production.up.railway.app` | API endpoint (use demo URL or your own) |
+| **Child ID** | `demo-child-001` | Use demo ID or your user's ID |
+| **Auth Token** | `demo-token` | Authentication token |
 
-![Inspector Configuration](docs/images/ivs-inspector.png)
+4. **Set up your camera/render texture** (if using a specific source)
+
+5. **Press Play and press U** to start streaming
+
+---
+
+### WebRTC Mode (Experimental)
+
+> **Note**: WebRTC mode requires IVS Real-Time Stage to be configured on the backend. The demo backend may not have this set up. If you encounter "signaling not available" errors, use RTMPS mode instead.
+
+1. **Create a GameObject** for streaming (or use an existing one)
+
+2. **Add the `IVSRealTimeStreamControl` component**
+   - In Unity: `Add Component → IVSRealTimeStreamControl`
+
+3. **Configure in the Inspector:**
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| **Backend URL** | `https://substream-sdk-production.up.railway.app` | API endpoint (use demo URL or your own) |
+| **Child ID** | `demo-child-001` | Use demo ID or your user's ID |
+| **Auth Token** | `demo-token` | Use demo token or your user's auth token |
 
 **Quality Settings** (optional):
 - Stream Width: `1280` (default)
 - Stream Height: `720` (default)
-- Stream Bitrate: `3500` kbps (default)
+- Target Bitrate: `3.5` Mbps (default)
 - Frame Rate: `30` fps (default)
+
+### RTMPS Mode (Legacy)
+
+1. Add the `IVSStreamControl` component instead
+2. Same configuration as above
+3. Requires native FFmpeg libraries in `Plugins/`
 
 ---
 
 ## Step 3: Control Streaming from Code
 
-### Basic Usage
+### Basic Usage (WebRTC Mode)
 
 ```csharp
 using UnityEngine;
 
 public class GameStreamManager : MonoBehaviour
 {
-    public IVSStreamControl streamControl;
+    // Use IVSRealTimeStreamControl for WebRTC (recommended)
+    public IVSRealTimeStreamControl streamControl;
     
     // Call this when player wants to start streaming
     public void StartStream()
@@ -120,6 +191,12 @@ public class GameStreamManager : MonoBehaviour
     {
         return streamControl.IsStreaming;
     }
+    
+    // Get WebRTC connection state
+    public string GetConnectionState()
+    {
+        return streamControl.GetConnectionState();
+    }
 }
 ```
 
@@ -128,7 +205,7 @@ public class GameStreamManager : MonoBehaviour
 ```csharp
 public class AuthManager : MonoBehaviour
 {
-    public IVSStreamControl streamControl;
+    public IVSRealTimeStreamControl streamControl;
     
     // Call after user logs in
     public void OnUserAuthenticated(string userId, string authToken)
@@ -144,7 +221,7 @@ public class AuthManager : MonoBehaviour
 ```csharp
 public class StreamEventHandler : MonoBehaviour
 {
-    public IVSStreamControl streamControl;
+    public IVSRealTimeStreamControl streamControl;
     
     void Start()
     {
@@ -315,7 +392,32 @@ If you see "stub" messages, the SDK is working but needs the native library for 
 
 ## API Reference
 
-### IVSStreamControl Properties
+### IVSRealTimeStreamControl Properties (WebRTC - Recommended)
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `backendUrl` | string | API endpoint URL |
+| `childId` | string | User identifier |
+| `authToken` | string | Authentication token |
+| `streamWidth` | int | Video width (default: 1280) |
+| `streamHeight` | int | Video height (default: 720) |
+| `targetBitrateMbps` | float | Bitrate in Mbps (default: 3.5) |
+| `streamFrameRate` | int | FPS (default: 30) |
+| `IsStreaming` | bool | True if currently streaming |
+
+### IVSRealTimeStreamControl Methods
+
+| Method | Description |
+|--------|-------------|
+| `StartStreaming()` | Begin WebRTC streaming |
+| `StopStreaming()` | Stop streaming |
+| `ToggleStreaming()` | Toggle streaming on/off |
+| `SetAuthToken(string)` | Set auth token at runtime |
+| `SetChildId(string)` | Set child ID at runtime |
+| `GetConnectionState()` | Get WebRTC connection state |
+| `GetCurrentSessionId()` | Get current session ID |
+
+### IVSStreamControl Properties (RTMPS - Legacy)
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -328,18 +430,7 @@ If you see "stub" messages, the SDK is working but needs the native library for 
 | `streamFrameRate` | int | FPS (default: 30) |
 | `IsStreaming` | bool | True if currently streaming |
 
-### IVSStreamControl Methods
-
-| Method | Description |
-|--------|-------------|
-| `StartStreaming()` | Begin streaming |
-| `StopStreaming()` | Stop streaming |
-| `ToggleStreaming()` | Toggle streaming on/off |
-| `SetAuthToken(string)` | Set auth token at runtime |
-| `SetChildId(string)` | Set child ID at runtime |
-| `GetStreamStats()` | Get (framesSent, droppedFrames, bitrateMbps) |
-
-### Events
+### Events (Both Components)
 
 | Event | Description |
 |-------|-------------|
@@ -357,12 +448,23 @@ If you see "stub" messages, the SDK is working but needs the native library for 
 - ✅ Check `childId` exists in your user system
 - ✅ Check `authToken` is valid
 
-### "RTMP publisher initialized (using stub)"
+### WebRTC Connection Issues
 
-This is normal in development! The stub allows testing without the native library. For actual streaming:
-- Ensure native libraries are in `Plugins/` folder
-- Check platform (Windows/macOS/Android/iOS)
-- Restart Unity after adding plugins
+**"Connection state: Failed" or "Disconnected"**
+- ✅ Check internet connection
+- ✅ Verify firewall allows WebRTC (UDP ports)
+- ✅ Try a different network (corporate networks may block WebRTC)
+
+**"Signaling not available"**
+- This means the backend doesn't have IVS Real-Time configured yet
+- Contact your backend administrator to run `pnpm ivs:setup`
+- Or switch to HLS mode in the web viewer
+
+### "RTMP publisher initialized (using stub)" (RTMPS Mode)
+
+This means the native FFmpeg library is not available. For actual streaming:
+- **Option 1**: Switch to WebRTC mode (recommended) - no native libs needed!
+- **Option 2**: Install native libraries in `Plugins/` folder
 
 ### Stream not showing in viewer
 
@@ -370,13 +472,15 @@ This is normal in development! The stub allows testing without the native librar
 - ✅ Check playback URL is correct
 - ✅ Verify auth token for private channels
 - ✅ Check browser console for errors
+- ✅ In web viewer, try switching between "WebRTC" and "HLS" modes
 
 ### Low quality or stuttering
 
-- Reduce `streamBitrate` (try 2000 kbps)
+- Reduce `targetBitrateMbps` (try 2.0)
 - Reduce `streamWidth`/`streamHeight`
 - Check network connection
 - Use wired connection if possible
+- For WebRTC: Check WebRTC connection state in Unity console
 
 ---
 

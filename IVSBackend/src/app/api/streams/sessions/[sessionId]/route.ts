@@ -4,10 +4,14 @@
  * 
  * GET /api/streams/sessions/:sessionId - Get session info
  * DELETE /api/streams/sessions/:sessionId - End session
+ * 
+ * Query parameters for DELETE:
+ *   mode: 'webrtc' (default) | 'rtmps'
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionInfo, endStreamSession, StreamingError } from '@/lib/streaming';
+import { endRealTimeSession } from '@/lib/streaming/stream-realtime-service';
 
 export async function GET(
   request: NextRequest,
@@ -50,6 +54,10 @@ export async function DELETE(
   try {
     const { sessionId } = await params;
     
+    // Check session mode (rtmps is default for backward compatibility)
+    const searchParams = request.nextUrl.searchParams;
+    const mode = searchParams.get('mode') || 'rtmps';
+    
     // Auth check
     const authHeader = request.headers.get('authorization');
     if (!authHeader) {
@@ -67,7 +75,13 @@ export async function DELETE(
       );
     }
 
-    await endStreamSession(sessionId, requestingUserId);
+    if (mode === 'webrtc') {
+      // WebRTC mode - also stops compositions
+      await endRealTimeSession(sessionId, requestingUserId);
+    } else {
+      // Legacy RTMPS mode
+      await endStreamSession(sessionId, requestingUserId);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -89,8 +103,17 @@ export async function DELETE(
 
 function extractUserIdFromAuth(authHeader: string): string | null {
   const match = authHeader.match(/^Bearer\s+(.+)$/);
-  if (match) {
-    return match[1];
-  }
-  return null;
+  if (!match) return null;
+  
+  const token = match[1];
+  
+  // Demo token mapping for SDK users to test immediately
+  const demoTokens: Record<string, string> = {
+    'demo-token': 'demo-user-001',
+    'demo-viewer-token': 'demo-viewer-001',
+    'test-token': 'test-user-id',
+    'test-parent-token': 'test-parent-user-id',
+  };
+  
+  return demoTokens[token] || token;
 }

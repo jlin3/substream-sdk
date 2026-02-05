@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   createChannel,
   createStreamKey,
+  listStreamKeys,
   getStream,
   stopStream,
 } from './ivs-client';
@@ -80,8 +81,27 @@ export async function ensureChannelForChild(childId: string): Promise<{
     },
   });
 
-  // Create stream key
-  const streamKey = await createStreamKey(ivsChannel.arn);
+  // Get or create stream key
+  let streamKey;
+  try {
+    // First check if any stream keys already exist for this channel
+    const existingKeys = await listStreamKeys(ivsChannel.arn);
+    if (existingKeys.length > 0) {
+      streamKey = existingKeys[0];
+    } else {
+      // Create new stream key
+      streamKey = await createStreamKey(ivsChannel.arn);
+    }
+  } catch (error) {
+    // If stream key creation fails due to quota, try to list and use existing
+    console.error('Stream key creation error, checking for existing keys:', error);
+    const existingKeys = await listStreamKeys(ivsChannel.arn);
+    if (existingKeys.length > 0) {
+      streamKey = existingKeys[0];
+    } else {
+      throw error; // Re-throw if we can't find any existing keys
+    }
+  }
 
   // Store in database
   const dbChannel = await prisma.childStreamChannel.create({
@@ -317,11 +337,51 @@ export async function createStreamSession(
   });
 
   if (activeSession) {
-    throw new StreamingError(
-      'A session is already active',
-      StreamingErrorCode.SESSION_ALREADY_ACTIVE,
-      409
-    );
+    // Check if session is stale (more than 2 hours old with no actual stream)
+    const sessionAge = Date.now() - activeSession.startedAt.getTime();
+    const TWO_HOURS = 2 * 60 * 60 * 1000;
+    
+    // Check IVS for actual stream status
+    const ivsStream = await getStream(channel.ivsChannelArn);
+    const isActuallyLive = ivsStream?.state === 'LIVE';
+    
+    if (!isActuallyLive && sessionAge > TWO_HOURS) {
+      // Auto-cleanup stale session
+      console.log(`[Stream] Auto-cleaning stale session ${activeSession.id}`);
+      await prisma.childStreamSession.update({
+        where: { id: activeSession.id },
+        data: {
+          status: 'FAILED',
+          endedAt: new Date(),
+          errorMessage: 'Session auto-ended due to inactivity',
+        },
+      });
+      await prisma.childStreamChannel.update({
+        where: { id: channel.id },
+        data: { status: 'INACTIVE' },
+      });
+    } else if (!isActuallyLive) {
+      // Session exists but stream isn't actually live - end it to allow restart
+      console.log(`[Stream] Ending inactive session ${activeSession.id} to allow restart`);
+      await prisma.childStreamSession.update({
+        where: { id: activeSession.id },
+        data: {
+          status: 'COMPLETED',
+          endedAt: new Date(),
+        },
+      });
+      await prisma.childStreamChannel.update({
+        where: { id: channel.id },
+        data: { status: 'INACTIVE' },
+      });
+    } else {
+      // Actually live - don't allow duplicate session
+      throw new StreamingError(
+        'A session is already active',
+        StreamingErrorCode.SESSION_ALREADY_ACTIVE,
+        409
+      );
+    }
   }
 
   // Create session

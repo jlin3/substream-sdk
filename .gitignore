@@ -83,3 +83,6 @@ IVSBackend/.env
 
 # All node_modules directories
 **/node_modules/
+.env
+*.tsbuildinfo
+.DS_Store

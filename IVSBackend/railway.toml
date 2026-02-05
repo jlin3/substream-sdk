@@ -3,11 +3,14 @@
 
 [build]
 builder = "nixpacks"
-buildCommand = "npm install -g pnpm && pnpm install && pnpm db:generate && pnpm build"
+# Only generate Prisma client during build (no DB connection needed)
+buildCommand = "npm install && npx prisma generate && npm run build"
 
 [deploy]
-startCommand = "pnpm start"
+# Database schema already synced - just start the app
+startCommand = "npm start"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 60
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
+

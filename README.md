@@ -40,6 +40,20 @@ The `IVSBackend/` and `WebappBackend/` directories contain server code that SDK 
 
 ---
 
+## Try It Now (Demo)
+
+Test streaming immediately with our live demo:
+
+| Setting | Value |
+|---------|-------|
+| **Live API** | `https://substream-sdk-production.up.railway.app` |
+| **Child ID** | `demo-child-001` |
+| **Auth Token** | `demo-token` |
+
+**[Full Demo Guide →](SDK_STREAMING_GUIDE.md#quick-demo-try-it-now)**
+
+---
+
 ## Quick Start (Game Developers)
 
 ### 1. Import the SDK

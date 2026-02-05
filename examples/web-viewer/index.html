@@ -323,15 +323,22 @@
             <div class="config-grid">
                 <div class="input-group">
                     <label for="api-endpoint">API Endpoint</label>
-                    <input type="text" id="api-endpoint" placeholder="https://substream-ivs.up.railway.app" value="https://substream-ivs.up.railway.app">
+                    <input type="text" id="api-endpoint" placeholder="https://substream-sdk-production.up.railway.app" value="https://substream-sdk-production.up.railway.app">
                 </div>
                 <div class="input-group">
                     <label for="child-id">Child ID</label>
                     <input type="text" id="child-id" placeholder="demo-child-001" value="demo-child-001">
                 </div>
                 <div class="input-group">
-                    <label for="auth-token">Auth Token</label>
-                    <input type="text" id="auth-token" placeholder="demo-token" value="demo-token">
+                    <label for="auth-token">Auth Token (Viewer)</label>
+                    <input type="text" id="auth-token" placeholder="demo-viewer-token" value="demo-viewer-token">
+                </div>
+                <div class="input-group">
+                    <label for="playback-mode">Playback Mode</label>
+                    <select id="playback-mode" style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; font-size: 0.875rem;">
+                        <option value="hls">HLS (Current - IVS Low-Latency)</option>
+                        <option value="webrtc">WebRTC (Experimental - IVS Real-Time)</option>
+                    </select>
                 </div>
             </div>
             <div class="btn-row">
@@ -418,6 +425,7 @@
             const apiEndpoint = document.getElementById('api-endpoint').value.trim();
             const childId = document.getElementById('child-id').value.trim();
             const authToken = document.getElementById('auth-token').value.trim();
+            const playbackMode = document.getElementById('playback-mode').value;
             
             if (!apiEndpoint || !childId) {
                 showError('Please enter API endpoint and Child ID');
@@ -427,9 +435,9 @@
             }
             
             try {
-                // Fetch playback URL from API
+                // Fetch playback URL from API with mode parameter
                 const response = await fetch(
-                    `${apiEndpoint}/api/streams/children/${childId}/playback`,
+                    `${apiEndpoint}/api/streams/children/${childId}/playback?mode=${playbackMode}`,
                     {
                         headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
                     }
@@ -443,54 +451,43 @@
                 const data = await response.json();
                 console.log('Playback data:', data);
                 
+                // Check if stream is live
                 if (!data.status?.isLive) {
                     updateStatus('offline', 'Stream Offline');
-                    showPlaceholder('Stream is not currently live. Check back later!');
+                    const modeText = data.mode === 'webrtc' ? 'IVS Real-Time (WebRTC)' : 'IVS Low-Latency (HLS)';
+                    showPlaceholder(`Stream is not currently live.\nMode: ${modeText}\nCheck back later!`);
                     return;
                 }
                 
-                // Initialize IVS player
-                if (!IVSPlayer.isPlayerSupported) {
-                    throw new Error('IVS Player is not supported in this browser');
+                // Handle WebRTC mode playback
+                if (data.mode === 'webrtc') {
+                    // IVS Real-Time WebRTC - check for HLS URL (from composition)
+                    if (data.playback?.hlsUrl) {
+                        // HLS available from composition - use IVS Player
+                        await loadHLSStream(data.playback.hlsUrl);
+                    } else if (data.playback?.viewerToken) {
+                        // WebRTC-only viewing (not implemented in this demo)
+                        showPlaceholder('WebRTC direct viewing not yet implemented.\nHLS composition may not be running.\nTry HLS mode instead.');
+                        updateStatus('offline', 'WebRTC Only');
+                    } else {
+                        showPlaceholder('No playback URL available.\nHLS composition may not be running.');
+                        updateStatus('offline', 'No Stream');
+                    }
+                    return;
                 }
                 
-                // Clean up existing player
-                if (player) {
-                    player.delete();
+                // Handle HLS mode (legacy)
+                if (!data.playback?.url) {
+                    throw new Error('No playback URL received');
                 }
                 
-                player = IVSPlayer.create();
-                player.attachHTMLVideoElement(document.getElementById('video-player'));
-                
-                // Set up event handlers
-                player.addEventListener(IVSPlayer.PlayerState.PLAYING, () => {
-                    updateStatus('live', 'LIVE');
-                    hidePlaceholder();
-                    document.getElementById('stats-panel').classList.remove('hidden');
-                    startStatsUpdate();
-                });
-                
-                player.addEventListener(IVSPlayer.PlayerState.ENDED, () => {
-                    updateStatus('offline', 'Stream Ended');
-                    showPlaceholder('Stream has ended');
-                    stopStatsUpdate();
-                });
-                
-                player.addEventListener(IVSPlayer.PlayerEventType.ERROR, (err) => {
-                    console.error('Player error:', err);
-                    showError(`Player error: ${err.message || 'Unknown error'}`);
-                });
-                
-                // Load stream
-                player.load(data.playback.url);
-                
-                // Set playback token if private channel
+                // Append auth token if provided (required for private channels)
+                let playbackUrl = data.playback.url;
                 if (data.playback.token) {
-                    // Note: IVS player handles auth via URL params for basic channels
-                    // For private channels, token is embedded in URL
+                    playbackUrl += `?token=${data.playback.token}`;
                 }
                 
-                player.play();
+                await loadHLSStream(playbackUrl);
                 
             } catch (error) {
                 console.error('Failed to load stream:', error);
@@ -498,6 +495,45 @@
                 updateStatus('offline');
                 showPlaceholder('Failed to connect. Check your settings and try again.');
             }
+        }
+        
+        async function loadHLSStream(url) {
+            // Initialize IVS player
+            if (!IVSPlayer.isPlayerSupported) {
+                throw new Error('IVS Player is not supported in this browser');
+            }
+            
+            // Clean up existing player
+            if (player) {
+                player.delete();
+            }
+            
+            player = IVSPlayer.create();
+            player.attachHTMLVideoElement(document.getElementById('video-player'));
+            
+            // Set up event handlers
+            player.addEventListener(IVSPlayer.PlayerState.PLAYING, () => {
+                updateStatus('live', 'LIVE');
+                hidePlaceholder();
+                document.getElementById('stats-panel').classList.remove('hidden');
+                startStatsUpdate();
+            });
+            
+            player.addEventListener(IVSPlayer.PlayerState.ENDED, () => {
+                updateStatus('offline', 'Stream Ended');
+                showPlaceholder('Stream has ended');
+                stopStatsUpdate();
+            });
+            
+            player.addEventListener(IVSPlayer.PlayerEventType.ERROR, (err) => {
+                console.error('Player error:', err);
+                showError(`Player error: ${err.message || 'Unknown error'}`);
+            });
+            
+            // Load stream
+            console.log('Loading HLS stream:', url);
+            player.load(url);
+            player.play();
         }
         
         function stopStream() {
@@ -556,6 +592,9 @@
         }
         if (params.get('token')) {
             document.getElementById('auth-token').value = params.get('token');
+        }
+        if (params.get('mode')) {
+            document.getElementById('playback-mode').value = params.get('mode');
         }
         if (params.get('autoplay')) {
             loadStream();
