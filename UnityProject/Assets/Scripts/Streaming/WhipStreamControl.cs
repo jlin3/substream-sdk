@@ -594,7 +594,7 @@ namespace Substream.Streaming
             // Must be called AFTER SetupMediaTracks() so transceivers exist
             var transceivers = _peerConnection.GetTransceivers();
             
-            if (transceivers == null || transceivers.Length == 0)
+            if (transceivers == null || !transceivers.Any())
             {
                 Debug.LogWarning("[WHIP] No transceivers found - codec preferences not set. " +
                     "Ensure ConfigureCodecPreferences is called after AddTrack.");
@@ -603,7 +603,7 @@ namespace Substream.Streaming
             
             foreach (var transceiver in transceivers)
             {
-                // Use MediaType instead of Receiver.Track.Kind (track may be null for send-only)
+                // Use Sender.Track (not Receiver.Track which may be null for send-only)
                 if (transceiver.Sender?.Track?.Kind == TrackKind.Video)
                 {
                     var capabilities = RTCRtpSender.GetCapabilities(TrackKind.Video);
