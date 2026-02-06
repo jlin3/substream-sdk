@@ -95,6 +95,8 @@ namespace Substream.Streaming
         private AudioStreamTrack _audioTrack;
         private Camera _streamCamera;
         private RenderTexture _streamTexture;
+        private bool _needsTextureBlit = false;
+        private RenderTexture _sourceTextureForBlit;
         
         // ICE gathering
         private List<RTCIceCandidate> _pendingCandidates = new List<RTCIceCandidate>();
@@ -129,6 +131,12 @@ namespace Substream.Streaming
             if (Input.GetKeyDown(KeyCode.U))
             {
                 ToggleStreaming();
+            }
+            
+            // Blit source texture to stream texture if format conversion is needed
+            if (_needsTextureBlit && _isStreaming && _sourceTextureForBlit != null && _streamTexture != null)
+            {
+                Graphics.Blit(_sourceTextureForBlit, _streamTexture);
             }
         }
         
@@ -814,7 +822,26 @@ namespace Substream.Streaming
             // Use provided texture or create one
             if (sourceTexture != null)
             {
-                _streamTexture = sourceTexture;
+                // Validate texture format - WebRTC requires BGRA
+                if (sourceTexture.graphicsFormat != UnityEngine.Experimental.Rendering.GraphicsFormat.B8G8R8A8_UNorm)
+                {
+                    Debug.LogWarning($"[WHIP] Source texture format {sourceTexture.graphicsFormat} may not be supported. " +
+                        "WebRTC requires B8G8R8A8_UNorm (BGRA). Creating compatible texture instead.");
+                    
+                    // Create a compatible texture and blit from source
+                    int width = Mathf.Min(sourceTexture.width, 1280);
+                    int height = Mathf.Min(sourceTexture.height, 720);
+                    _streamTexture = new RenderTexture(width, height, 0, UnityEngine.Experimental.Rendering.GraphicsFormat.B8G8R8A8_UNorm);
+                    _streamTexture.Create();
+                    
+                    // We'll need to blit each frame - set up a flag
+                    _needsTextureBlit = true;
+                    _sourceTextureForBlit = sourceTexture;
+                }
+                else
+                {
+                    _streamTexture = sourceTexture;
+                }
             }
             else
             {
@@ -823,8 +850,9 @@ namespace Substream.Streaming
                 int width = Mathf.Min(streamWidth, 1280);
                 int height = Mathf.Min(streamHeight, 720);
                 
-                _streamTexture = new RenderTexture(width, height, 24);
-                _streamTexture.format = RenderTextureFormat.ARGB32;
+                // IMPORTANT: Unity WebRTC requires B8G8R8A8_UNorm (BGRA) format
+                // Using ARGB32/RGBA will cause "graphics format not supported" error
+                _streamTexture = new RenderTexture(width, height, 24, UnityEngine.Experimental.Rendering.GraphicsFormat.B8G8R8A8_UNorm);
                 _streamTexture.Create();
                 
                 // Setup camera if not using provided texture
