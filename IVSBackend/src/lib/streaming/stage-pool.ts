@@ -367,6 +367,22 @@ class StagePoolAllocator {
       throw error;
     }
 
+    // Extract the stage-specific WHIP URL from the JWT token.
+    // The token payload contains a "whip_url" field with the direct endpoint
+    // that doesn't require a 307 redirect (unlike the global endpoint).
+    let whipUrl = WHIP_GLOBAL_ENDPOINT;
+    try {
+      const tokenPayload = JSON.parse(
+        Buffer.from(tokenResponse.token.split('.')[1], 'base64').toString()
+      );
+      if (tokenPayload.whip_url) {
+        whipUrl = tokenPayload.whip_url;
+        console.log(`[StagePool] Extracted stage-specific WHIP URL: ${whipUrl}`);
+      }
+    } catch (e) {
+      console.warn('[StagePool] Could not parse WHIP URL from token, using global endpoint');
+    }
+
     console.log(`[StagePool] Allocated stage ${stage.name} for stream ${streamId}`);
 
     return {
@@ -375,7 +391,7 @@ class StagePoolAllocator {
       publishToken: tokenResponse.token,
       participantId: tokenResponse.participantId,
       expiresAt: tokenResponse.expirationTime,
-      whipUrl: WHIP_GLOBAL_ENDPOINT,
+      whipUrl,
       region: this.config.region,
     };
   }
