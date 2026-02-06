@@ -87,6 +87,7 @@ namespace Substream.Streaming
         private string _whipSessionUrl;
         private string _whipETag;
         private string _publishToken;
+        private string _whipUrl; // IVS-specific WHIP URL from backend
         
         // WebRTC
         private RTCPeerConnection _peerConnection;
@@ -109,6 +110,16 @@ namespace Substream.Streaming
         
         public bool IsStreaming => _isStreaming;
         public string CurrentStreamId => _currentStreamId;
+        
+        /// <summary>Returns the current stream ID (same as CurrentStreamId property).</summary>
+        public string GetCurrentStreamId() => _currentStreamId;
+        
+        /// <summary>Returns the full viewer URL for parents to watch this stream.</summary>
+        public string GetViewerUrl()
+        {
+            if (string.IsNullOrEmpty(_currentStreamId)) return null;
+            return $"{backendUrl}/viewer/{_currentStreamId}";
+        }
         
         // ============================================
         // LIFECYCLE
@@ -264,9 +275,13 @@ namespace Substream.Streaming
             string whipError = null;
             WhipClient.WhipSessionInfo sessionInfo = null;
             
+            // Use the IVS-specific WHIP URL from backend, fall back to global
+            string whipEndpoint = !string.IsNullOrEmpty(_whipUrl) ? _whipUrl : WhipClient.GlobalWhipEndpoint;
+            Debug.Log($"[WHIP] Sending SDP offer to: {whipEndpoint}");
+            
             WhipClient.PostOffer(
                 this,
-                WhipClient.GlobalWhipEndpoint,
+                whipEndpoint,
                 _publishToken,
                 offer.sdp,
                 (info) => {
@@ -382,6 +397,7 @@ namespace Substream.Streaming
             _isStreaming = false;
             _currentStreamId = null;
             _whipSessionUrl = null;
+            _whipUrl = null;
             _whipETag = null;
             _publishToken = null;
             
@@ -404,6 +420,7 @@ namespace Substream.Streaming
             _isStreaming = false;
             _currentStreamId = null;
             _whipSessionUrl = null;
+            _whipUrl = null;
             _whipETag = null;
             _publishToken = null;
         }
@@ -441,9 +458,10 @@ namespace Substream.Streaming
                     var response = JsonUtility.FromJson<WhipStartResponse>(request.downloadHandler.text);
                     _currentStreamId = response.streamId;
                     _publishToken = response.publishToken;
+                    _whipUrl = response.whipUrl;
                     
                     Debug.Log($"[WHIP] Got credentials. Stream: {_currentStreamId}");
-                    Debug.Log($"[WHIP] WHIP URL: {response.whipUrl}");
+                    Debug.Log($"[WHIP] WHIP URL: {_whipUrl}");
                 }
                 catch (Exception e)
                 {
@@ -753,6 +771,10 @@ namespace Substream.Streaming
             
             _pendingCandidates.Clear();
             _iceGatheringComplete = false;
+            
+            // Reset texture blit state
+            _needsTextureBlit = false;
+            _sourceTextureForBlit = null;
         }
         
         // ============================================

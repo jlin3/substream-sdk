@@ -289,15 +289,15 @@ public class StreamEventHandler : MonoBehaviour
     void Start()
     {
         // Subscribe to streaming events
-        streamControl.OnStartStreaming.AddListener(OnStreamStarted);
-        streamControl.OnStopStreaming.AddListener(OnStreamStopped);
-        streamControl.OnError.AddListener(OnStreamError);
+        streamControl.OnStreamStarted.AddListener(OnStreamStarted);
+        streamControl.OnStreamStopped.AddListener(OnStreamStopped);
+        streamControl.OnStreamError.AddListener(OnStreamError);
     }
     
     void OnStreamStarted()
     {
         Debug.Log("Stream is live via WHIP!");
-        string viewerUrl = $"{streamControl.backendUrl}/viewer/{streamControl.GetCurrentStreamId()}";
+        string viewerUrl = streamControl.GetViewerUrl();
         Debug.Log($"Viewer URL: {viewerUrl}");
     }
     
@@ -591,9 +591,9 @@ If you see "stub" messages, the SDK is working but needs the native library for 
 
 | Event | Description |
 |-------|-------------|
-| `OnStartStreaming` | Fired when stream goes live |
-| `OnStopStreaming` | Fired when stream ends |
-| `OnError(string)` | Fired on error with message |
+| `OnStreamStarted` | Fired when stream goes live |
+| `OnStreamStopped` | Fired when stream ends |
+| `OnStreamError(string)` | Fired on error with message |
 
 ---
 
@@ -639,9 +639,9 @@ If you see "stub" messages, the SDK is working but needs the native library for 
 
 | Event | Description |
 |-------|-------------|
-| `OnStartStreaming` | Fired when streaming begins |
-| `OnStopStreaming` | Fired when streaming ends |
-| `OnError(string)` | Fired on error with message |
+| `OnStreamStarted` | Fired when streaming begins |
+| `OnStreamStopped` | Fired when streaming ends |
+| `OnStreamError(string)` | Fired on error with message |
 
 ---
 
