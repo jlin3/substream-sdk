@@ -128,9 +128,12 @@ namespace Substream.Streaming
                 request.SetRequestHeader("Content-Type", "application/sdp");
                 request.SetRequestHeader("Authorization", $"Bearer {bearerToken}");
                 
-                // Disable automatic redirects - we need to handle 307 manually
-                // to preserve Authorization header
-                request.redirectLimit = 0;
+                // Allow Unity to follow up to 5 redirects automatically.
+                // NOTE: Unity strips the Authorization header on redirect, so if
+                // we hit a 307 from the global WHIP endpoint, the redirected request
+                // may fail with 401. The preferred approach is to use the specific 
+                // whipUrl from the backend to avoid redirects entirely.
+                request.redirectLimit = 5;
                 
                 yield return request.SendWebRequest();
                 
@@ -139,6 +142,22 @@ namespace Substream.Streaming
                 {
                     onError($"WHIP connection error: {request.error}");
                     yield break;
+                }
+                
+                // Handle protocol errors (4xx/5xx) - still get response body
+                if (request.result == UnityWebRequest.Result.ProtocolError)
+                {
+                    string errorBody = request.downloadHandler?.text ?? "";
+                    Debug.LogWarning($"[WHIP] HTTP {request.responseCode}: {errorBody}");
+                    
+                    // If 401/403 after redirect, the Authorization header was likely stripped
+                    if (request.responseCode == 401 || request.responseCode == 403)
+                    {
+                        onError($"WHIP auth failed (HTTP {request.responseCode}). " +
+                            "If using global WHIP URL, the redirect may have stripped the auth header. " +
+                            "Ensure the backend returns a specific whipUrl.");
+                        yield break;
+                    }
                 }
                 
                 // Get response headers
