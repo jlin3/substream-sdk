@@ -182,6 +182,13 @@ namespace Substream.Streaming
                 return;
             }
             
+            // Log all response headers for debugging
+            Debug.Log($"[WHIP] 201 Response headers ({headers.Count}):");
+            foreach (var kvp in headers)
+            {
+                Debug.Log($"[WHIP]   {kvp.Key}: {kvp.Value}");
+            }
+            
             // Extract required headers
             string sessionUrl = GetHeader(headers, "Location");
             string etag = GetHeader(headers, "ETag");
@@ -192,10 +199,13 @@ namespace Substream.Streaming
                 return;
             }
             
+            // ETag is used for PATCH ICE candidates. Unity's UnityWebRequest may
+            // strip this header. If missing, we'll use wildcard "If-Match: *" for PATCH.
             if (string.IsNullOrEmpty(etag))
             {
-                onError("WHIP 201 response missing ETag header");
-                return;
+                Debug.LogWarning("[WHIP] ETag header not found in response. " +
+                    "Unity may strip this header. Using wildcard for ICE PATCH.");
+                etag = "*"; // WHIP/HTTP wildcard match
             }
             
             // Parse ICE servers from Link headers
