@@ -17,6 +17,7 @@ import {
   allocateStage, 
   getStagePoolStatus,
   releaseStage,
+  findStageByStreamId,
 } from '@/lib/streaming/stage-pool';
 
 // ============================================
@@ -188,6 +189,15 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    // Validate authentication
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) {
+      return NextResponse.json(
+        { error: 'Missing authorization token', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      );
+    }
+    
     const body = await request.json() as WhipStopRequest;
     
     if (!body.streamId) {
@@ -197,8 +207,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
     
-    // Find the stage by stream ID in our pool
-    const { findStageByStreamId } = await import('@/lib/streaming/stage-pool');
+    // Find the stage by stream ID in our pool (static import)
     const stage = findStageByStreamId(body.streamId);
     
     if (!stage) {

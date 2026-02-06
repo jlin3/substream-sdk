@@ -128,12 +128,12 @@ namespace Substream.Streaming
                 request.SetRequestHeader("Content-Type", "application/sdp");
                 request.SetRequestHeader("Authorization", $"Bearer {bearerToken}");
                 
-                // Allow Unity to follow up to 5 redirects automatically.
-                // NOTE: Unity strips the Authorization header on redirect, so if
-                // we hit a 307 from the global WHIP endpoint, the redirected request
-                // may fail with 401. The preferred approach is to use the specific 
-                // whipUrl from the backend to avoid redirects entirely.
-                request.redirectLimit = 5;
+                // Disable automatic redirects so we can handle 307 manually.
+                // Unity strips the Authorization header on cross-origin redirect,
+                // so we must re-send with auth headers preserved.
+                // Preferred approach: use the specific whipUrl from the backend
+                // to avoid 307 redirects entirely.
+                request.redirectLimit = 0;
                 
                 yield return request.SendWebRequest();
                 
@@ -142,22 +142,6 @@ namespace Substream.Streaming
                 {
                     onError($"WHIP connection error: {request.error}");
                     yield break;
-                }
-                
-                // Handle protocol errors (4xx/5xx) - still get response body
-                if (request.result == UnityWebRequest.Result.ProtocolError)
-                {
-                    string errorBody = request.downloadHandler?.text ?? "";
-                    Debug.LogWarning($"[WHIP] HTTP {request.responseCode}: {errorBody}");
-                    
-                    // If 401/403 after redirect, the Authorization header was likely stripped
-                    if (request.responseCode == 401 || request.responseCode == 403)
-                    {
-                        onError($"WHIP auth failed (HTTP {request.responseCode}). " +
-                            "If using global WHIP URL, the redirect may have stripped the auth header. " +
-                            "Ensure the backend returns a specific whipUrl.");
-                        yield break;
-                    }
                 }
                 
                 // Get response headers
@@ -277,10 +261,10 @@ namespace Substream.Streaming
                     yield break;
                 }
                 
-                // WHIP expects 204 No Content on successful PATCH
-                if (request.responseCode != 204)
+                // WHIP RFC allows 200 OK (server has new candidates) or 204 No Content
+                if (request.responseCode != 200 && request.responseCode != 204)
                 {
-                    onError($"WHIP PATCH expected 204, got {request.responseCode}. Body: {request.downloadHandler?.text}");
+                    onError($"WHIP PATCH expected 200/204, got {request.responseCode}. Body: {request.downloadHandler?.text}");
                     yield break;
                 }
                 
@@ -451,13 +435,24 @@ namespace Substream.Streaming
             if (!string.IsNullOrEmpty(icePwd))
                 sb.AppendLine($"a=ice-pwd:{icePwd}");
             
-            // Add each candidate
+            // Group candidates by mid (avoid duplicate a=mid lines per RFC 8840)
+            var candidatesByMid = new Dictionary<string, List<RTCIceCandidate>>();
             foreach (var candidate in candidates)
             {
-                if (!string.IsNullOrEmpty(candidate.SdpMid))
-                    sb.AppendLine($"a=mid:{candidate.SdpMid}");
-                
-                sb.AppendLine($"a={candidate.Candidate}");
+                string mid = candidate.SdpMid ?? "0";
+                if (!candidatesByMid.ContainsKey(mid))
+                    candidatesByMid[mid] = new List<RTCIceCandidate>();
+                candidatesByMid[mid].Add(candidate);
+            }
+            
+            foreach (var kvp in candidatesByMid)
+            {
+                sb.AppendLine($"m=video 9 UDP/TLS/RTP/SAVPF 0");
+                sb.AppendLine($"a=mid:{kvp.Key}");
+                foreach (var candidate in kvp.Value)
+                {
+                    sb.AppendLine($"a={candidate.Candidate}");
+                }
             }
             
             // Signal end of candidates if gathering is complete

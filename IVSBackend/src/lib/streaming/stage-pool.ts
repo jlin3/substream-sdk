@@ -344,17 +344,28 @@ class StagePoolAllocator {
     stage.allocatedAt = new Date();
 
     // Create publish token for this stage
-    const tokenResponse = await createParticipantToken({
-      stageArn: stage.arn,
-      userId,
-      capabilities: ['PUBLISH'],
-      duration: 60, // 1 hour for WHIP sessions
-      attributes: {
-        role: 'publisher',
-        childId,
-        streamId,
-      },
-    });
+    // Wrapped in try/catch to rollback stage allocation on failure
+    let tokenResponse;
+    try {
+      tokenResponse = await createParticipantToken({
+        stageArn: stage.arn,
+        userId,
+        capabilities: ['PUBLISH'],
+        duration: 60, // 1 hour for WHIP sessions
+        attributes: {
+          role: 'publisher',
+          childId,
+          streamId,
+        },
+      });
+    } catch (error) {
+      // Rollback: release the stage so it's not permanently stuck as in-use
+      console.error(`[StagePool] Token creation failed, rolling back stage ${stage.name}:`, error);
+      stage.inUse = false;
+      stage.streamId = undefined;
+      stage.allocatedAt = undefined;
+      throw error;
+    }
 
     console.log(`[StagePool] Allocated stage ${stage.name} for stream ${streamId}`);
 

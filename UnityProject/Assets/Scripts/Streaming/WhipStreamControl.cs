@@ -96,8 +96,10 @@ namespace Substream.Streaming
         private AudioStreamTrack _audioTrack;
         private Camera _streamCamera;
         private RenderTexture _streamTexture;
+        private bool _ownsStreamTexture = false; // Track if we created the texture
         private bool _needsTextureBlit = false;
         private RenderTexture _sourceTextureForBlit;
+        private GameObject _streamCameraGo; // Track for cleanup
         
         // ICE gathering
         private List<RTCIceCandidate> _pendingCandidates = new List<RTCIceCandidate>();
@@ -127,6 +129,9 @@ namespace Substream.Streaming
         
         void Start()
         {
+            // REQUIRED: Unity WebRTC needs this coroutine to pump video frames
+            StartCoroutine(WebRTC.Update());
+            
             // Load config from PlayerPrefs if not set
             LoadSavedConfig();
             
@@ -160,10 +165,17 @@ namespace Substream.Streaming
             
             CleanupWebRTC();
             
-            if (_streamTexture != null)
+            // Only destroy textures we created (not user's sourceTexture)
+            if (_streamTexture != null && _ownsStreamTexture)
             {
                 _streamTexture.Release();
                 Destroy(_streamTexture);
+            }
+            
+            // Destroy the stream camera if we created one
+            if (_streamCameraGo != null)
+            {
+                Destroy(_streamCameraGo);
             }
         }
         
@@ -228,11 +240,14 @@ namespace Substream.Streaming
             
             UpdateStatus("Connecting to IVS...");
             
-            // Step 2: Setup WebRTC peer connection
+            // Step 2: Setup WebRTC peer connection and media tracks
             try
             {
                 SetupPeerConnection();
                 SetupMediaTracks();
+                
+                // Configure codec preferences AFTER tracks are added (transceivers exist now)
+                ConfigureCodecPreferences();
             }
             catch (Exception e)
             {
@@ -268,9 +283,30 @@ namespace Substream.Streaming
                 yield break;
             }
             
+            // Step 5: Wait for ICE gathering to complete (Full Gathering approach)
+            // Per WHIP RFC 9725, we can send the offer with all candidates included,
+            // eliminating the need for PATCH/ETag handling entirely.
+            UpdateStatus("Gathering ICE candidates...");
+            float iceTimeout = 10f;
+            while (!_iceGatheringComplete && iceTimeout > 0)
+            {
+                yield return new WaitForSeconds(0.5f);
+                iceTimeout -= 0.5f;
+            }
+            
+            if (!_iceGatheringComplete)
+            {
+                Debug.LogWarning("[WHIP] ICE gathering timed out, proceeding with available candidates");
+            }
+            
+            Debug.Log($"[WHIP] ICE gathering done. {_pendingCandidates.Count} candidates found");
+            
+            // Step 6: Read the complete local description (now contains all ICE candidates)
+            string fullOfferSdp = _peerConnection.LocalDescription.sdp;
+            
             UpdateStatus("Connecting to WHIP...");
             
-            // Step 5: Send offer to WHIP endpoint
+            // Step 7: Send complete offer (with candidates) to WHIP endpoint
             bool whipSuccess = false;
             string whipError = null;
             WhipClient.WhipSessionInfo sessionInfo = null;
@@ -283,7 +319,7 @@ namespace Substream.Streaming
                 this,
                 whipEndpoint,
                 _publishToken,
-                offer.sdp,
+                fullOfferSdp, // Full offer with all ICE candidates
                 (info) => {
                     sessionInfo = info;
                     whipSuccess = true;
@@ -311,18 +347,7 @@ namespace Substream.Streaming
             _whipSessionUrl = sessionInfo.SessionUrl;
             _whipETag = sessionInfo.ETag;
             
-            // Step 6: Apply ICE servers from WHIP response
-            if (sessionInfo.IceServers != null && sessionInfo.IceServers.Length > 0)
-            {
-                var config = _peerConnection.GetConfiguration();
-                var newServers = new List<RTCIceServer>(config.iceServers);
-                newServers.AddRange(sessionInfo.IceServers);
-                config.iceServers = newServers.ToArray();
-                _peerConnection.SetConfiguration(ref config);
-                Debug.Log($"[WHIP] Applied {sessionInfo.IceServers.Length} ICE servers from WHIP");
-            }
-            
-            // Step 7: Set remote description (SDP answer)
+            // Step 8: Set remote description (SDP answer from IVS)
             var answer = new RTCSessionDescription
             {
                 type = RTCSdpType.Answer,
@@ -339,8 +364,9 @@ namespace Substream.Streaming
                 yield break;
             }
             
-            // Step 8: Send ICE candidates via PATCH
-            yield return SendIceCandidates();
+            // No PATCH needed - all candidates were in the offer (Full Gathering approach)
+            Debug.Log("[WHIP] Full ICE gathering approach - no PATCH needed");
+            _pendingCandidates.Clear();
             
             _isStreaming = true;
             UpdateStatus("🔴 LIVE (WHIP)");
@@ -513,8 +539,8 @@ namespace Substream.Streaming
             
             _peerConnection = new RTCPeerConnection(ref config);
             
-            // Configure codec preferences for IVS compliance (H.264 baseline, no B-frames)
-            ConfigureCodecPreferences();
+            // NOTE: ConfigureCodecPreferences() is called AFTER SetupMediaTracks()
+            // in the streaming flow, so transceivers exist when we set preferences.
             
             // Handle ICE candidates
             _peerConnection.OnIceCandidate = (candidate) =>
@@ -565,40 +591,63 @@ namespace Substream.Streaming
         /// </summary>
         private void ConfigureCodecPreferences()
         {
-            // Get available codecs and prioritize H.264
-            var senders = _peerConnection.GetTransceivers();
-            foreach (var transceiver in senders)
+            // Must be called AFTER SetupMediaTracks() so transceivers exist
+            var transceivers = _peerConnection.GetTransceivers();
+            
+            if (transceivers == null || transceivers.Length == 0)
             {
-                if (transceiver.Receiver.Track.Kind == TrackKind.Video)
+                Debug.LogWarning("[WHIP] No transceivers found - codec preferences not set. " +
+                    "Ensure ConfigureCodecPreferences is called after AddTrack.");
+                return;
+            }
+            
+            foreach (var transceiver in transceivers)
+            {
+                // Use MediaType instead of Receiver.Track.Kind (track may be null for send-only)
+                if (transceiver.Sender?.Track?.Kind == TrackKind.Video)
                 {
-                    var codecs = RTCRtpSender.GetCapabilities(TrackKind.Video).codecs;
-                    var h264Codecs = new List<RTCRtpCodecCapability>();
+                    var capabilities = RTCRtpSender.GetCapabilities(TrackKind.Video);
+                    if (capabilities?.codecs == null) continue;
                     
-                    foreach (var codec in codecs)
+                    var h264Codecs = new List<RTCRtpCodecCapability>();
+                    var supportCodecs = new List<RTCRtpCodecCapability>(); // RTX, RED, ULPFEC
+                    
+                    foreach (var codec in capabilities.codecs)
                     {
-                        // Prefer H.264 baseline profile for IVS compatibility
                         if (codec.mimeType == "video/H264")
                         {
-                            // Check for baseline profile (profile-level-id starts with 42)
+                            // Prioritize Baseline/Constrained Baseline (profile-level-id=42xxxx)
                             if (codec.sdpFmtpLine?.Contains("profile-level-id=42") == true)
                             {
-                                h264Codecs.Insert(0, codec); // Prioritize baseline
+                                h264Codecs.Insert(0, codec);
                             }
                             else
                             {
                                 h264Codecs.Add(codec);
                             }
                         }
+                        else if (codec.mimeType == "video/rtx" || 
+                                 codec.mimeType == "video/red" || 
+                                 codec.mimeType == "video/ulpfec")
+                        {
+                            // Keep retransmission/FEC codecs for reliability
+                            supportCodecs.Add(codec);
+                        }
                     }
                     
                     if (h264Codecs.Count > 0)
                     {
-                        transceiver.SetCodecPreferences(h264Codecs.ToArray());
-                        Debug.Log($"[WHIP] Set H.264 codec preferences ({h264Codecs.Count} variants)");
+                        // Combine H.264 + support codecs
+                        var allCodecs = new List<RTCRtpCodecCapability>(h264Codecs);
+                        allCodecs.AddRange(supportCodecs);
+                        
+                        transceiver.SetCodecPreferences(allCodecs.ToArray());
+                        Debug.Log($"[WHIP] Set H.264 codec preferences ({h264Codecs.Count} H.264 + {supportCodecs.Count} support codecs)");
                     }
                     else
                     {
-                        Debug.LogWarning("[WHIP] H.264 codec not found - IVS may reject stream");
+                        Debug.LogWarning("[WHIP] H.264 codec not found in capabilities - IVS may reject stream. " +
+                            "Available codecs: " + string.Join(", ", capabilities.codecs.Select(c => c.mimeType)));
                     }
                 }
             }
@@ -679,8 +728,26 @@ namespace Substream.Streaming
             var lines = sdp.Split('\n');
             var modifiedLines = new List<string>();
             bool inVideoSection = false;
-            string videoPayloadType = null;
+            bool addedBandwidth = false;
             
+            // First pass: find H.264 payload types from a=rtpmap lines
+            var h264PayloadTypes = new HashSet<string>();
+            foreach (var line in lines)
+            {
+                // a=rtpmap:96 H264/90000
+                if (line.Contains("a=rtpmap:") && line.Contains("H264"))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(line, @"a=rtpmap:(\d+)\s+H264");
+                    if (match.Success)
+                    {
+                        h264PayloadTypes.Add(match.Groups[1].Value);
+                    }
+                }
+            }
+            
+            Debug.Log($"[WHIP] Found H.264 payload types: {string.Join(", ", h264PayloadTypes)}");
+            
+            // Second pass: modify SDP
             foreach (var line in lines)
             {
                 string modifiedLine = line;
@@ -689,47 +756,53 @@ namespace Substream.Streaming
                 if (line.StartsWith("m=video"))
                 {
                     inVideoSection = true;
-                    // Extract first payload type (usually the preferred codec)
-                    var parts = line.Split(' ');
-                    if (parts.Length > 3)
-                    {
-                        videoPayloadType = parts[3]; // First payload type
-                    }
+                    addedBandwidth = false;
                 }
                 else if (line.StartsWith("m="))
                 {
                     inVideoSection = false;
                 }
                 
-                // Add bitrate constraints to video section
                 if (inVideoSection)
                 {
-                    // Check for H.264 fmtp line and ensure baseline profile
-                    if (line.Contains("a=fmtp:") && line.Contains("H264"))
+                    // Check for H.264 fmtp lines by payload type number
+                    foreach (var pt in h264PayloadTypes)
                     {
-                        // Ensure profile-level-id is baseline (42 prefix)
-                        // and add appropriate parameters
-                        if (!line.Contains("profile-level-id=42"))
+                        if (line.Contains($"a=fmtp:{pt} ") || line.Contains($"a=fmtp:{pt}\t"))
                         {
-                            // Try to modify to baseline if possible
-                            modifiedLine = line.Replace("profile-level-id=64", "profile-level-id=42");
-                        }
-                        
-                        // Add keyframe interval if not present (x-google-max-keyframe-interval)
-                        if (!line.Contains("x-google-"))
-                        {
-                            modifiedLine = modifiedLine.TrimEnd();
-                            if (!modifiedLine.EndsWith(";")) modifiedLine += ";";
-                            modifiedLine += $" x-google-max-keyframe-interval={keyframeIntervalSeconds * 1000}";
+                            // Replace High/Main profile with Baseline if present
+                            // profile-level-id is 6 hex chars: PPCCLL (profile, constraints, level)
+                            // 42xxxx = Baseline/Constrained Baseline
+                            // 4Dxxxx = Main
+                            // 64xxxx = High
+                            if (System.Text.RegularExpressions.Regex.IsMatch(modifiedLine, @"profile-level-id=(4[Dd]|64)\w{4}"))
+                            {
+                                // Replace with Constrained Baseline Level 3.1 (42e01f)
+                                modifiedLine = System.Text.RegularExpressions.Regex.Replace(
+                                    modifiedLine, 
+                                    @"profile-level-id=\w{6}", 
+                                    "profile-level-id=42e01f");
+                                Debug.Log($"[WHIP] Forced H.264 Baseline profile for PT {pt}");
+                            }
+                            
+                            // Add keyframe interval if not present
+                            if (!modifiedLine.Contains("x-google-"))
+                            {
+                                modifiedLine = modifiedLine.TrimEnd();
+                                if (!modifiedLine.EndsWith(";")) modifiedLine += ";";
+                                modifiedLine += $"x-google-max-keyframe-interval={keyframeIntervalSeconds * 1000}";
+                            }
+                            
+                            break;
                         }
                     }
                     
-                    // Add bandwidth constraint if we hit c= line in video
-                    if (line.StartsWith("c=IN") && !modifiedLines.Any(l => l.Contains("b=AS:")))
+                    // Add bandwidth constraint after c= line in video section
+                    if (line.StartsWith("c=IN") && !addedBandwidth)
                     {
                         modifiedLines.Add(modifiedLine);
-                        // Add bandwidth constraint (AS = Application Specific, in kbps)
                         modifiedLines.Add($"b=AS:{streamBitrateBps / 1000}");
+                        addedBandwidth = true;
                         continue;
                     }
                 }
@@ -842,40 +915,42 @@ namespace Substream.Streaming
         private void SetupStreamCamera()
         {
             // Use provided texture or create one
+            // Get the platform-appropriate texture format for WebRTC
+            var supportedFormat = WebRTC.GetSupportedRenderTextureFormat(SystemInfo.graphicsDeviceType);
+            Debug.Log($"[WHIP] Platform texture format: {supportedFormat} (GPU: {SystemInfo.graphicsDeviceType})");
+            
             if (sourceTexture != null)
             {
-                // Validate texture format - WebRTC requires BGRA
-                if (sourceTexture.graphicsFormat != UnityEngine.Experimental.Rendering.GraphicsFormat.B8G8R8A8_UNorm)
+                // Validate texture format
+                if (sourceTexture.format != supportedFormat)
                 {
-                    Debug.LogWarning($"[WHIP] Source texture format {sourceTexture.graphicsFormat} may not be supported. " +
-                        "WebRTC requires B8G8R8A8_UNorm (BGRA). Creating compatible texture instead.");
+                    Debug.LogWarning($"[WHIP] Source texture format {sourceTexture.format} doesn't match " +
+                        $"required {supportedFormat}. Creating compatible texture with blit.");
                     
-                    // Create a compatible texture and blit from source
                     int width = Mathf.Min(sourceTexture.width, 1280);
                     int height = Mathf.Min(sourceTexture.height, 720);
-                    _streamTexture = new RenderTexture(width, height, 0, UnityEngine.Experimental.Rendering.GraphicsFormat.B8G8R8A8_UNorm);
+                    _streamTexture = new RenderTexture(width, height, 0, supportedFormat);
                     _streamTexture.Create();
+                    _ownsStreamTexture = true;
                     
-                    // We'll need to blit each frame - set up a flag
                     _needsTextureBlit = true;
                     _sourceTextureForBlit = sourceTexture;
                 }
                 else
                 {
                     _streamTexture = sourceTexture;
+                    _ownsStreamTexture = false; // User owns this texture
                 }
             }
             else
             {
-                // Create render texture for streaming
-                // IVS max is 720p, but we allow configurable resolution
+                // Create render texture with platform-appropriate format
                 int width = Mathf.Min(streamWidth, 1280);
                 int height = Mathf.Min(streamHeight, 720);
                 
-                // IMPORTANT: Unity WebRTC requires B8G8R8A8_UNorm (BGRA) format
-                // Using ARGB32/RGBA will cause "graphics format not supported" error
-                _streamTexture = new RenderTexture(width, height, 24, UnityEngine.Experimental.Rendering.GraphicsFormat.B8G8R8A8_UNorm);
+                _streamTexture = new RenderTexture(width, height, 24, supportedFormat);
                 _streamTexture.Create();
+                _ownsStreamTexture = true;
                 
                 // Setup camera if not using provided texture
                 _streamCamera = sourceCamera ?? Camera.main;
@@ -883,7 +958,8 @@ namespace Substream.Streaming
                 if (_streamCamera != null)
                 {
                     // Create a dedicated stream camera that renders to our texture
-                    var streamCamGo = new GameObject("WhipStreamCamera");
+                    _streamCameraGo = new GameObject("WhipStreamCamera");
+                    var streamCamGo = _streamCameraGo;
                     var streamCam = streamCamGo.AddComponent<Camera>();
                     streamCam.CopyFrom(_streamCamera);
                     streamCam.targetTexture = _streamTexture;
