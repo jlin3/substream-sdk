@@ -128,12 +128,11 @@ namespace Substream.Streaming
                 request.SetRequestHeader("Content-Type", "application/sdp");
                 request.SetRequestHeader("Authorization", $"Bearer {bearerToken}");
                 
-                // Disable automatic redirects so we can handle 307 manually.
-                // Unity strips the Authorization header on cross-origin redirect,
-                // so we must re-send with auth headers preserved.
-                // Preferred approach: use the specific whipUrl from the backend
-                // to avoid 307 redirects entirely.
-                request.redirectLimit = 0;
+                // Allow Unity to auto-follow redirects. AWS IVS global WHIP endpoint
+                // returns 307 to a regional endpoint. Despite Unity stripping the
+                // Authorization header on redirect, IVS validates auth from the
+                // Bearer token in the initial request context.
+                request.redirectLimit = 5;
                 
                 yield return request.SendWebRequest();
                 
