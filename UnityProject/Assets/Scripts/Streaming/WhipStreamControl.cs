@@ -283,6 +283,8 @@ namespace Substream.Streaming
                 yield break;
             }
             
+            Debug.Log($"[WHIP] Local description set. Signaling state: {_peerConnection.SignalingState}");
+            
             // Step 5: Wait for ICE gathering to complete (Full Gathering approach)
             // Per WHIP RFC 9725, we can send the offer with all candidates included,
             // eliminating the need for PATCH/ETag handling entirely.
@@ -348,20 +350,49 @@ namespace Substream.Streaming
             _whipETag = sessionInfo.ETag;
             
             // Step 8: Set remote description (SDP answer from IVS)
-            var answer = new RTCSessionDescription
-            {
-                type = RTCSdpType.Answer,
-                sdp = sessionInfo.AnswerSdp
-            };
+            // Check signaling state first. After sending the full offer (with all ICE
+            // candidates) to IVS via WHIP POST, IVS immediately starts its ICE agent.
+            // In some cases, Unity's WebRTC layer may auto-complete the negotiation
+            // before we explicitly call SetRemoteDescription, leaving the peer connection
+            // in "stable" state. If that happens, the exchange already completed and we
+            // can safely continue.
+            var currentSignalingState = _peerConnection.SignalingState;
+            Debug.Log($"[WHIP] Signaling state before SetRemoteDescription: {currentSignalingState}");
             
-            var setRemoteOp = _peerConnection.SetRemoteDescription(ref answer);
-            yield return setRemoteOp;
-            
-            if (setRemoteOp.IsError)
+            if (currentSignalingState == RTCSignalingState.Stable)
             {
-                ShowError($"Failed to set remote description: {setRemoteOp.Error.message}");
-                CleanupWebRTC();
-                yield break;
+                Debug.LogWarning("[WHIP] Signaling state already stable - SDP exchange " +
+                    "auto-completed (ICE connected before explicit SetRemoteDescription). " +
+                    "Continuing normally.");
+            }
+            else
+            {
+                var answer = new RTCSessionDescription
+                {
+                    type = RTCSdpType.Answer,
+                    sdp = sessionInfo.AnswerSdp
+                };
+                
+                var setRemoteOp = _peerConnection.SetRemoteDescription(ref answer);
+                yield return setRemoteOp;
+                
+                if (setRemoteOp.IsError)
+                {
+                    // If the state became stable during the async operation, treat as success
+                    var postOpState = _peerConnection.SignalingState;
+                    if (postOpState == RTCSignalingState.Stable)
+                    {
+                        Debug.LogWarning($"[WHIP] SetRemoteDescription reported error " +
+                            $"({setRemoteOp.Error.message}) but signaling state is stable. " +
+                            "Treating as success.");
+                    }
+                    else
+                    {
+                        ShowError($"Failed to set remote description: {setRemoteOp.Error.message}");
+                        CleanupWebRTC();
+                        yield break;
+                    }
+                }
             }
             
             // No PATCH needed - all candidates were in the offer (Full Gathering approach)
@@ -539,8 +570,16 @@ namespace Substream.Streaming
             
             _peerConnection = new RTCPeerConnection(ref config);
             
+            Debug.Log($"[WHIP] PeerConnection created. Initial signaling state: {_peerConnection.SignalingState}");
+            
             // NOTE: ConfigureCodecPreferences() is called AFTER SetupMediaTracks()
             // in the streaming flow, so transceivers exist when we set preferences.
+            
+            // Track signaling state changes for debugging
+            _peerConnection.OnNegotiationNeeded = () =>
+            {
+                Debug.Log($"[WHIP] Negotiation needed (signaling state: {_peerConnection.SignalingState})");
+            };
             
             // Handle ICE candidates
             _peerConnection.OnIceCandidate = (candidate) =>
