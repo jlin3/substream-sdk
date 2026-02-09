@@ -24,7 +24,7 @@ declare module 'amazon-ivs-web-broadcast' {
   export interface StageStrategy {
     stageStreamsToPublish(): StageStream[];
     shouldPublishParticipant(info: StageParticipantInfo): boolean;
-    shouldSubscribeToParticipant(info: StageParticipantInfo): boolean;
+    shouldSubscribeToParticipant(info: StageParticipantInfo): SubscribeType | string;
   }
 
   export interface StageConnectionState {
