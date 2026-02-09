@@ -20,7 +20,7 @@ function ViewerContent() {
   const streamId = params.streamId as string;
   
   const [viewerData, setViewerData] = useState<{
-    token: string;
+    subscribeToken: string;
     participantId: string;
     stageArn: string;
     expiresAt: string;
@@ -121,7 +121,7 @@ function ViewerContent() {
       </header>
       
       <IvsRealTimeViewer
-        token={viewerData.token}
+        token={viewerData.subscribeToken}
         stageArn={viewerData.stageArn}
         participantId={viewerData.participantId}
       />
