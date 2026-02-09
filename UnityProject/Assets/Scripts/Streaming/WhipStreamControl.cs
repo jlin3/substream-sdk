@@ -403,7 +403,85 @@ namespace Substream.Streaming
             UpdateStatus("🔴 LIVE (WHIP)");
             Debug.Log($"[WHIP] Streaming started. Stream ID: {_currentStreamId}");
             
+            // Start periodic stats logging to verify frames are being sent
+            StartCoroutine(LogWebRtcStats());
+            
             OnStreamStarted?.Invoke();
+        }
+        
+        /// <summary>
+        /// Periodically logs WebRTC stats to verify video frames are being encoded and sent.
+        /// Critical for diagnosing black-screen issues on the viewer.
+        /// </summary>
+        private IEnumerator LogWebRtcStats()
+        {
+            // Wait a moment for connection to stabilize
+            yield return new WaitForSeconds(2f);
+            
+            while (_isStreaming && _peerConnection != null)
+            {
+                var statsOp = _peerConnection.GetStats();
+                yield return statsOp;
+                
+                if (statsOp.Value != null)
+                {
+                    var report = statsOp.Value;
+                    foreach (var stat in report.Stats)
+                    {
+                        // Log outbound video RTP stats
+                        if (stat.Value.Type == RTCStatsType.OutboundRtp)
+                        {
+                            // Check if it's a video track
+                            if (stat.Value.Dict.TryGetValue("kind", out var kind) && kind.ToString() == "video")
+                            {
+                                var d = stat.Value.Dict;
+                                string framesEncoded = d.ContainsKey("framesEncoded") ? d["framesEncoded"].ToString() : "N/A";
+                                string framesSent = d.ContainsKey("framesSent") ? d["framesSent"].ToString() : "N/A";
+                                string bytesSent = d.ContainsKey("bytesSent") ? d["bytesSent"].ToString() : "N/A";
+                                string qualityLimit = d.ContainsKey("qualityLimitationReason") ? d["qualityLimitationReason"].ToString() : "N/A";
+                                string encoderImpl = d.ContainsKey("encoderImplementation") ? d["encoderImplementation"].ToString() : "N/A";
+                                string nackCount = d.ContainsKey("nackCount") ? d["nackCount"].ToString() : "0";
+                                string pliCount = d.ContainsKey("pliCount") ? d["pliCount"].ToString() : "0";
+                                
+                                Debug.Log($"[WHIP STATS] Video: framesEncoded={framesEncoded}, " +
+                                    $"framesSent={framesSent}, bytesSent={bytesSent}, " +
+                                    $"encoder={encoderImpl}, qualityLimit={qualityLimit}, " +
+                                    $"nack={nackCount}, pli={pliCount}");
+                            }
+                        }
+                        
+                        // Log ICE candidate pair stats for connection health
+                        if (stat.Value.Type == RTCStatsType.CandidatePair)
+                        {
+                            var d = stat.Value.Dict;
+                            if (d.ContainsKey("state") && d["state"].ToString() == "succeeded")
+                            {
+                                string bytesS = d.ContainsKey("bytesSent") ? d["bytesSent"].ToString() : "0";
+                                string bytesR = d.ContainsKey("bytesReceived") ? d["bytesReceived"].ToString() : "0";
+                                string rtt = d.ContainsKey("currentRoundTripTime") ? d["currentRoundTripTime"].ToString() : "N/A";
+                                Debug.Log($"[WHIP STATS] ICE pair: bytesSent={bytesS}, bytesRecv={bytesR}, rtt={rtt}");
+                            }
+                        }
+                    }
+                }
+                
+                // Also log RenderTexture state
+                if (_streamTexture != null)
+                {
+                    Debug.Log($"[WHIP STATS] RenderTexture: {_streamTexture.width}x{_streamTexture.height}, " +
+                        $"format={_streamTexture.format}, created={_streamTexture.IsCreated()}, " +
+                        $"needsBlit={_needsTextureBlit}");
+                }
+                
+                // Log video track state
+                if (_videoTrack != null)
+                {
+                    Debug.Log($"[WHIP STATS] VideoTrack: enabled={_videoTrack.Enabled}, " +
+                        $"readyState={_videoTrack.ReadyState}");
+                }
+                
+                yield return new WaitForSeconds(5f);
+            }
         }
         
         private IEnumerator StopStreamingCoroutine()

@@ -87,6 +87,7 @@ export default function IvsRealTimeViewer({
     bitrate?: number;
     resolution?: string;
     fps?: number;
+    trackState?: string;
   }>({});
 
   // Handle participant streams
@@ -131,25 +132,66 @@ export default function IvsRealTimeViewer({
           fps: settings.frameRate,
         }));
 
-        // Monitor track for frames arriving (settings update when frames arrive)
-        const pollSettings = setInterval(() => {
-          if (track.readyState === 'ended') {
-            clearInterval(pollSettings);
-            return;
-          }
+        // Listen for track unmute event (fires when first frame arrives)
+        track.onunmute = () => {
+          console.log('[IVS Viewer] Video track UNMUTED - frames should be arriving now');
           const s = track.getSettings();
+          console.log('[IVS Viewer] Track settings after unmute:', JSON.stringify(s));
           if (s.width && s.height) {
             setStats(prev => ({
               ...prev,
               resolution: `${s.width}x${s.height}`,
               fps: s.frameRate,
             }));
-            clearInterval(pollSettings);
           }
-        }, 1000);
+        };
+        
+        track.onmute = () => {
+          console.log('[IVS Viewer] Video track MUTED - frames stopped');
+        };
+        
+        track.onended = () => {
+          console.log('[IVS Viewer] Video track ENDED');
+        };
 
-        // Clean up poll after 30s
-        setTimeout(() => clearInterval(pollSettings), 30000);
+        // Monitor track and video element for frames arriving
+        const pollSettings = setInterval(() => {
+          if (track.readyState === 'ended') {
+            clearInterval(pollSettings);
+            return;
+          }
+          const s = track.getSettings();
+          const vid = videoRef.current;
+          const vidW = vid?.videoWidth || 0;
+          const vidH = vid?.videoHeight || 0;
+          const vidReady = vid?.readyState || 0;
+          const vidTime = vid?.currentTime?.toFixed(2) || '0';
+          const trackMuted = track.muted;
+          
+          console.log(`[IVS Viewer] Poll: track.muted=${trackMuted}, ` +
+            `track.readyState=${track.readyState}, ` +
+            `settings=${s.width}x${s.height}, ` +
+            `video.readyState=${vidReady}, ` +
+            `video.dimensions=${vidW}x${vidH}, ` +
+            `video.currentTime=${vidTime}`);
+          
+          if (s.width && s.height) {
+            setStats(prev => ({
+              ...prev,
+              resolution: `${s.width}x${s.height}`,
+              fps: s.frameRate,
+            }));
+          } else if (vidW > 0 && vidH > 0) {
+            // Fall back to video element dimensions
+            setStats(prev => ({
+              ...prev,
+              resolution: `${vidW}x${vidH}`,
+            }));
+          }
+        }, 3000);
+
+        // Clean up poll after 60s
+        setTimeout(() => clearInterval(pollSettings), 60000);
       }
     });
 
@@ -413,13 +455,13 @@ export default function IvsRealTimeViewer({
         )}
       </div>
       
-      {/* Stats bar */}
+      {/* Stats bar - always show when connected for diagnostics */}
       <div style={styles.statsBar}>
-        {isPlaying && stats.resolution && <span>📺 {stats.resolution}</span>}
-        {isPlaying && stats.fps && <span>🎬 {stats.fps.toFixed(0)} fps</span>}
+        {stats.resolution && <span>📺 {stats.resolution}</span>}
+        {stats.fps ? <span>🎬 {stats.fps.toFixed(0)} fps</span> : null}
         {isPlaying && (
           <button onClick={handleMuteToggle} style={styles.muteButton}>
-            {isMuted ? '🔇 Unmute' : '🔊 Muted'}
+            {isMuted ? '🔇 Unmute' : '🔊 Sound On'}
           </button>
         )}
         <span style={{ 
