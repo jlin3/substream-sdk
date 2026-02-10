@@ -6,7 +6,10 @@ import { useEffect, useRef, useState, useCallback } from 'react';
  * IVS Real-Time Viewer Component
  * 
  * Uses the Amazon IVS Web Broadcast SDK to subscribe to a stage
- * and display the publisher's video stream.
+ * and display the publisher's video stream via canvas rendering.
+ * 
+ * Canvas rendering is used instead of direct <video> display to avoid
+ * browser-specific video element rendering quirks.
  * 
  * @see https://docs.aws.amazon.com/ivs/latest/RealTimeUserGuide/web-subscribe.html
  */
@@ -37,7 +40,7 @@ interface StageStream {
 interface StageStrategy {
   stageStreamsToPublish(): StageStream[];
   shouldPublishParticipant(info: StageParticipantInfo): boolean;
-  shouldSubscribeToParticipant(info: StageParticipantInfo): string; // Returns SubscribeType enum value
+  shouldSubscribeToParticipant(info: StageParticipantInfo): string;
 }
 
 interface StageEvents {
@@ -72,6 +75,8 @@ export default function IvsRealTimeViewer({
   participantId 
 }: IvsRealTimeViewerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animFrameRef = useRef<number>(0);
   const stageRef = useRef<{
     join(): Promise<void>;
     leave(): void;
@@ -82,13 +87,80 @@ export default function IvsRealTimeViewer({
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(true); // Start muted for autoplay
+  const [isMuted, setIsMuted] = useState(true);
   const [stats, setStats] = useState<{
-    bitrate?: number;
     resolution?: string;
     fps?: number;
-    trackState?: string;
+    pixelSample?: string; // Debug: center pixel color
   }>({});
+
+  // Draw video frames to canvas (bypasses <video> element display issues)
+  const startCanvasRenderer = useCallback(() => {
+    const videoEl = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!videoEl || !canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    let frameCount = 0;
+    let lastLogTime = Date.now();
+    
+    const drawFrame = () => {
+      if (videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
+        // Match canvas size to video
+        if (canvas.width !== videoEl.videoWidth || canvas.height !== videoEl.videoHeight) {
+          canvas.width = videoEl.videoWidth;
+          canvas.height = videoEl.videoHeight;
+          console.log(`[IVS Viewer] Canvas resized to ${canvas.width}x${canvas.height}`);
+        }
+        
+        // Draw video frame to canvas
+        ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+        frameCount++;
+        
+        // Log pixel sample every 5 seconds for diagnosis
+        const now = Date.now();
+        if (now - lastLogTime > 5000) {
+          try {
+            const cx = Math.floor(canvas.width / 2);
+            const cy = Math.floor(canvas.height / 2);
+            const pixel = ctx.getImageData(cx, cy, 1, 1).data;
+            const pixelStr = `rgba(${pixel[0]},${pixel[1]},${pixel[2]},${pixel[3]})`;
+            const isBlack = pixel[0] === 0 && pixel[1] === 0 && pixel[2] === 0;
+            
+            console.log(`[IVS Viewer] Canvas: ${frameCount} frames drawn, ` +
+              `center pixel: ${pixelStr}, isBlack: ${isBlack}, ` +
+              `video.currentTime: ${videoEl.currentTime.toFixed(1)}`);
+            
+            setStats(prev => ({
+              ...prev,
+              resolution: `${canvas.width}x${canvas.height}`,
+              pixelSample: isBlack ? 'BLACK' : pixelStr,
+            }));
+          } catch (e) {
+            // getImageData can fail with security errors on cross-origin content
+            console.warn('[IVS Viewer] Could not sample pixel:', e);
+          }
+          lastLogTime = now;
+          frameCount = 0;
+        }
+      }
+      
+      animFrameRef.current = requestAnimationFrame(drawFrame);
+    };
+    
+    console.log('[IVS Viewer] Starting canvas renderer');
+    drawFrame();
+  }, []);
+
+  // Stop canvas renderer
+  const stopCanvasRenderer = useCallback(() => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = 0;
+    }
+  }, []);
 
   // Handle participant streams
   const handleStreamsAdded = useCallback((participant: StageParticipantInfo, streams: StageStream[]) => {
@@ -97,7 +169,6 @@ export default function IvsRealTimeViewer({
       'streams:', streams.length,
       'types:', streams.map(s => s.streamType));
     
-    // Only handle remote participants (publisher)
     if (participant.isLocal) return;
     
     const videoEl = videoRef.current;
@@ -106,9 +177,7 @@ export default function IvsRealTimeViewer({
       return;
     }
 
-    // Create a MediaStream from the received tracks
     const mediaStream = new MediaStream();
-    let hasVideo = false;
     
     streams.forEach((stream) => {
       console.log('[IVS Viewer] Adding track:', stream.streamType, 
@@ -116,115 +185,38 @@ export default function IvsRealTimeViewer({
         'readyState:', stream.mediaStreamTrack.readyState,
         'muted:', stream.mediaStreamTrack.muted);
       mediaStream.addTrack(stream.mediaStreamTrack);
-      
-      // Track stats for video
-      if (stream.streamType === 'video') {
-        hasVideo = true;
-        const track = stream.mediaStreamTrack;
-        const settings = track.getSettings();
-        console.log('[IVS Viewer] Video track settings:', JSON.stringify(settings));
-        
-        const width = settings.width;
-        const height = settings.height;
-        setStats(prev => ({
-          ...prev,
-          resolution: width && height ? `${width}x${height}` : 'Initializing...',
-          fps: settings.frameRate,
-        }));
-
-        // Listen for track unmute event (fires when first frame arrives)
-        track.onunmute = () => {
-          console.log('[IVS Viewer] Video track UNMUTED - frames should be arriving now');
-          const s = track.getSettings();
-          console.log('[IVS Viewer] Track settings after unmute:', JSON.stringify(s));
-          if (s.width && s.height) {
-            setStats(prev => ({
-              ...prev,
-              resolution: `${s.width}x${s.height}`,
-              fps: s.frameRate,
-            }));
-          }
-        };
-        
-        track.onmute = () => {
-          console.log('[IVS Viewer] Video track MUTED - frames stopped');
-        };
-        
-        track.onended = () => {
-          console.log('[IVS Viewer] Video track ENDED');
-        };
-
-        // Monitor track and video element for frames arriving
-        const pollSettings = setInterval(() => {
-          if (track.readyState === 'ended') {
-            clearInterval(pollSettings);
-            return;
-          }
-          const s = track.getSettings();
-          const vid = videoRef.current;
-          const vidW = vid?.videoWidth || 0;
-          const vidH = vid?.videoHeight || 0;
-          const vidReady = vid?.readyState || 0;
-          const vidTime = vid?.currentTime?.toFixed(2) || '0';
-          const trackMuted = track.muted;
-          
-          console.log(`[IVS Viewer] Poll: track.muted=${trackMuted}, ` +
-            `track.readyState=${track.readyState}, ` +
-            `settings=${s.width}x${s.height}, ` +
-            `video.readyState=${vidReady}, ` +
-            `video.dimensions=${vidW}x${vidH}, ` +
-            `video.currentTime=${vidTime}`);
-          
-          if (s.width && s.height) {
-            setStats(prev => ({
-              ...prev,
-              resolution: `${s.width}x${s.height}`,
-              fps: s.frameRate,
-            }));
-          } else if (vidW > 0 && vidH > 0) {
-            // Fall back to video element dimensions
-            setStats(prev => ({
-              ...prev,
-              resolution: `${vidW}x${vidH}`,
-            }));
-          }
-        }, 3000);
-
-        // Clean up poll after 60s
-        setTimeout(() => clearInterval(pollSettings), 60000);
-      }
     });
 
-    console.log('[IVS Viewer] MediaStream tracks:', mediaStream.getTracks().length, 'hasVideo:', hasVideo);
+    console.log('[IVS Viewer] MediaStream tracks:', mediaStream.getTracks().length);
 
-    // Set the stream on the video element
+    // Set stream on hidden video element (used for decoding; canvas renders visually)
     videoEl.srcObject = mediaStream;
-    
-    // Start muted for autoplay compliance, then unmute
     videoEl.muted = true;
     videoEl.play()
       .then(() => {
         setIsPlaying(true);
-        console.log('[IVS Viewer] Video playback started (muted for autoplay)');
+        console.log('[IVS Viewer] Video decoding started, launching canvas renderer');
+        // Start drawing to canvas
+        startCanvasRenderer();
       })
       .catch((err) => {
-        console.error('[IVS Viewer] Autoplay failed even muted:', err);
+        console.error('[IVS Viewer] Autoplay failed:', err);
         setIsPlaying(false);
       });
-  }, []);
+  }, [startCanvasRenderer]);
 
-  // Handle participant leaving (stream ended)
+  // Handle participant leaving
   const handleStreamsRemoved = useCallback((participant: StageParticipantInfo) => {
     console.log('[IVS Viewer] Streams removed from:', participant.id);
-    
     if (participant.isLocal) return;
     
+    stopCanvasRenderer();
     const videoEl = videoRef.current;
     if (videoEl) {
       videoEl.srcObject = null;
       setIsPlaying(false);
     }
-  }, []);
+  }, [stopCanvasRenderer]);
 
   // Initialize IVS SDK and connect to stage
   useEffect(() => {
@@ -242,43 +234,31 @@ export default function IvsRealTimeViewer({
         setConnectionState('connecting');
         setError(null);
 
-        // Dynamically import the IVS Web Broadcast SDK
-        // This is required because it uses browser-only APIs
         const IVSModule = await import('amazon-ivs-web-broadcast') as unknown as IVSBroadcastClient;
-        
         if (!mounted) return;
 
-        console.log('[IVS Viewer] SDK loaded, SubscribeType values:', JSON.stringify(IVSModule.SubscribeType));
+        console.log('[IVS Viewer] SDK loaded, SubscribeType:', JSON.stringify(IVSModule.SubscribeType));
 
-        // Create stage strategy (subscribe-only, no publishing)
-        // IMPORTANT: shouldSubscribeToParticipant must return SubscribeType enum, NOT boolean
         const strategy: StageStrategy = {
-          stageStreamsToPublish: () => [], // We don't publish anything
-          shouldPublishParticipant: () => false, // Never publish
+          stageStreamsToPublish: () => [],
+          shouldPublishParticipant: () => false,
           shouldSubscribeToParticipant: (info) => {
             const subscribeType = info.isLocal 
               ? IVSModule.SubscribeType.NONE 
               : IVSModule.SubscribeType.AUDIO_VIDEO;
-            console.log('[IVS Viewer] shouldSubscribeToParticipant:', info.id, 
-              'isLocal:', info.isLocal, 
-              'returning:', subscribeType);
+            console.log('[IVS Viewer] shouldSubscribe:', info.id, subscribeType);
             return subscribeType;
           },
         };
 
-        // Create and join the stage
         stage = new IVSModule.Stage(token, strategy);
 
-        // Set up event handlers
         stage.on(IVSModule.StageEvents.STAGE_CONNECTION_STATE_CHANGED, 
           (...args: unknown[]) => {
             const state = args[0] as string;
             console.log('[IVS Viewer] Connection state:', state);
-            if (state === 'connected') {
-              setConnectionState('connected');
-            } else if (state === 'disconnected') {
-              setConnectionState('disconnected');
-            }
+            if (state === 'connected') setConnectionState('connected');
+            else if (state === 'disconnected') setConnectionState('disconnected');
           }
         );
 
@@ -286,11 +266,7 @@ export default function IvsRealTimeViewer({
           (...args: unknown[]) => {
             const info = args[0] as StageParticipantInfo;
             console.log('[IVS Viewer] Participant joined:', info.id, 'isLocal:', info.isLocal);
-            // Refresh strategy so SDK re-evaluates subscription for new participant
-            if (!info.isLocal && stage) {
-              console.log('[IVS Viewer] Refreshing strategy for new participant');
-              stage.refreshStrategy();
-            }
+            if (!info.isLocal && stage) stage.refreshStrategy();
           }
         );
 
@@ -298,35 +274,24 @@ export default function IvsRealTimeViewer({
           (...args: unknown[]) => {
             const info = args[0] as StageParticipantInfo;
             console.log('[IVS Viewer] Participant left:', info.id);
-            if (!info.isLocal) {
-              // Publisher left - stream ended
-              setError('Stream ended');
-            }
+            if (!info.isLocal) setError('Stream ended');
           }
         );
 
-        // Handle publish state changes (WHIP publisher may start publishing after join)
         stage.on(IVSModule.StageEvents.STAGE_PARTICIPANT_PUBLISH_STATE_CHANGED,
           (...args: unknown[]) => {
             const info = args[0] as StageParticipantInfo;
-            const publishState = args[1] as string;
-            console.log('[IVS Viewer] Participant publish state changed:', info.id, 
-              'state:', publishState, 'isLocal:', info.isLocal);
-            // When a remote participant starts publishing, refresh strategy to trigger subscription
-            if (!info.isLocal && stage) {
-              console.log('[IVS Viewer] Refreshing strategy after publish state change');
-              stage.refreshStrategy();
-            }
+            const pubState = args[1] as string;
+            console.log('[IVS Viewer] Publish state:', info.id, pubState);
+            if (!info.isLocal && stage) stage.refreshStrategy();
           }
         );
 
-        // Handle subscribe state changes (for debugging)
         stage.on(IVSModule.StageEvents.STAGE_PARTICIPANT_SUBSCRIBE_STATE_CHANGED,
           (...args: unknown[]) => {
             const info = args[0] as StageParticipantInfo;
-            const subscribeState = args[1] as string;
-            console.log('[IVS Viewer] Subscribe state changed:', info.id, 
-              'state:', subscribeState);
+            const subState = args[1] as string;
+            console.log('[IVS Viewer] Subscribe state:', info.id, subState);
           }
         );
 
@@ -345,64 +310,51 @@ export default function IvsRealTimeViewer({
           }
         );
 
-        // Join the stage
-        console.log('[IVS Viewer] Joining stage with token length:', token?.length);
+        console.log('[IVS Viewer] Joining stage...');
         await stage.join();
-        console.log('[IVS Viewer] Successfully joined stage');
+        console.log('[IVS Viewer] Joined stage');
 
-        if (mounted) {
-          stageRef.current = stage;
-        }
+        if (mounted) stageRef.current = stage;
       } catch (err) {
         console.error('[IVS Viewer] Failed to initialize:', err);
         if (mounted) {
           setConnectionState('error');
-          setError(err instanceof Error ? err.message : 'Failed to connect to stream');
+          setError(err instanceof Error ? err.message : 'Failed to connect');
         }
       }
     }
 
     initializeStage();
 
-    // Cleanup on unmount
     return () => {
       mounted = false;
-      if (stage) {
-        console.log('[IVS Viewer] Leaving stage...');
-        stage.leave();
-      }
+      stopCanvasRenderer();
+      if (stage) { stage.leave(); }
     };
-  }, [token, handleStreamsAdded, handleStreamsRemoved]);
+  }, [token, handleStreamsAdded, handleStreamsRemoved, stopCanvasRenderer]);
 
-  // Manual play/unmute button handler
   const handlePlayClick = async () => {
     const videoEl = videoRef.current;
-    if (videoEl) {
+    if (!videoEl?.srcObject) return;
+    try {
+      videoEl.muted = false;
+      setIsMuted(false);
+      await videoEl.play();
+      setIsPlaying(true);
+      startCanvasRenderer();
+    } catch {
+      videoEl.muted = true;
+      setIsMuted(true);
       try {
-        if (!videoEl.srcObject) {
-          console.warn('[IVS Viewer] No srcObject on video element');
-          return;
-        }
-        videoEl.muted = false;
-        setIsMuted(false);
         await videoEl.play();
         setIsPlaying(true);
-      } catch (err) {
-        console.error('[IVS Viewer] Play failed:', err);
-        // If unmuted play fails, try muted
-        videoEl.muted = true;
-        setIsMuted(true);
-        try {
-          await videoEl.play();
-          setIsPlaying(true);
-        } catch (err2) {
-          console.error('[IVS Viewer] Even muted play failed:', err2);
-        }
+        startCanvasRenderer();
+      } catch (e) {
+        console.error('[IVS Viewer] Play failed:', e);
       }
     }
   };
 
-  // Toggle mute
   const handleMuteToggle = () => {
     const videoEl = videoRef.current;
     if (videoEl) {
@@ -413,14 +365,21 @@ export default function IvsRealTimeViewer({
 
   return (
     <div style={styles.container}>
-      {/* Video container */}
+      {/* Video area */}
       <div style={styles.videoWrapper}>
+        {/* Hidden video element - used for decoding only */}
         <video
           ref={videoRef}
-          style={styles.video}
+          style={styles.hiddenVideo}
           autoPlay
           playsInline
           muted
+        />
+        
+        {/* Canvas element - used for visual rendering */}
+        <canvas
+          ref={canvasRef}
+          style={styles.canvas}
         />
         
         {/* Loading overlay */}
@@ -438,7 +397,7 @@ export default function IvsRealTimeViewer({
           </div>
         )}
         
-        {/* Play button for when video hasn't started yet */}
+        {/* Play button */}
         {connectionState === 'connected' && !isPlaying && (
           <div style={styles.overlay}>
             <button onClick={handlePlayClick} style={styles.playButton}>
@@ -447,7 +406,7 @@ export default function IvsRealTimeViewer({
           </div>
         )}
         
-        {/* Stream ended overlay */}
+        {/* Stream ended */}
         {error === 'Stream ended' && (
           <div style={styles.overlay}>
             <p>The stream has ended</p>
@@ -455,10 +414,14 @@ export default function IvsRealTimeViewer({
         )}
       </div>
       
-      {/* Stats bar - always show when connected for diagnostics */}
+      {/* Stats bar */}
       <div style={styles.statsBar}>
         {stats.resolution && <span>📺 {stats.resolution}</span>}
-        {stats.fps != null && isFinite(stats.fps) ? <span>🎬 {stats.fps.toFixed(0)} fps</span> : null}
+        {stats.pixelSample && (
+          <span style={{ color: stats.pixelSample === 'BLACK' ? '#ef4444' : '#22c55e' }}>
+            🎨 {stats.pixelSample === 'BLACK' ? 'Content is BLACK (Unity camera issue)' : stats.pixelSample}
+          </span>
+        )}
         {isPlaying && (
           <button onClick={handleMuteToggle} style={styles.muteButton}>
             {isMuted ? '🔇 Unmute' : '🔊 Sound On'}
@@ -485,11 +448,19 @@ const styles: Record<string, React.CSSProperties> = {
   videoWrapper: {
     flex: 1,
     position: 'relative',
-    backgroundColor: '#000',
+    backgroundColor: '#111',
     minHeight: '300px',
     overflow: 'hidden',
   },
-  video: {
+  hiddenVideo: {
+    // Hidden: only used for decoding, canvas renders visually
+    position: 'absolute',
+    width: '1px',
+    height: '1px',
+    opacity: 0,
+    pointerEvents: 'none' as const,
+  },
+  canvas: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -507,6 +478,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     gap: '1rem',
+    zIndex: 10,
   },
   spinner: {
     width: '48px',
@@ -524,7 +496,6 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     borderRadius: '12px',
     cursor: 'pointer',
-    transition: 'transform 0.2s, background-color 0.2s',
   },
   statsBar: {
     display: 'flex',
@@ -534,6 +505,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '0.75rem',
     color: '#888',
     alignItems: 'center',
+    flexWrap: 'wrap' as const,
   },
   muteButton: {
     background: 'none',
