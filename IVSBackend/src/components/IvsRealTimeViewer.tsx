@@ -458,7 +458,7 @@ export default function IvsRealTimeViewer({
       {/* Stats bar - always show when connected for diagnostics */}
       <div style={styles.statsBar}>
         {stats.resolution && <span>📺 {stats.resolution}</span>}
-        {stats.fps ? <span>🎬 {stats.fps.toFixed(0)} fps</span> : null}
+        {stats.fps != null && isFinite(stats.fps) ? <span>🎬 {stats.fps.toFixed(0)} fps</span> : null}
         {isPlaying && (
           <button onClick={handleMuteToggle} style={styles.muteButton}>
             {isMuted ? '🔇 Unmute' : '🔊 Sound On'}
@@ -485,17 +485,18 @@ const styles: Record<string, React.CSSProperties> = {
   videoWrapper: {
     flex: 1,
     position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#000',
     minHeight: '300px',
+    overflow: 'hidden',
   },
   video: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
     width: '100%',
     height: '100%',
     objectFit: 'contain',
-    backgroundColor: '#000',
+    display: 'block',
   },
   overlay: {
     position: 'absolute',
