@@ -115,8 +115,13 @@ export default function IvsRealTimeViewer({
           console.log(`[IVS Viewer] Canvas resized to ${canvas.width}x${canvas.height}`);
         }
         
-        // Draw video frame to canvas
+        // Draw video frame to canvas (flip vertically to correct GPU framebuffer Y-axis)
+        // ScreenCapture.CaptureScreenshotIntoRenderTexture captures with inverted Y
+        ctx.save();
+        ctx.translate(0, canvas.height);
+        ctx.scale(1, -1);
         ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+        ctx.restore();
         frameCount++;
         
         // Log pixel sample every 5 seconds for diagnosis
@@ -462,11 +467,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   canvas: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100%',
-    objectFit: 'contain',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    maxWidth: '100%',
+    maxHeight: '100%',
     display: 'block',
   },
   overlay: {
