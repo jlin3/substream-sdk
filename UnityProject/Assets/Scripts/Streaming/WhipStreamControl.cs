@@ -1368,12 +1368,21 @@ namespace Substream.Streaming
         private int _cachedSampleRate;
 
         /// <summary>
+        /// Cache sample rate immediately during AddComponent, before
+        /// OnAudioFilterRead can fire on the audio thread.
+        /// </summary>
+        void Awake()
+        {
+            _cachedSampleRate = AudioSettings.outputSampleRate; // main thread -- safe
+            Debug.Log($"[WHIP Audio] Sample rate cached in Awake: {_cachedSampleRate}");
+        }
+
+        /// <summary>
         /// Initialize the audio capture. Must be called from the main thread.
         /// Returns the AudioStreamTrack to be added to the peer connection.
         /// </summary>
         public AudioStreamTrack Init()
         {
-            _cachedSampleRate = AudioSettings.outputSampleRate; // main thread -- safe
             _audioTrack = new AudioStreamTrack();
             Debug.Log($"[WHIP Audio] Initialized capture (sampleRate: {_cachedSampleRate})");
             return _audioTrack;
