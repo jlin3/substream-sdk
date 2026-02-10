@@ -69,6 +69,13 @@ namespace Substream.Streaming
         [Tooltip("Render texture to stream (alternative to camera)")]
         public RenderTexture sourceTexture;
         
+        [Tooltip("Use screen capture instead of dedicated camera (fallback for edge cases)")]
+        public bool useScreenCapture = false;
+        
+        [Header("Audio")]
+        [Tooltip("Enable audio streaming from the game's AudioListener")]
+        public bool enableAudio = true;
+        
         [Header("UI References (Optional)")]
         public TMP_Text statusText;
         public TMP_Text errorText;
@@ -100,6 +107,7 @@ namespace Substream.Streaming
         private bool _needsTextureBlit = false;
         private RenderTexture _sourceTextureForBlit;
         private GameObject _streamCameraGo; // Track for cleanup
+        private WhipAudioCapture _audioCapture; // Audio capture helper
         
         // ICE gathering
         private List<RTCIceCandidate> _pendingCandidates = new List<RTCIceCandidate>();
@@ -800,9 +808,26 @@ namespace Substream.Streaming
                 Debug.Log($"[WHIP] Added video track: {constrainedWidth}x{constrainedHeight}@{streamFramerate}fps");
             }
             
-            // Audio track (optional - uses default audio source)
-            // Note: Audio requires AudioListener or AudioSource setup
-            // For now, we'll skip audio in this implementation
+            // Audio track from AudioListener (captures all game audio)
+            if (enableAudio)
+            {
+                var listener = FindObjectOfType<AudioListener>();
+                if (listener != null)
+                {
+                    _audioCapture = listener.gameObject.AddComponent<WhipAudioCapture>();
+                    _audioCapture.Init(_peerConnection, _mediaStream);
+                    Debug.Log("[WHIP] Audio track added from AudioListener");
+                }
+                else
+                {
+                    Debug.LogWarning("[WHIP] No AudioListener found in scene - audio will not be streamed. " +
+                        "Add an AudioListener component to a GameObject (usually the Main Camera).");
+                }
+            }
+            else
+            {
+                Debug.Log("[WHIP] Audio streaming disabled");
+            }
             
             Debug.Log("[WHIP] Media tracks configured");
         }
@@ -953,6 +978,13 @@ namespace Substream.Streaming
                 _audioTrack = null;
             }
             
+            // Clean up audio capture helper
+            if (_audioCapture != null)
+            {
+                Destroy(_audioCapture);
+                _audioCapture = null;
+            }
+            
             if (_mediaStream != null)
             {
                 _mediaStream.Dispose();
@@ -1067,9 +1099,35 @@ namespace Substream.Streaming
                     _ownsStreamTexture = false;
                 }
             }
-            else if (sourceCamera != null)
+            else if (useScreenCapture)
             {
-                // User provided a specific camera - clone it (advanced use)
+                // FALLBACK: Screen capture mode (captures Game View)
+                // Resolution depends on Game View window size - use dedicated camera for fixed resolution.
+                int width = Mathf.Min(streamWidth, 1280);
+                int height = Mathf.Min(streamHeight, 720);
+                
+                _streamTexture = new RenderTexture(width, height, 0, supportedFormat);
+                _streamTexture.Create();
+                _ownsStreamTexture = true;
+                
+                _screenCaptureCoroutine = StartCoroutine(ScreenCaptureLoop());
+                
+                Debug.Log($"[WHIP] Screen capture mode: {width}x{height} (Game View dependent)");
+            }
+            else
+            {
+                // DEFAULT: Dedicated stream camera at fixed resolution
+                // Renders to a 1280x720 RenderTexture independent of Game View size.
+                // CopyFrom() copies base Camera settings; CopyUrpCameraData() copies
+                // URP-specific settings (renderer, post-processing, etc.) via reflection.
+                _streamCamera = sourceCamera ?? Camera.main;
+                
+                if (_streamCamera == null)
+                {
+                    Debug.LogError("[WHIP] No camera found! Assign sourceCamera or ensure Camera.main exists.");
+                    return;
+                }
+                
                 int width = Mathf.Min(streamWidth, 1280);
                 int height = Mathf.Min(streamHeight, 720);
                 
@@ -1079,42 +1137,83 @@ namespace Substream.Streaming
                 
                 _streamCameraGo = new GameObject("WhipStreamCamera");
                 var streamCam = _streamCameraGo.AddComponent<Camera>();
-                streamCam.CopyFrom(sourceCamera);
+                streamCam.CopyFrom(_streamCamera);
                 streamCam.targetTexture = _streamTexture;
                 streamCam.enabled = true;
+                // Render before the main camera so texture is ready for WebRTC
+                streamCam.depth = _streamCamera.depth - 1;
                 
-                _streamCameraGo.transform.SetParent(sourceCamera.transform);
+                // URP fix: copy UniversalAdditionalCameraData settings
+                CopyUrpCameraData(_streamCamera, streamCam);
+                
+                // Parent to source camera so it follows position/rotation
+                _streamCameraGo.transform.SetParent(_streamCamera.transform);
                 _streamCameraGo.transform.localPosition = Vector3.zero;
                 _streamCameraGo.transform.localRotation = Quaternion.identity;
                 
-                Debug.Log($"[WHIP] Clone camera setup: {width}x{height}");
+                Debug.Log($"[WHIP] Dedicated stream camera: {width}x{height} (fixed resolution, URP-compatible)");
             }
-            else
+        }
+        
+        /// <summary>
+        /// Copies URP-specific camera data from source to destination camera.
+        /// Uses reflection to avoid a hard dependency on UnityEngine.Rendering.Universal,
+        /// so the code compiles with any render pipeline (Built-in, URP, HDRP).
+        /// Falls back gracefully if URP is not installed.
+        /// </summary>
+        private void CopyUrpCameraData(Camera source, Camera dest)
+        {
+            try
             {
-                // DEFAULT: Screen capture mode (works with ALL render pipelines)
-                // This captures the final rendered frame exactly as the player sees it,
-                // including post-processing, UI overlays, and URP camera stacking.
-                // The clone camera approach doesn't work with URP because CopyFrom()
-                // doesn't copy UniversalAdditionalCameraData (renderer, camera stack, etc).
-                int width = Mathf.Min(streamWidth, 1280);
-                int height = Mathf.Min(streamHeight, 720);
+                var sourceData = source.GetComponent("UniversalAdditionalCameraData");
+                var destData = dest.GetComponent("UniversalAdditionalCameraData");
                 
-                _streamTexture = new RenderTexture(width, height, 0, supportedFormat);
-                _streamTexture.Create();
-                _ownsStreamTexture = true;
+                if (sourceData == null || destData == null)
+                {
+                    Debug.Log("[WHIP] No UniversalAdditionalCameraData found (not URP or not yet added)");
+                    return;
+                }
                 
-                // Start screen capture coroutine
-                _screenCaptureCoroutine = StartCoroutine(ScreenCaptureLoop());
+                var type = sourceData.GetType();
                 
-                Debug.Log($"[WHIP] Screen capture mode: {width}x{height} (works with URP/HDRP/Built-in)");
+                // Copy key URP camera properties via reflection
+                string[] propertiesToCopy = new[]
+                {
+                    "renderType",
+                    "scriptableRenderer",
+                    "renderPostProcessing",
+                    "antialiasing",
+                    "antialiasingQuality",
+                    "volumeLayerMask",
+                    "requiresColorTexture",
+                    "requiresDepthTexture",
+                    "renderShadows",
+                    "requiresColorOption",
+                    "requiresDepthOption",
+                };
+                
+                int copied = 0;
+                foreach (var propName in propertiesToCopy)
+                {
+                    var prop = type.GetProperty(propName);
+                    if (prop != null && prop.CanRead && prop.CanWrite)
+                    {
+                        prop.SetValue(destData, prop.GetValue(sourceData));
+                        copied++;
+                    }
+                }
+                
+                Debug.Log($"[WHIP] Copied {copied} URP camera properties via reflection");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[WHIP] Could not copy URP camera data (non-fatal): {e.Message}");
             }
         }
         
         /// <summary>
         /// Captures the final screen output into the stream RenderTexture each frame.
-        /// Uses WaitForEndOfFrame to ensure all rendering (including post-processing
-        /// and UI) is complete before capturing.
-        /// Works with all render pipelines: Built-in, URP, HDRP.
+        /// Only used when useScreenCapture is enabled (fallback mode).
         /// </summary>
         private IEnumerator ScreenCaptureLoop()
         {
@@ -1125,9 +1224,6 @@ namespace Substream.Streaming
                 
                 if (_streamTexture != null && _streamTexture.IsCreated())
                 {
-                    // CaptureScreenshotIntoRenderTexture copies the display buffer
-                    // into our RenderTexture, auto-scaling if dimensions differ.
-                    // This is the most reliable way to capture what's on screen.
                     ScreenCapture.CaptureScreenshotIntoRenderTexture(_streamTexture);
                 }
             }
@@ -1205,6 +1301,54 @@ namespace Substream.Streaming
         private class WhipStopRequest
         {
             public string streamId;
+        }
+    }
+    
+    /// <summary>
+    /// Helper component that captures game audio from an AudioListener and feeds it
+    /// to a WebRTC AudioStreamTrack. Attach to the same GameObject as the AudioListener.
+    /// 
+    /// This uses OnAudioFilterRead to intercept the audio pipeline and forward
+    /// audio samples to the WebRTC track for streaming.
+    /// </summary>
+    public class WhipAudioCapture : MonoBehaviour
+    {
+        private AudioStreamTrack _audioTrack;
+        private bool _initialized = false;
+        
+        /// <summary>
+        /// Initialize the audio capture with a peer connection and media stream.
+        /// Creates an AudioStreamTrack and adds it to both the stream and connection.
+        /// </summary>
+        public void Init(RTCPeerConnection peerConnection, MediaStream mediaStream)
+        {
+            _audioTrack = new AudioStreamTrack();
+            mediaStream.AddTrack(_audioTrack);
+            peerConnection.AddTrack(_audioTrack, mediaStream);
+            _initialized = true;
+            Debug.Log($"[WHIP Audio] Initialized audio capture (sampleRate: {AudioSettings.outputSampleRate})");
+        }
+        
+        /// <summary>
+        /// Called by Unity's audio system on the audio thread.
+        /// Forwards audio samples to the WebRTC AudioStreamTrack.
+        /// </summary>
+        void OnAudioFilterRead(float[] data, int channels)
+        {
+            if (_initialized && _audioTrack != null)
+            {
+                _audioTrack.SetData(data, channels, AudioSettings.outputSampleRate);
+            }
+        }
+        
+        void OnDestroy()
+        {
+            if (_audioTrack != null)
+            {
+                _audioTrack.Dispose();
+                _audioTrack = null;
+            }
+            _initialized = false;
         }
     }
 }
