@@ -107,7 +107,6 @@ namespace Substream.Streaming
         private bool _needsTextureBlit = false;
         private RenderTexture _sourceTextureForBlit;
         private GameObject _streamCameraGo; // Track for cleanup
-        private WhipAudioCapture _audioCapture; // Audio capture helper
         
         // ICE gathering
         private List<RTCIceCandidate> _pendingCandidates = new List<RTCIceCandidate>();
@@ -143,8 +142,8 @@ namespace Substream.Streaming
             // Load config from PlayerPrefs if not set
             LoadSavedConfig();
             
-            // Setup camera for streaming
-            SetupStreamCamera();
+            // NOTE: SetupStreamCamera() is called lazily in StartStreamingCoroutine()
+            // because Camera.main may not be available yet during Start().
             
             UpdateStatus("Ready to stream (WHIP)");
         }
@@ -243,6 +242,19 @@ namespace Substream.Streaming
         private IEnumerator StartStreamingCoroutine()
         {
             UpdateStatus("Starting WHIP stream...");
+            
+            // Step 0: Setup stream camera (deferred from Start() because Camera.main
+            // may not be available during scene loading)
+            if (_streamTexture == null)
+            {
+                SetupStreamCamera();
+                
+                if (_streamTexture == null)
+                {
+                    ShowError("Failed to setup stream camera/texture");
+                    yield break;
+                }
+            }
             
             // Step 1: Request WHIP credentials from backend
             yield return RequestWhipCredentials();
@@ -808,15 +820,29 @@ namespace Substream.Streaming
                 Debug.Log($"[WHIP] Added video track: {constrainedWidth}x{constrainedHeight}@{streamFramerate}fps");
             }
             
-            // Audio track from AudioListener (captures all game audio)
+            // Audio track - uses AudioStreamTrack(AudioSource) constructor
+            // which handles audio capture internally without OnAudioFilterRead,
+            // avoiding thread issues and AudioSource/AudioListener conflicts.
             if (enableAudio)
             {
                 var listener = FindObjectOfType<AudioListener>();
                 if (listener != null)
                 {
-                    _audioCapture = listener.gameObject.AddComponent<WhipAudioCapture>();
-                    _audioCapture.Init(_peerConnection, _mediaStream);
-                    Debug.Log("[WHIP] Audio track added from AudioListener");
+                    // Get or create an AudioSource on the AudioListener's GameObject
+                    var audioSource = listener.GetComponent<AudioSource>();
+                    if (audioSource == null)
+                    {
+                        audioSource = listener.gameObject.AddComponent<AudioSource>();
+                        Debug.Log("[WHIP] Created AudioSource on AudioListener GameObject for streaming");
+                    }
+                    
+                    // AudioStreamTrack(AudioSource) captures audio from the source
+                    // without needing OnAudioFilterRead or manual SetData calls
+                    _audioTrack = new AudioStreamTrack(audioSource);
+                    _mediaStream.AddTrack(_audioTrack);
+                    _peerConnection.AddTrack(_audioTrack, _mediaStream);
+                    
+                    Debug.Log("[WHIP] Audio track added from AudioSource");
                 }
                 else
                 {
@@ -978,12 +1004,7 @@ namespace Substream.Streaming
                 _audioTrack = null;
             }
             
-            // Clean up audio capture helper
-            if (_audioCapture != null)
-            {
-                Destroy(_audioCapture);
-                _audioCapture = null;
-            }
+            // Audio track is disposed above with _audioTrack.Dispose()
             
             if (_mediaStream != null)
             {
@@ -1304,51 +1325,4 @@ namespace Substream.Streaming
         }
     }
     
-    /// <summary>
-    /// Helper component that captures game audio from an AudioListener and feeds it
-    /// to a WebRTC AudioStreamTrack. Attach to the same GameObject as the AudioListener.
-    /// 
-    /// This uses OnAudioFilterRead to intercept the audio pipeline and forward
-    /// audio samples to the WebRTC track for streaming.
-    /// </summary>
-    public class WhipAudioCapture : MonoBehaviour
-    {
-        private AudioStreamTrack _audioTrack;
-        private bool _initialized = false;
-        
-        /// <summary>
-        /// Initialize the audio capture with a peer connection and media stream.
-        /// Creates an AudioStreamTrack and adds it to both the stream and connection.
-        /// </summary>
-        public void Init(RTCPeerConnection peerConnection, MediaStream mediaStream)
-        {
-            _audioTrack = new AudioStreamTrack();
-            mediaStream.AddTrack(_audioTrack);
-            peerConnection.AddTrack(_audioTrack, mediaStream);
-            _initialized = true;
-            Debug.Log($"[WHIP Audio] Initialized audio capture (sampleRate: {AudioSettings.outputSampleRate})");
-        }
-        
-        /// <summary>
-        /// Called by Unity's audio system on the audio thread.
-        /// Forwards audio samples to the WebRTC AudioStreamTrack.
-        /// </summary>
-        void OnAudioFilterRead(float[] data, int channels)
-        {
-            if (_initialized && _audioTrack != null)
-            {
-                _audioTrack.SetData(data, channels, AudioSettings.outputSampleRate);
-            }
-        }
-        
-        void OnDestroy()
-        {
-            if (_audioTrack != null)
-            {
-                _audioTrack.Dispose();
-                _audioTrack = null;
-            }
-            _initialized = false;
-        }
-    }
 }
