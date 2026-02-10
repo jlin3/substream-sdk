@@ -821,44 +821,19 @@ namespace Substream.Streaming
                 Debug.Log($"[WHIP] Added video track: {constrainedWidth}x{constrainedHeight}@{streamFramerate}fps");
             }
             
-            // Audio track - captures game audio from the AudioListener.
-            // Uses WhipAudioCapture (OnAudioFilterRead) for full game audio mix
-            // when possible; falls back to AudioStreamTrack(AudioSource) if the
-            // AudioListener's GameObject also has an AudioSource (conflict).
+            // Audio track from AudioListener (captures all game audio)
             if (enableAudio)
             {
                 var listener = FindObjectOfType<AudioListener>();
                 if (listener != null)
                 {
-                    bool hasAudioSource = listener.GetComponent<AudioSource>() != null;
-                    
-                    if (!hasAudioSource)
-                    {
-                        // No conflict: OnAudioFilterRead binds to AudioListener
-                        // -> captures the full game audio mix
-                        _audioCapture = listener.gameObject.AddComponent<WhipAudioCapture>();
-                        _audioTrack = _audioCapture.Init();
-                        Debug.Log("[WHIP] Audio track added via OnAudioFilterRead (full game audio)");
-                    }
-                    else
-                    {
-                        // Conflict: GO has both AudioSource + AudioListener.
-                        // OnAudioFilterRead would bind to AudioSource (not the full mix).
-                        // Fallback: capture from the existing AudioSource directly.
-                        Debug.LogWarning("[WHIP] AudioListener GO has an AudioSource -- " +
-                            "using AudioStreamTrack(AudioSource) fallback (captures only that source, not full mix).");
-                        var audioSource = listener.GetComponent<AudioSource>();
-                        _audioTrack = new AudioStreamTrack(audioSource);
-                    }
-                    
-                    _mediaStream.AddTrack(_audioTrack);
-                    _peerConnection.AddTrack(_audioTrack, _mediaStream);
-                    Debug.Log("[WHIP] Audio track added");
+                    _audioCapture = listener.gameObject.AddComponent<WhipAudioCapture>();
+                    _audioCapture.Init(_peerConnection, _mediaStream);
+                    Debug.Log("[WHIP] Audio track added from AudioListener");
                 }
                 else
                 {
-                    Debug.LogWarning("[WHIP] No AudioListener found in scene - audio will not be streamed. " +
-                        "Add an AudioListener component to a GameObject (usually the Main Camera).");
+                    Debug.LogWarning("[WHIP] No AudioListener found in scene - audio will not be streamed.");
                 }
             }
             else
@@ -1355,47 +1330,46 @@ namespace Substream.Streaming
     
     /// <summary>
     /// Helper component that captures game audio from an AudioListener and feeds it
-    /// to a WebRTC AudioStreamTrack. Attach to the same GameObject as the AudioListener
-    /// (ensure no AudioSource is also on the same GameObject to avoid binding conflicts).
+    /// to a WebRTC AudioStreamTrack. Attach to the same GameObject as the AudioListener.
     ///
-    /// Caches AudioSettings.outputSampleRate on the main thread so that
-    /// OnAudioFilterRead (which runs on the audio thread) never calls Unity APIs
-    /// that require the main thread.
+    /// The audio sample rate is cached in Awake() (main thread) so that
+    /// OnAudioFilterRead (audio thread) never calls main-thread-only Unity APIs.
     /// </summary>
     public class WhipAudioCapture : MonoBehaviour
     {
         private AudioStreamTrack _audioTrack;
-        private int _cachedSampleRate;
+        private bool _initialized = false;
+        private int _sampleRate;
 
-        /// <summary>
-        /// Cache sample rate immediately during AddComponent, before
-        /// OnAudioFilterRead can fire on the audio thread.
-        /// </summary>
         void Awake()
         {
-            _cachedSampleRate = AudioSettings.outputSampleRate; // main thread -- safe
-            Debug.Log($"[WHIP Audio] Sample rate cached in Awake: {_cachedSampleRate}");
+            _sampleRate = AudioSettings.outputSampleRate; // safe on main thread
+            Debug.Log($"Audio sample rate: {_sampleRate}");
         }
 
         /// <summary>
-        /// Initialize the audio capture. Must be called from the main thread.
-        /// Returns the AudioStreamTrack to be added to the peer connection.
+        /// Initialize the audio capture with a peer connection and media stream.
+        /// Creates an AudioStreamTrack and adds it to both the stream and connection.
         /// </summary>
-        public AudioStreamTrack Init()
+        public void Init(RTCPeerConnection peerConnection, MediaStream mediaStream)
         {
             _audioTrack = new AudioStreamTrack();
-            Debug.Log($"[WHIP Audio] Initialized capture (sampleRate: {_cachedSampleRate})");
-            return _audioTrack;
+            mediaStream.AddTrack(_audioTrack);
+            peerConnection.AddTrack(_audioTrack, mediaStream);
+            _initialized = true;
+            Debug.Log($"[WHIP Audio] Initialized audio capture (sampleRate: {_sampleRate})");
         }
 
         /// <summary>
         /// Called by Unity's audio system on the audio thread.
         /// Forwards audio samples to the WebRTC AudioStreamTrack.
-        /// Uses the cached sample rate to avoid main-thread-only API calls.
         /// </summary>
         void OnAudioFilterRead(float[] data, int channels)
         {
-            _audioTrack?.SetData(data, channels, _cachedSampleRate); // cached -- safe
+            if (_initialized && _audioTrack != null)
+            {
+                _audioTrack.SetData(data, channels, _sampleRate);
+            }
         }
 
         void OnDestroy()
@@ -1405,6 +1379,7 @@ namespace Substream.Streaming
                 _audioTrack.Dispose();
                 _audioTrack = null;
             }
+            _initialized = false;
         }
     }
 }
