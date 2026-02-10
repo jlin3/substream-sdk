@@ -165,6 +165,13 @@ namespace Substream.Streaming
             
             CleanupWebRTC();
             
+            // Stop screen capture coroutine
+            if (_screenCaptureCoroutine != null)
+            {
+                StopCoroutine(_screenCaptureCoroutine);
+                _screenCaptureCoroutine = null;
+            }
+            
             // Only destroy textures we created (not user's sourceTexture)
             if (_streamTexture != null && _ownsStreamTexture)
             {
@@ -1029,16 +1036,17 @@ namespace Substream.Streaming
         // CAMERA SETUP
         // ============================================
         
+        private Coroutine _screenCaptureCoroutine;
+        
         private void SetupStreamCamera()
         {
-            // Use provided texture or create one
             // Get the platform-appropriate texture format for WebRTC
             var supportedFormat = WebRTC.GetSupportedRenderTextureFormat(SystemInfo.graphicsDeviceType);
             Debug.Log($"[WHIP] Platform texture format: {supportedFormat} (GPU: {SystemInfo.graphicsDeviceType})");
             
             if (sourceTexture != null)
             {
-                // Validate texture format
+                // User provided a specific texture - use it directly
                 if (sourceTexture.format != supportedFormat)
                 {
                     Debug.LogWarning($"[WHIP] Source texture format {sourceTexture.format} doesn't match " +
@@ -1056,12 +1064,12 @@ namespace Substream.Streaming
                 else
                 {
                     _streamTexture = sourceTexture;
-                    _ownsStreamTexture = false; // User owns this texture
+                    _ownsStreamTexture = false;
                 }
             }
-            else
+            else if (sourceCamera != null)
             {
-                // Create render texture with platform-appropriate format
+                // User provided a specific camera - clone it (advanced use)
                 int width = Mathf.Min(streamWidth, 1280);
                 int height = Mathf.Min(streamHeight, 720);
                 
@@ -1069,25 +1077,58 @@ namespace Substream.Streaming
                 _streamTexture.Create();
                 _ownsStreamTexture = true;
                 
-                // Setup camera if not using provided texture
-                _streamCamera = sourceCamera ?? Camera.main;
+                _streamCameraGo = new GameObject("WhipStreamCamera");
+                var streamCam = _streamCameraGo.AddComponent<Camera>();
+                streamCam.CopyFrom(sourceCamera);
+                streamCam.targetTexture = _streamTexture;
+                streamCam.enabled = true;
                 
-                if (_streamCamera != null)
+                _streamCameraGo.transform.SetParent(sourceCamera.transform);
+                _streamCameraGo.transform.localPosition = Vector3.zero;
+                _streamCameraGo.transform.localRotation = Quaternion.identity;
+                
+                Debug.Log($"[WHIP] Clone camera setup: {width}x{height}");
+            }
+            else
+            {
+                // DEFAULT: Screen capture mode (works with ALL render pipelines)
+                // This captures the final rendered frame exactly as the player sees it,
+                // including post-processing, UI overlays, and URP camera stacking.
+                // The clone camera approach doesn't work with URP because CopyFrom()
+                // doesn't copy UniversalAdditionalCameraData (renderer, camera stack, etc).
+                int width = Mathf.Min(streamWidth, 1280);
+                int height = Mathf.Min(streamHeight, 720);
+                
+                _streamTexture = new RenderTexture(width, height, 0, supportedFormat);
+                _streamTexture.Create();
+                _ownsStreamTexture = true;
+                
+                // Start screen capture coroutine
+                _screenCaptureCoroutine = StartCoroutine(ScreenCaptureLoop());
+                
+                Debug.Log($"[WHIP] Screen capture mode: {width}x{height} (works with URP/HDRP/Built-in)");
+            }
+        }
+        
+        /// <summary>
+        /// Captures the final screen output into the stream RenderTexture each frame.
+        /// Uses WaitForEndOfFrame to ensure all rendering (including post-processing
+        /// and UI) is complete before capturing.
+        /// Works with all render pipelines: Built-in, URP, HDRP.
+        /// </summary>
+        private IEnumerator ScreenCaptureLoop()
+        {
+            Debug.Log("[WHIP] Screen capture loop started");
+            while (true)
+            {
+                yield return new WaitForEndOfFrame();
+                
+                if (_streamTexture != null && _streamTexture.IsCreated())
                 {
-                    // Create a dedicated stream camera that renders to our texture
-                    _streamCameraGo = new GameObject("WhipStreamCamera");
-                    var streamCamGo = _streamCameraGo;
-                    var streamCam = streamCamGo.AddComponent<Camera>();
-                    streamCam.CopyFrom(_streamCamera);
-                    streamCam.targetTexture = _streamTexture;
-                    streamCam.enabled = true;
-                    
-                    // Parent to source camera so it follows
-                    streamCamGo.transform.SetParent(_streamCamera.transform);
-                    streamCamGo.transform.localPosition = Vector3.zero;
-                    streamCamGo.transform.localRotation = Quaternion.identity;
-                    
-                    Debug.Log($"[WHIP] Stream camera setup: {width}x{height}");
+                    // CaptureScreenshotIntoRenderTexture copies the display buffer
+                    // into our RenderTexture, auto-scaling if dimensions differ.
+                    // This is the most reliable way to capture what's on screen.
+                    ScreenCapture.CaptureScreenshotIntoRenderTexture(_streamTexture);
                 }
             }
         }
