@@ -1,0 +1,10 @@
+# Ignore WebappBackend - we're only deploying IVSBackend
+WebappBackend/
+
+# Standard ignores
+node_modules/
+.git/
+*.log
+.env
+.env.*
+!.env.example

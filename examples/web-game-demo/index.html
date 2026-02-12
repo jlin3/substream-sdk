@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Substream Web Game Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0a0a0a;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .subtitle { color: #888; margin-bottom: 1.5rem; font-size: 0.9rem; }
+    #game-canvas {
+      border: 2px solid #333;
+      border-radius: 8px;
+      background: #111;
+      cursor: crosshair;
+    }
+    .controls {
+      margin-top: 1rem;
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    button {
+      padding: 0.6rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    #startBtn { background: #22c55e; color: #000; font-weight: 600; }
+    #stopBtn { background: #ef4444; color: #fff; font-weight: 600; }
+    .status {
+      margin-top: 0.75rem;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      text-align: center;
+      max-width: 600px;
+    }
+    .status.info { background: #1e3a5f; color: #93c5fd; }
+    .status.live { background: #14532d; color: #86efac; }
+    .status.error { background: #7f1d1d; color: #fca5a5; }
+    .viewer-link {
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+    }
+    .viewer-link a { color: #60a5fa; text-decoration: underline; }
+    .instructions {
+      margin-top: 1.5rem;
+      color: #666;
+      font-size: 0.8rem;
+      text-align: center;
+      max-width: 500px;
+      line-height: 1.5;
+    }
+    .config {
+      margin-top: 1rem;
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .config label { color: #888; font-size: 0.8rem; }
+    .config input {
+      background: #222;
+      border: 1px solid #444;
+      color: #fff;
+      padding: 0.3rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      width: 280px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Substream Web Game Demo</h1>
+  <p class="subtitle">Stream any HTML5 canvas game to parents via IVS</p>
+
+  <canvas id="game-canvas" width="1280" height="720"></canvas>
+
+  <div class="config">
+    <label>Backend URL:</label>
+    <input id="backendUrl" type="text" value="https://substream-sdk-production.up.railway.app" />
+  </div>
+
+  <div class="controls">
+    <button id="startBtn" onclick="startStreaming()">Start Streaming</button>
+    <button id="stopBtn" onclick="stopStreaming()" disabled>Stop Streaming</button>
+  </div>
+
+  <div id="status" class="status info">Click "Start Streaming" to go live</div>
+  <div id="viewerLink" class="viewer-link" style="display:none"></div>
+
+  <div class="instructions">
+    <strong>Demo Game:</strong> Move your mouse over the canvas to control the paddle. 
+    Bouncing ball game renders to a &lt;canvas&gt; element, which is captured and 
+    streamed in real-time via the Substream Web SDK.<br><br>
+    This same approach works for any canvas-based game engine: 
+    Unity WebGL, Phaser, Cocos, Construct, Three.js, PixiJS, etc.
+  </div>
+
+  <!-- IVS Web Broadcast SDK (loaded from CDN for the demo) -->
+  <script src="https://web-broadcast.live-video.net/1.12.0/amazon-ivs-web-broadcast.js"></script>
+
+  <script>
+    // ============================================
+    // SIMPLE BREAKOUT-STYLE DEMO GAME
+    // ============================================
+
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Polyfill roundRect for older browsers (Safari < 16, Firefox < 112)
+    if (!ctx.roundRect) {
+      CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+        r = Math.min(r, w / 2, h / 2);
+        this.moveTo(x + r, y);
+        this.arcTo(x + w, y, x + w, y + h, r);
+        this.arcTo(x + w, y + h, x, y + h, r);
+        this.arcTo(x, y + h, x, y, r);
+        this.arcTo(x, y, x + w, y, r);
+        this.closePath();
+      };
+    }
+    const W = canvas.width;
+    const H = canvas.height;
+
+    // Game state
+    let paddleX = W / 2 - 60;
+    const paddleW = 120, paddleH = 16, paddleY = H - 40;
+    let ballX = W / 2, ballY = H / 2, ballDX = 4, ballDY = -4, ballR = 10;
+    let score = 0;
+    let blocks = [];
+    const blockRows = 5, blockCols = 10;
+    const blockW = (W - 40) / blockCols, blockH = 24, blockPad = 4;
+
+    function initBlocks() {
+      blocks = [];
+      const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6'];
+      for (let r = 0; r < blockRows; r++) {
+        for (let c = 0; c < blockCols; c++) {
+          blocks.push({
+            x: 20 + c * blockW, y: 60 + r * (blockH + blockPad),
+            w: blockW - blockPad, h: blockH,
+            color: colors[r], alive: true,
+          });
+        }
+      }
+    }
+    initBlocks();
+
+    // Mouse control
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = W / rect.width;
+      paddleX = (e.clientX - rect.left) * scaleX - paddleW / 2;
+      paddleX = Math.max(0, Math.min(W - paddleW, paddleX));
+    });
+
+    // Game loop
+    function gameLoop() {
+      // Clear
+      ctx.fillStyle = '#111827';
+      ctx.fillRect(0, 0, W, H);
+
+      // Draw blocks
+      blocks.forEach(b => {
+        if (!b.alive) return;
+        ctx.fillStyle = b.color;
+        ctx.beginPath();
+        ctx.roundRect(b.x, b.y, b.w, b.h, 4);
+        ctx.fill();
+      });
+
+      // Draw paddle
+      ctx.fillStyle = '#60a5fa';
+      ctx.beginPath();
+      ctx.roundRect(paddleX, paddleY, paddleW, paddleH, 8);
+      ctx.fill();
+
+      // Draw ball
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(ballX, ballY, ballR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Ball shadow/glow
+      ctx.shadowColor = '#60a5fa';
+      ctx.shadowBlur = 15;
+      ctx.beginPath();
+      ctx.arc(ballX, ballY, ballR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Move ball
+      ballX += ballDX;
+      ballY += ballDY;
+
+      // Wall collisions
+      if (ballX - ballR < 0 || ballX + ballR > W) ballDX = -ballDX;
+      if (ballY - ballR < 0) ballDY = -ballDY;
+
+      // Paddle collision
+      if (
+        ballY + ballR >= paddleY &&
+        ballY + ballR <= paddleY + paddleH + 8 &&
+        ballX >= paddleX && ballX <= paddleX + paddleW
+      ) {
+        ballDY = -Math.abs(ballDY);
+        // Angle based on where ball hits paddle
+        const hitPos = (ballX - paddleX) / paddleW - 0.5;
+        ballDX = hitPos * 8;
+      }
+
+      // Block collisions
+      blocks.forEach(b => {
+        if (!b.alive) return;
+        if (
+          ballX + ballR > b.x && ballX - ballR < b.x + b.w &&
+          ballY + ballR > b.y && ballY - ballR < b.y + b.h
+        ) {
+          b.alive = false;
+          ballDY = -ballDY;
+          score += 10;
+        }
+      });
+
+      // Ball fell below paddle - reset
+      if (ballY - ballR > H) {
+        ballX = W / 2;
+        ballY = H / 2;
+        ballDX = 4 * (Math.random() > 0.5 ? 1 : -1);
+        ballDY = -4;
+      }
+
+      // All blocks destroyed - reset
+      if (blocks.every(b => !b.alive)) {
+        initBlocks();
+        ballDX *= 1.1;
+        ballDY *= 1.1;
+      }
+
+      // Score
+      ctx.fillStyle = '#fff';
+      ctx.font = '20px system-ui';
+      ctx.fillText(`Score: ${score}`, 20, 35);
+
+      // Streaming indicator
+      if (currentSession && currentSession.isLive) {
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(W - 30, 30, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = '14px system-ui';
+        ctx.fillText('LIVE', W - 70, 35);
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+    gameLoop();
+
+    // ============================================
+    // STREAMING (uses Substream Web SDK pattern)
+    // ============================================
+
+    let currentSession = null;
+
+    async function startStreaming() {
+      const startBtn = document.getElementById('startBtn');
+      const stopBtn = document.getElementById('stopBtn');
+      const statusEl = document.getElementById('status');
+      const viewerLinkEl = document.getElementById('viewerLink');
+      const backendUrl = document.getElementById('backendUrl').value.replace(/\/$/, '');
+
+      startBtn.disabled = true;
+      statusEl.className = 'status info';
+      statusEl.textContent = 'Connecting...';
+
+      try {
+        // Step 1: Get publish token from backend
+        const response = await fetch(`${backendUrl}/api/streams/web-publish`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer demo-token',
+          },
+          body: JSON.stringify({ childId: 'demo-child-001' }),
+        });
+
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err.error || `HTTP ${response.status}`);
+        }
+
+        const publishInfo = await response.json();
+        console.log('[Demo] Got publish info:', publishInfo);
+
+        // Step 2: Capture canvas
+        const canvasStream = canvas.captureStream(30);
+        console.log('[Demo] Canvas capture started, tracks:', canvasStream.getTracks().length);
+
+        // Step 3: Create IVS stage and publish
+        const { Stage, LocalStageStream, SubscribeType, StageEvents } = IVSBroadcastClient;
+
+        const localStreams = canvasStream.getTracks().map(
+          track => new LocalStageStream(track)
+        );
+
+        const strategy = {
+          stageStreamsToPublish: () => localStreams,
+          shouldPublishParticipant: () => true,
+          shouldSubscribeToParticipant: () => SubscribeType.NONE,
+        };
+
+        const stage = new Stage(publishInfo.publishToken, strategy);
+
+        stage.on(StageEvents.STAGE_CONNECTION_STATE_CHANGED, (state) => {
+          console.log('[Demo] Stage connection state:', state);
+          if (state === 'connected') {
+            statusEl.className = 'status live';
+            statusEl.textContent = 'LIVE - Streaming to parents!';
+            stopBtn.disabled = false;
+          }
+        });
+
+        await stage.join();
+        console.log('[Demo] Joined stage, publishing canvas stream');
+
+        currentSession = {
+          streamId: publishInfo.streamId,
+          viewerUrl: publishInfo.viewerUrl,
+          stage,
+          canvasStream,
+          isLive: true,
+        };
+
+        // Show viewer link
+        viewerLinkEl.innerHTML = `Viewer URL: <a href="${publishInfo.viewerUrl}" target="_blank">${publishInfo.viewerUrl}</a>`;
+        viewerLinkEl.style.display = 'block';
+
+      } catch (err) {
+        console.error('[Demo] Error:', err);
+        statusEl.className = 'status error';
+        statusEl.textContent = `Error: ${err.message}`;
+        startBtn.disabled = false;
+      }
+    }
+
+    async function stopStreaming() {
+      if (!currentSession) return;
+
+      const startBtn = document.getElementById('startBtn');
+      const stopBtn = document.getElementById('stopBtn');
+      const statusEl = document.getElementById('status');
+      const viewerLinkEl = document.getElementById('viewerLink');
+      const backendUrl = document.getElementById('backendUrl').value.replace(/\/$/, '');
+
+      stopBtn.disabled = true;
+
+      // Stop tracks
+      currentSession.canvasStream.getTracks().forEach(t => t.stop());
+
+      // Leave stage
+      try { currentSession.stage.leave(); } catch (e) { /* ignore */ }
+
+      // Notify backend
+      try {
+        await fetch(`${backendUrl}/api/streams/web-publish`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer demo-token',
+          },
+          body: JSON.stringify({ streamId: currentSession.streamId }),
+        });
+      } catch (e) { console.warn('[Demo] Backend stop notification failed:', e); }
+
+      currentSession = null;
+
+      statusEl.className = 'status info';
+      statusEl.textContent = 'Stream stopped. Click "Start Streaming" to go live again.';
+      viewerLinkEl.style.display = 'none';
+      startBtn.disabled = false;
+    }
+  </script>
+</body>
+</html>

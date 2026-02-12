@@ -1,0 +1,7 @@
+/Users/jesselinson/substream-sdk/UnityProject/Plugins/Native/build/macos/CMakeFiles/ffmpeg_rtmp.dir
+/Users/jesselinson/substream-sdk/UnityProject/Plugins/Native/build/macos/CMakeFiles/edit_cache.dir
+/Users/jesselinson/substream-sdk/UnityProject/Plugins/Native/build/macos/CMakeFiles/rebuild_cache.dir
+/Users/jesselinson/substream-sdk/UnityProject/Plugins/Native/build/macos/CMakeFiles/list_install_components.dir
+/Users/jesselinson/substream-sdk/UnityProject/Plugins/Native/build/macos/CMakeFiles/install.dir
+/Users/jesselinson/substream-sdk/UnityProject/Plugins/Native/build/macos/CMakeFiles/install/local.dir
+/Users/jesselinson/substream-sdk/UnityProject/Plugins/Native/build/macos/CMakeFiles/install/strip.dir

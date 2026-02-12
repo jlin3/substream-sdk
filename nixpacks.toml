@@ -1,0 +1,14 @@
+# Nixpacks configuration for Railway
+# Only build the IVSBackend directory
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "pnpm"]
+
+[phases.install]
+cmds = ["cd IVSBackend && pnpm install"]
+
+[phases.build]
+cmds = ["cd IVSBackend && pnpm db:generate && pnpm build"]
+
+[start]
+cmd = "cd IVSBackend && pnpm start"

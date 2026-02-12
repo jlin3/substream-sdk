@@ -1,0 +1,16 @@
+# Railway deployment configuration for IVS Streaming Backend
+# Set Root Directory to "IVSBackend" in Railway settings
+
+[build]
+builder = "nixpacks"
+# Only generate Prisma client during build (no DB connection needed)
+buildCommand = "npm install && npx prisma generate && npm run build"
+
+[deploy]
+# Database schema already synced - just start the app
+startCommand = "npm start"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 60
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
