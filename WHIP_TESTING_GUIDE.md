@@ -103,8 +103,8 @@ curl -X POST https://substream-sdk-production.up.railway.app/api/streams/{stream
    - Check Console for stream ID
 
 4. **View the Stream:**
-   - Open browser: `https://substream-sdk-production.up.railway.app/viewer/{streamId}?auth=demo-viewer-token` 
-(You can find the streamID in the console logs under a message similar to: "[WHIP] Streaming started. Stream ID: 123456a-bcde-789f-gh10-ijklmnopqrs) 
+   - Open browser: `https://substream-sdk-production.up.railway.app/viewer/{streamId}?auth=demo-viewer-token`
+(You can find the streamID in the console logs under a message similar to: "[WHIP] Streaming started. Stream ID: 123456a-bcde-789f-gh10-ijklmnopqrs") 
    - Video should appear with <500ms latency
 
 ---
