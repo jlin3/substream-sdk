@@ -7,8 +7,8 @@ builder = "nixpacks"
 buildCommand = "npm install && npx prisma generate && npm run build"
 
 [deploy]
-# Database schema already synced - just start the app
-startCommand = "npm start"
+# Run prisma db push at startup to apply schema changes, then start the app
+startCommand = "npx prisma db push --skip-generate && npm start"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 60
 restartPolicyType = "on_failure"

@@ -4,12 +4,12 @@
 import { NextResponse } from 'next/server';
 
 const BUILD_TIME = new Date().toISOString();
-const VERSION = '1.2.0-webrtc-signaling';
+const VERSION = '1.1.0-demo-auth';
 
 export async function GET() {
   return NextResponse.json({
     version: VERSION,
     buildTime: BUILD_TIME,
-    features: ['demo-tokens', 'ivs-streaming', 'webrtc-signaling'],
+    features: ['demo-tokens', 'ivs-streaming'],
   });
 }

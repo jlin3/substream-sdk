@@ -17,7 +17,6 @@ import {
   stopComposition,
   getComposition,
   listCompositions,
-  isValidStageArn,
   type IVSStage,
   type IVSParticipantTokenResponse,
 } from './ivs-realtime-client';
@@ -76,8 +75,7 @@ export async function ensureStageForChild(childId: string): Promise<{
     where: { childId },
   });
 
-  // Only check AWS if we have a valid stage ARN stored
-  if (existingChannel?.ivsStageArn && isValidStageArn(existingChannel.ivsStageArn)) {
+  if (existingChannel?.ivsStageArn) {
     // Verify the stage still exists in AWS
     const stage = await getStage(existingChannel.ivsStageArn);
     if (stage) {
@@ -87,7 +85,6 @@ export async function ensureStageForChild(childId: string): Promise<{
       };
     }
     // Stage was deleted in AWS, need to recreate
-    console.log(`[RealTime] Stage ${existingChannel.ivsStageArn} not found in AWS, will recreate`);
   }
 
   // Get child profile for naming
@@ -106,13 +103,13 @@ export async function ensureStageForChild(childId: string): Promise<{
 
   // Check if we should use the default demo stage
   const defaultStageArn = process.env.IVS_STAGE_ARN;
-  if (defaultStageArn && isValidStageArn(defaultStageArn)) {
+  if (defaultStageArn) {
     // Use the configured stage for all streaming
     // This is simpler and avoids per-child stage creation
     const stage = await getStage(defaultStageArn);
     if (!stage) {
       throw new StreamingError(
-        'Configured IVS_STAGE_ARN not found in AWS. Run pnpm ivs:setup to create resources.',
+        'Configured IVS_STAGE_ARN not found. Run pnpm ivs:setup to create resources.',
         StreamingErrorCode.CHANNEL_NOT_FOUND,
         500
       );

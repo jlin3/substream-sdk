@@ -134,27 +134,10 @@ export async function createStage(config: IVSStageConfig): Promise<IVSStage> {
   return mapStage(response.stage);
 }
 
-// ARN pattern for IVS Real-Time Stage
-const STAGE_ARN_PATTERN = /^arn:aws:ivs:[a-z0-9-]+:[0-9]+:stage\/[a-zA-Z0-9]+$/;
-
-/**
- * Validate that a string is a valid IVS Stage ARN
- */
-export function isValidStageArn(arn: string | null | undefined): boolean {
-  if (!arn || typeof arn !== 'string') return false;
-  return STAGE_ARN_PATTERN.test(arn);
-}
-
 /**
  * Get an existing Stage by ARN
  */
 export async function getStage(stageArn: string): Promise<IVSStage | null> {
-  // Validate ARN format before calling AWS to prevent SDK errors
-  if (!isValidStageArn(stageArn)) {
-    console.warn(`[IVS-RT] Invalid stage ARN format: "${stageArn}"`);
-    return null;
-  }
-  
   const client = getIVSRealTimeClient();
   
   try {

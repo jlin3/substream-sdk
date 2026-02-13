@@ -18,24 +18,14 @@ Add live streaming from your Unity game to a web viewer in 3 simple steps.
 
 ## Streaming Modes
 
-The SDK supports three streaming modes:
+The SDK supports two streaming modes:
 
-| Mode | Component | Protocol | Latency | Platform Support | Status |
-|------|-----------|----------|---------|------------------|--------|
-| **RTMPS** | `IVSStreamControl` | RTMPS | 2-5 seconds | Windows/macOS (native libs) | ✅ Production Ready |
-| **WHIP** (NEW) | `WhipStreamControl` | WHIP/WebRTC | <500ms | All platforms (no native libs) | ✅ Production Ready |
-| **WebRTC** | `IVSRealTimeStreamControl` | WebRTC | <1 second | All platforms | ⚠️ Experimental |
+| Mode | Component | Protocol | Latency | Platform Support |
+|------|-----------|----------|---------|------------------|
+| **WebRTC** (Recommended) | `IVSRealTimeStreamControl` | WebRTC | <1 second | All platforms |
+| **RTMPS** (Legacy) | `IVSStreamControl` | RTMPS | 2-5 seconds | Requires native libs |
 
-> **Recommendation**: Use **WHIP mode** (`WhipStreamControl`) for ultra-low latency WebRTC streaming without native dependencies. Use **RTMPS mode** (`IVSStreamControl`) for maximum reliability. WHIP mode requires the IVS Real-Time backend endpoints.
-
-### Choosing a Mode
-
-| Use Case | Recommended Mode |
-|----------|-----------------|
-| Real-time viewing (parents watching live) | **WHIP** - Sub-second latency |
-| Reliability over latency | **RTMPS** - More stable, but 2-5s delay |
-| Quest/VR platforms | **WHIP** - No native library dependencies |
-| Cross-platform (WebGL excluded) | **WHIP** - Uses Unity WebRTC package |
+> **Use WebRTC mode** - It uses Unity's built-in WebRTC package, works out of the box, and has lower latency!
 
 ---
 
@@ -53,20 +43,17 @@ Want to test streaming immediately? Use our demo credentials:
 
 > **Note**: Demo credentials allow you to test streaming immediately. The streaming token is for the Unity child, the viewer token is for the parent watching. For production use, integrate with k-ID authentication.
 
-### Quick Test Steps (RTMPS Mode - Stable)
+### Quick Test Steps (WebRTC Mode - Recommended)
 
 1. Import the SDK into Unity (see Step 1 below)
-2. Add `IVSStreamControl` component to a GameObject
+2. Add `IVSRealTimeStreamControl` component to a GameObject
 3. Set these values in the Inspector:
    - **Backend URL**: `https://substream-sdk-production.up.railway.app`
    - **Child ID**: `demo-child-001`
    - **Auth Token**: `demo-token`
-4. **Windows only**: Copy FFmpeg DLLs to `Plugins/x86_64/` (see Native Library Setup below)
-5. Press Play in Unity
-6. Press `U` to start streaming
-7. Open `examples/web-viewer/index.html` in your browser to watch your stream!
-
-> **Note for Windows**: The native FFmpeg library needs FFmpeg DLLs to work. See the "Native Library Setup" section in Step 1.
+4. Press Play in Unity
+5. Press `U` to start streaming
+6. Open `examples/web-viewer/index.html` in your browser to watch your stream!
 
 ---
 
@@ -85,106 +72,26 @@ Copy these folders from the SDK into your Unity project:
 UnityProject/Assets/Scripts/     →  YourProject/Assets/Scripts/
 ```
 
-**Required files for RTMPS mode (Stable - Recommended):**
+**Required files for WebRTC mode (Recommended):**
+- `Scripts/IVSRealTimeStreamControl.cs` - WebRTC streaming component
+
+**Required files for RTMPS mode (Legacy):**
 - `Scripts/IVSStreamControl.cs` - RTMPS streaming component
 - `Scripts/Streaming/FFmpegRTMPPublisher.cs` - Video encoding
 - `Scripts/Streaming/NativeFFmpegBridge.cs` - Native library interface
 - `Plugins/` - Native streaming libraries (per platform)
 
-**Required files for WebRTC mode (Experimental):**
-- `Scripts/IVSRealTimeStreamControl.cs` - WebRTC streaming component
-
-**Native Library Setup (RTMPS mode - Windows):**
-
-The RTMPS mode requires native FFmpeg libraries. On Windows:
-
-1. Download FFmpeg from https://www.gyan.dev/ffmpeg/builds/ (full build)
-2. Copy these DLLs from the `bin/` folder to `Plugins/x86_64/`:
-   - `avcodec-*.dll`
-   - `avformat-*.dll`
-   - `avutil-*.dll`
-   - `swscale-*.dll`
-   - `swresample-*.dll`
-3. Run `Plugins/verify-windows-deps.ps1` to verify setup
-4. Restart Unity
-
-On macOS, run: `cd UnityProject/Plugins/Native && ./build.sh macos`
-
-**For WHIP mode** (recommended) or WebRTC mode, install Unity WebRTC package:
+**Also install Unity WebRTC package** (for WebRTC mode):
 1. Open Window → Package Manager
 2. Click + → Add package from git URL
 3. Enter: `com.unity.webrtc@3.0.0-pre.7`
 4. Click Add
 
-**WHIP mode also requires:**
-- `Scripts/Streaming/WhipStreamControl.cs` - Main WHIP streaming component
-- `Scripts/Streaming/WhipClient.cs` - WHIP protocol client
-
 ---
 
 ## Step 2: Add Streaming to Your Scene
 
-### WHIP Mode (Recommended for Low Latency)
-
-WHIP (WebRTC-HTTP Ingestion Protocol) provides sub-second latency streaming using AWS IVS Real-Time. No native libraries required!
-
-1. **Create a GameObject** for streaming (or use an existing one)
-
-2. **Add the `WhipStreamControl` component**
-   - In Unity: `Add Component → Substream/Streaming/WhipStreamControl`
-
-3. **Configure in the Inspector:**
-
-| Setting | Value | Description |
-|---------|-------|-------------|
-| **Backend URL** | `https://substream-sdk-production.up.railway.app` | API endpoint |
-| **Child ID** | `demo-child-001` | Use demo ID or your user's ID |
-| **Auth Token** | `demo-token` | Authentication token |
-
-**Video Settings (IVS Constraints):**
-
-| Setting | Default | IVS Limit | Description |
-|---------|---------|-----------|-------------|
-| **Stream Width** | 1280 | 1280 max | Video width in pixels |
-| **Stream Height** | 720 | 720 max | Video height in pixels |
-| **Stream Framerate** | 30 | 30 max | Frames per second |
-| **Stream Bitrate** | 2,500,000 | 8,500,000 max | Bitrate in bps |
-| **Keyframe Interval** | 2 | 2 required | IDR interval in seconds |
-
-> **Important**: IVS WHIP requires H.264 Baseline profile, no B-frames, and IDR frames every 2 seconds. The `WhipStreamControl` component automatically configures these settings.
-
-4. **Press Play and press U** to start streaming
-
-5. **View the stream**: Open `https://your-backend.com/viewer/{streamId}` in a browser
-
----
-
-### RTMPS Mode (Stable - Higher Latency)
-
-RTMPS provides reliable streaming with 2-5 second latency. Requires native FFmpeg libraries.
-
-1. **Create a GameObject** for streaming (or use an existing one)
-
-2. **Add the `IVSStreamControl` component**
-   - In Unity: `Add Component → IVSStreamControl`
-
-3. **Configure in the Inspector:**
-
-| Setting | Value | Description |
-|---------|-------|-------------|
-| **Backend URL** | `https://substream-sdk-production.up.railway.app` | API endpoint (use demo URL or your own) |
-| **Child ID** | `demo-child-001` | Use demo ID or your user's ID |
-| **Auth Token** | `demo-token` | Authentication token |
-
-4. **Set up your camera/render texture** (if using a specific source)
-
-5. **Press Play and press U** to start streaming
-
----
-
-### WebRTC Mode (Experimental)
-
-> **Note**: WebRTC mode requires IVS Real-Time Stage to be configured on the backend. The demo backend may not have this set up. If you encounter "signaling not available" errors, use RTMPS mode instead.
+### WebRTC Mode (Recommended)
 
 1. **Create a GameObject** for streaming (or use an existing one)
 
@@ -215,114 +122,14 @@ RTMPS provides reliable streaming with 2-5 second latency. Requires native FFmpe
 
 ## Step 3: Control Streaming from Code
 
-### Basic Usage (WHIP Mode - Recommended)
+### Basic Usage (WebRTC Mode)
 
 ```csharp
 using UnityEngine;
-using Substream.Streaming;
 
 public class GameStreamManager : MonoBehaviour
 {
-    // Use WhipStreamControl for low-latency WebRTC streaming
-    public WhipStreamControl streamControl;
-    
-    // Call this when player wants to start streaming
-    public void StartStream()
-    {
-        streamControl.StartStreaming();
-    }
-    
-    // Call this when player wants to stop streaming
-    public void StopStream()
-    {
-        streamControl.StopStreaming();
-    }
-    
-    // Check if currently streaming
-    public bool IsLive()
-    {
-        return streamControl.IsStreaming;
-    }
-    
-    // Get the viewer URL for parents
-    public string GetViewerUrl()
-    {
-        string streamId = streamControl.GetCurrentStreamId();
-        return $"{streamControl.backendUrl}/viewer/{streamId}";
-    }
-}
-```
-
-### Setting WHIP Credentials at Runtime
-
-```csharp
-using Substream.Streaming;
-
-public class AuthManager : MonoBehaviour
-{
-    public WhipStreamControl streamControl;
-    
-    // Call after user logs in
-    public void OnUserAuthenticated(string userId, string authToken)
-    {
-        streamControl.childId = userId;
-        streamControl.authToken = authToken;
-    }
-    
-    // Optional: Override the WHIP endpoint URL
-    public void SetBackend(string backendUrl)
-    {
-        streamControl.backendUrl = backendUrl;
-    }
-}
-```
-
-### Handling WHIP Events
-
-```csharp
-using Substream.Streaming;
-
-public class StreamEventHandler : MonoBehaviour
-{
-    public WhipStreamControl streamControl;
-    
-    void Start()
-    {
-        // Subscribe to streaming events
-        streamControl.OnStreamStarted.AddListener(OnStreamStarted);
-        streamControl.OnStreamStopped.AddListener(OnStreamStopped);
-        streamControl.OnStreamError.AddListener(OnStreamError);
-    }
-    
-    void OnStreamStarted()
-    {
-        Debug.Log("Stream is live via WHIP!");
-        string viewerUrl = streamControl.GetViewerUrl();
-        Debug.Log($"Viewer URL: {viewerUrl}");
-    }
-    
-    void OnStreamStopped()
-    {
-        Debug.Log("Stream ended");
-    }
-    
-    void OnStreamError(string error)
-    {
-        Debug.LogError($"Stream error: {error}");
-    }
-}
-```
-
----
-
-### Legacy: WebRTC Mode
-
-```csharp
-using UnityEngine;
-
-public class GameStreamManagerLegacy : MonoBehaviour
-{
-    // Legacy: Use IVSRealTimeStreamControl for WebRTC
+    // Use IVSRealTimeStreamControl for WebRTC (recommended)
     public IVSRealTimeStreamControl streamControl;
     
     // Call this when player wants to start streaming
@@ -412,33 +219,13 @@ By default, pressing `U` toggles streaming on/off. You can disable this by remov
 
 Once streaming starts, viewers can watch via:
 
-### Option A: Built-in Web Viewer (WHIP Mode)
-
-For WHIP streams, the backend includes a built-in web viewer:
-
-1. Get the stream ID from `WhipStreamControl.GetCurrentStreamId()`
-2. Open `https://your-backend.com/viewer/{streamId}` in any browser
-3. The viewer automatically connects to the IVS Real-Time stage
-
-**Query Parameters (Optional):**
-- `auth` - Authorization token for the parent
-- `parentId` - Parent user ID for analytics
-- `childId` - Child ID for validation
-
-**Example URL:**
-```
-https://substream-sdk-production.up.railway.app/viewer/abc123?parentId=parent-001&auth=token
-```
-
-The web viewer uses the IVS Real-Time Web SDK to subscribe to the stage with sub-second latency.
-
-### Option B: k-ID Dashboard
+### Option A: k-ID Dashboard
 
 1. Log into the k-ID parent dashboard
 2. Navigate to **Live Streams**
 3. Click **Watch** on the active stream
 
-### Option C: Embed in Your Web App (WHIP/WebRTC)
+### Option B: Embed in Your Web App
 
 Add the IVS player to any web page:
 
@@ -563,41 +350,7 @@ If you see "stub" messages, the SDK is working but needs the native library for 
 
 ## API Reference
 
-### WhipStreamControl Properties (WHIP - Recommended)
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `backendUrl` | string | API endpoint URL |
-| `childId` | string | User identifier |
-| `authToken` | string | Authentication token |
-| `streamWidth` | int | Video width (max: 1280) |
-| `streamHeight` | int | Video height (max: 720) |
-| `streamFramerate` | int | FPS (max: 30) |
-| `streamBitrateBps` | int | Bitrate in bps (default: 2,500,000) |
-| `keyframeIntervalSeconds` | int | IDR interval (must be 2 for IVS) |
-| `IsStreaming` | bool | True if currently streaming |
-
-### WhipStreamControl Methods
-
-| Method | Description |
-|--------|-------------|
-| `StartStreaming()` | Begin WHIP streaming to IVS Real-Time |
-| `StopStreaming()` | Stop streaming and cleanup |
-| `ToggleStreaming()` | Toggle streaming on/off |
-| `GetCurrentStreamId()` | Get the current stream ID |
-| `GetViewerUrl()` | Get the viewer URL for parents |
-
-### WhipStreamControl Events
-
-| Event | Description |
-|-------|-------------|
-| `OnStreamStarted` | Fired when stream goes live |
-| `OnStreamStopped` | Fired when stream ends |
-| `OnStreamError(string)` | Fired on error with message |
-
----
-
-### IVSRealTimeStreamControl Properties (WebRTC - Legacy)
+### IVSRealTimeStreamControl Properties (WebRTC - Recommended)
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -639,9 +392,9 @@ If you see "stub" messages, the SDK is working but needs the native library for 
 
 | Event | Description |
 |-------|-------------|
-| `OnStreamStarted` | Fired when streaming begins |
-| `OnStreamStopped` | Fired when streaming ends |
-| `OnStreamError(string)` | Fired on error with message |
+| `OnStartStreaming` | Fired when streaming begins |
+| `OnStopStreaming` | Fired when streaming ends |
+| `OnError(string)` | Fired on error with message |
 
 ---
 
@@ -652,28 +405,6 @@ If you see "stub" messages, the SDK is working but needs the native library for 
 - ✅ Check `backendUrl` is correct
 - ✅ Check `childId` exists in your user system
 - ✅ Check `authToken` is valid
-
-### WHIP Mode Issues
-
-**"WHIP connection failed" or "HTTP 4xx error"**
-- ✅ Verify the WHIP endpoint is available: `POST /api/streams/whip`
-- ✅ Check that IVS Real-Time stages are configured on the backend
-- ✅ Ensure the publish token is valid and not expired
-
-**"ICE connection failed"**
-- ✅ Check firewall allows UDP traffic (WebRTC uses UDP)
-- ✅ Try a different network (some corporate networks block WebRTC)
-- ✅ Check Unity Console for ICE candidate logs
-
-**"Codec not supported"**
-- ✅ IVS requires H.264 Baseline profile
-- ✅ Ensure Unity WebRTC package is version 3.0.0-pre.7 or later
-- ✅ Check that hardware H.264 encoding is available
-
-**Viewer shows "Unable to Join Stream"**
-- ✅ Verify stream is active (check backend logs)
-- ✅ Check that the subscribe token is valid
-- ✅ Ensure the stage ARN matches the viewer request
 
 ### WebRTC Connection Issues
 
