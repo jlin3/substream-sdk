@@ -116,7 +116,11 @@ This SDK supports **two streaming approaches**:
 substream-sdk/
 ├── SDK_STREAMING_GUIDE.md    # ← START HERE (Game Developers)
 ├── examples/
-│   └── web-viewer/           # Simple stream viewer page
+│   ├── web-viewer/           # Stream viewer page (parents)
+│   └── web-game-demo/        # HTML5 canvas game streaming demo
+│
+├── packages/
+│   └── web-sdk/              # TypeScript SDK for web game streaming
 │
 ├── UnityProject/             # Unity SDK components
 │   ├── Assets/Scripts/
@@ -125,7 +129,7 @@ substream-sdk/
 │   └── Plugins/              # Native libraries
 │
 ├── IVSBackend/               # [OPERATORS ONLY] IVS backend server
-│   ├── src/app/api/streams/  # API routes
+│   ├── src/app/api/streams/  # API routes (incl. web-publish, webhooks)
 │   ├── src/lib/streaming/    # IVS service layer
 │   └── prisma/               # Database schema
 │
@@ -197,13 +201,25 @@ substream-sdk/
 
 ## Platform Support
 
+### Unity Native (IVSStreamControl / IVSRealTimeStreamControl)
+
 | Platform | Status | Notes |
 |----------|--------|-------|
 | Windows (Editor) | ✅ | Full streaming |
 | macOS (Editor) | ✅ | Full streaming |
 | Quest 2/3/Pro | ✅ | Android ARM64 |
 | iOS | 🔄 | Coming soon |
-| WebGL | ❌ | No native plugins |
+| Unity WebGL | ❌ | No native plugins (use Web SDK below) |
+
+### Web Games (canvas.captureStream + IVS Web Broadcast SDK)
+
+| Platform | Status | Notes |
+|----------|--------|-------|
+| HTML5 Canvas games | ✅ | Phaser, Three.js, PixiJS, Cocos, Construct |
+| Unity WebGL builds | ✅ | Canvas streaming via Web SDK |
+| Any `<canvas>` app | ✅ | Works with any engine that renders to canvas |
+
+See [examples/web-game-demo/](examples/web-game-demo/) for a working demo.
 
 ---
 
