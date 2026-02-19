@@ -6,9 +6,59 @@ This guide shows how to demo the IVS streaming system step-by-step.
 
 | Demo Level | What It Shows | Requirements |
 |------------|---------------|--------------|
+| **Level 0: Web Game** | Canvas game streaming end-to-end | Browser only (no backend setup) |
 | **Level 1: API Only** | Backend works, API responses | Database only |
 | **Level 2: External Stream** | Full IVS pipeline | AWS credentials + OBS/FFmpeg |
 | **Level 3: Unity Integration** | Complete system | All above + native FFmpeg lib |
+
+---
+
+## Level 0: Web Game Demo (Easiest -- No Setup)
+
+This demonstrates the full streaming pipeline using a browser-based canvas game.
+No backend setup, no Unity, no AWS credentials needed on your machine -- everything
+uses the live hosted backend.
+
+### Step 1: Serve the Demo
+
+```bash
+cd examples/web-game-demo
+python3 -m http.server 8080
+```
+
+### Step 2: Open in Browser
+
+Navigate to `http://localhost:8080`. You should see:
+- A Breakout-style game rendering on a canvas
+- Preflight checks (all green if setup is correct)
+- An event log panel
+
+### Step 3: Start Streaming
+
+Click **Start Streaming**. The demo will:
+1. Request a publish token from the live backend
+2. Capture the canvas at 30fps via `canvas.captureStream()`
+3. Publish to an IVS Real-Time stage via WebRTC
+4. Display a **Viewer URL** that parents can open to watch
+
+### Step 4: Watch the Stream
+
+Open the displayed Viewer URL in a second browser tab (or send it to someone).
+They will see the game in real-time with sub-second latency.
+
+### What This Proves
+
+- The IVS backend is operational and allocating stages
+- Canvas capture and WebRTC publishing work end-to-end
+- The same approach works for any canvas-based game (Phaser, Three.js, Unity WebGL, etc.)
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| Preflight check "Backend reachable" fails | Check network, VPN, or try `curl https://substream-sdk-production.up.railway.app/api/health` |
+| "IVS SDK not loaded" | Disable ad-blocker, check console for CDN errors |
+| Opened via `file://` | Must serve over HTTP -- use `python3 -m http.server` |
 
 ---
 

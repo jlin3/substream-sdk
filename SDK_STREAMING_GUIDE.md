@@ -1,6 +1,6 @@
 # Streaming SDK Integration Guide
 
-Add live streaming from your Unity game to a web viewer in 3 simple steps.
+Add live streaming from your Unity game or HTML5 web game to a web viewer.
 
 ```
 ┌─────────────────┐                    ┌─────────────────┐
@@ -444,13 +444,71 @@ This means the native FFmpeg library is not available. For actual streaming:
 
 ## Platform Support
 
+### Unity Native (this guide)
+
 | Platform | Status | Notes |
 |----------|--------|-------|
 | Windows (Editor) | ✅ Supported | Full streaming |
 | macOS (Editor) | ✅ Supported | Full streaming |
 | Quest 2/3/Pro | ✅ Supported | Android ARM64 |
 | iOS | 🔄 In Progress | Coming soon |
-| WebGL | ❌ Not Supported | No native plugins |
+| Unity WebGL | ❌ | No native plugins -- use the Web SDK below |
+
+### Web Games (HTML5 canvas)
+
+Unity WebGL builds and other canvas-based games (Phaser, Three.js, PixiJS, Cocos,
+Construct) can stream using the **Web SDK** path instead.
+
+This uses `canvas.captureStream()` + the IVS Web Broadcast SDK -- no native plugins
+needed, runs entirely in the browser.
+
+See [examples/web-game-demo/](examples/web-game-demo/) for a complete working demo.
+
+**Quickest path (no npm, no build step):** Add two script tags and call `Substream.startStream()`:
+
+```html
+<script src="https://web-broadcast.live-video.net/1.32.0/amazon-ivs-web-broadcast.js"></script>
+<script src="substream.js"></script>
+<script>
+  const session = await Substream.startStream({
+    canvas: document.getElementById('game-canvas'),
+    backendUrl: 'https://substream-sdk-production.up.railway.app',
+    childId: 'demo-child-001',
+    authToken: 'demo-token',
+  });
+  console.log('Viewer URL:', session.viewerUrl);
+</script>
+```
+
+Copy `substream.js` from `examples/web-game-demo/substream.js`.
+For TypeScript projects, see [packages/web-sdk/](packages/web-sdk/).
+
+---
+
+## Webhooks
+
+Register a webhook to receive stream lifecycle events:
+
+```bash
+curl -X POST https://substream-sdk-production.up.railway.app/api/webhooks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://your-app.com/hooks/substream",
+    "events": ["stream.started", "stream.stopped", "viewer.joined", "viewer.left"]
+  }'
+```
+
+Events are delivered as POST requests with HMAC-SHA256 signed payloads:
+
+| Event | Fired When |
+|-------|-----------|
+| `stream.started` | A game starts publishing |
+| `stream.stopped` | A game stops publishing |
+| `viewer.joined` | A parent connects to watch |
+| `viewer.left` | A parent disconnects |
+
+The `X-Substream-Signature` header contains a `sha256=...` HMAC you can verify
+with the secret returned during registration.
 
 ---
 
@@ -458,7 +516,8 @@ This means the native FFmpeg library is not available. For actual streaming:
 
 1. Check the [Troubleshooting](#troubleshooting) section
 2. Review Unity Console logs (filter by "[IVS]")
-3. Contact k-ID support with your `childId` and error messages
+3. For web game issues, check the Event Log panel in the demo
+4. Contact k-ID support with your `childId` and error messages
 
 ---
 
@@ -467,4 +526,5 @@ This means the native FFmpeg library is not available. For actual streaming:
 - **Custom UI**: Build your own streaming controls using the events and methods
 - **Analytics**: Use `GetStreamStats()` to show viewers stream health
 - **VOD Playback**: Recorded streams are automatically available for replay
+- **Web Games**: Use the Web SDK to stream canvas games from the browser
 

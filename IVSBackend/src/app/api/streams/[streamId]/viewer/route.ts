@@ -16,6 +16,7 @@ import {
   createSubscribeTokenForStream,
   findStageByStreamId,
 } from '@/lib/streaming/stage-pool';
+import { dispatchWebhookEvent } from '@/lib/webhooks/webhook-service';
 
 // ============================================
 // TYPES
@@ -129,6 +130,12 @@ export async function GET(
     
     const region = subscription.region;
     
+    dispatchWebhookEvent('viewer.joined', {
+      streamId,
+      viewerUserId: auth.userId,
+      participantId: subscription.participantId,
+    });
+
     const response: ViewerTokenResponse = {
       streamId,
       stageArn: subscription.stageArn,

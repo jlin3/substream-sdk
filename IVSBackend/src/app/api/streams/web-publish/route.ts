@@ -23,6 +23,7 @@ import {
   releaseStage,
   findStageByStreamId,
 } from '@/lib/streaming/stage-pool';
+import { dispatchWebhookEvent } from '@/lib/webhooks/webhook-service';
 
 // ============================================
 // TYPES
@@ -111,6 +112,13 @@ export async function POST(request: NextRequest) {
       || 'localhost:3000';
     const protocol = request.headers.get('x-forwarded-proto') || 'https';
     const viewerUrl = `${protocol}://${baseUrl}/viewer/${streamId}?auth=demo-viewer-token`;
+
+    dispatchWebhookEvent('stream.started', {
+      streamId,
+      childId: body.childId,
+      stageArn: allocation.stageArn,
+      viewerUrl,
+    });
     
     const response: WebPublishStartResponse = {
       streamId,
@@ -173,6 +181,10 @@ export async function DELETE(request: NextRequest) {
     
     await releaseStage(stage.arn);
     console.log(`[WebPublish] Stopped stream ${body.streamId}`);
+
+    dispatchWebhookEvent('stream.stopped', {
+      streamId: body.streamId,
+    });
     
     return NextResponse.json(
       { success: true, streamId: body.streamId },

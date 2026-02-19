@@ -14,119 +14,320 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 2rem;
+      padding: 1.5rem;
     }
-    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
-    .subtitle { color: #888; margin-bottom: 1.5rem; font-size: 0.9rem; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    .subtitle { color: #888; margin-bottom: 1rem; font-size: 0.9rem; }
+
+    .main-layout {
+      display: flex;
+      gap: 1rem;
+      width: 100%;
+      max-width: 1100px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .game-col { flex: 1 1 500px; max-width: 750px; }
+    .side-col { flex: 1 1 280px; max-width: 340px; display: flex; flex-direction: column; gap: 0.75rem; }
+
     #game-canvas {
+      width: 100%;
+      height: auto;
       border: 2px solid #333;
       border-radius: 8px;
       background: #111;
       cursor: crosshair;
+      display: block;
     }
+
+    .config {
+      margin-top: 0.75rem;
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .config label { color: #888; font-size: 0.8rem; white-space: nowrap; }
+    .config input, .config select {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #fff;
+      padding: 0.35rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      flex: 1;
+      min-width: 180px;
+    }
+
     .controls {
-      margin-top: 1rem;
+      margin-top: 0.75rem;
       display: flex;
       gap: 0.75rem;
       align-items: center;
-      flex-wrap: wrap;
-      justify-content: center;
     }
     button {
       padding: 0.6rem 1.5rem;
       border: none;
       border-radius: 8px;
-      font-size: 1rem;
+      font-size: 0.95rem;
       cursor: pointer;
       transition: opacity 0.2s;
     }
     button:hover { opacity: 0.85; }
     button:disabled { opacity: 0.4; cursor: not-allowed; }
     #startBtn { background: #22c55e; color: #000; font-weight: 600; }
-    #stopBtn { background: #ef4444; color: #fff; font-weight: 600; }
-    .status {
-      margin-top: 0.75rem;
-      padding: 0.5rem 1rem;
+    #stopBtn  { background: #ef4444; color: #fff; font-weight: 600; }
+
+    .status-bar {
+      margin-top: 0.5rem;
+      padding: 0.5rem 0.75rem;
       border-radius: 6px;
       font-size: 0.85rem;
       text-align: center;
-      max-width: 600px;
     }
-    .status.info { background: #1e3a5f; color: #93c5fd; }
-    .status.live { background: #14532d; color: #86efac; }
-    .status.error { background: #7f1d1d; color: #fca5a5; }
+    .status-bar.info  { background: #1e3a5f; color: #93c5fd; }
+    .status-bar.live  { background: #14532d; color: #86efac; }
+    .status-bar.error { background: #7f1d1d; color: #fca5a5; }
+
     .viewer-link {
-      margin-top: 0.5rem;
+      margin-top: 0.35rem;
       font-size: 0.85rem;
     }
     .viewer-link a { color: #60a5fa; text-decoration: underline; }
-    .instructions {
-      margin-top: 1.5rem;
-      color: #666;
+
+    .panel {
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #888;
+      border-bottom: 1px solid #222;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .checklist { padding: 0.5rem 0.75rem; }
+    .check-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.25rem 0;
       font-size: 0.8rem;
+      color: #aaa;
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot.pending  { background: #555; }
+    .dot.ok       { background: #22c55e; }
+    .dot.fail     { background: #ef4444; }
+    .dot.working  { background: #eab308; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    #log-panel {
+      height: 200px;
+      overflow-y: auto;
+      padding: 0.5rem 0.75rem;
+      font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+      font-size: 0.7rem;
+      line-height: 1.5;
+      color: #999;
+    }
+    #log-panel .log-line { white-space: pre-wrap; word-break: break-all; }
+    #log-panel .log-info { color: #93c5fd; }
+    #log-panel .log-ok   { color: #86efac; }
+    #log-panel .log-warn { color: #fde68a; }
+    #log-panel .log-err  { color: #fca5a5; }
+
+    .instructions {
+      margin-top: 1rem;
+      color: #555;
+      font-size: 0.75rem;
       text-align: center;
-      max-width: 500px;
+      max-width: 700px;
       line-height: 1.5;
     }
-    .config {
-      margin-top: 1rem;
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-    .config label { color: #888; font-size: 0.8rem; }
-    .config input {
-      background: #222;
-      border: 1px solid #444;
-      color: #fff;
-      padding: 0.3rem 0.5rem;
-      border-radius: 4px;
-      font-size: 0.8rem;
-      width: 280px;
-    }
+    .instructions strong { color: #888; }
   </style>
 </head>
 <body>
   <h1>Substream Web Game Demo</h1>
-  <p class="subtitle">Stream any HTML5 canvas game to parents via IVS</p>
+  <p class="subtitle">Stream any HTML5 canvas game to parents via IVS Real-Time</p>
 
-  <canvas id="game-canvas" width="1280" height="720"></canvas>
+  <div class="main-layout">
+    <!-- Left: game + controls -->
+    <div class="game-col">
+      <canvas id="game-canvas" width="1280" height="720"></canvas>
 
-  <div class="config">
-    <label>Backend URL:</label>
-    <input id="backendUrl" type="text" value="https://substream-sdk-production.up.railway.app" />
+      <div class="config">
+        <label>Backend:</label>
+        <input id="backendUrl" type="text" value="https://substream-sdk-production.up.railway.app" />
+        <label>Child ID:</label>
+        <input id="childId" type="text" value="demo-child-001" style="min-width:120px;flex:0 1 auto;" />
+      </div>
+
+      <div class="controls">
+        <button id="startBtn" onclick="startStreaming()">Start Streaming</button>
+        <button id="stopBtn" onclick="stopStreaming()" disabled>Stop Streaming</button>
+      </div>
+
+      <div id="status" class="status-bar info">Click "Start Streaming" to go live</div>
+      <div id="viewerLink" class="viewer-link" style="display:none"></div>
+    </div>
+
+    <!-- Right: status checks + log -->
+    <div class="side-col">
+      <div class="panel">
+        <div class="panel-header">Preflight Checks</div>
+        <div class="checklist">
+          <div class="check-item" id="chk-protocol">
+            <span class="dot pending"></span>
+            <span>Served over HTTP/HTTPS (not file://)</span>
+          </div>
+          <div class="check-item" id="chk-capture">
+            <span class="dot pending"></span>
+            <span>canvas.captureStream() supported</span>
+          </div>
+          <div class="check-item" id="chk-sdk">
+            <span class="dot pending"></span>
+            <span>IVS Web Broadcast SDK loaded</span>
+          </div>
+          <div class="check-item" id="chk-backend">
+            <span class="dot pending"></span>
+            <span>Backend reachable</span>
+          </div>
+          <div class="check-item" id="chk-stage">
+            <span class="dot pending"></span>
+            <span>IVS stage connected</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="flex:1;display:flex;flex-direction:column;">
+        <div class="panel-header">
+          <span>Event Log</span>
+          <button onclick="clearLog()" style="padding:0.15rem 0.5rem;font-size:0.65rem;background:#222;color:#888;border-radius:4px;">Clear</button>
+        </div>
+        <div id="log-panel"></div>
+      </div>
+    </div>
   </div>
-
-  <div class="controls">
-    <button id="startBtn" onclick="startStreaming()">Start Streaming</button>
-    <button id="stopBtn" onclick="stopStreaming()" disabled>Stop Streaming</button>
-  </div>
-
-  <div id="status" class="status info">Click "Start Streaming" to go live</div>
-  <div id="viewerLink" class="viewer-link" style="display:none"></div>
 
   <div class="instructions">
-    <strong>Demo Game:</strong> Move your mouse over the canvas to control the paddle. 
-    Bouncing ball game renders to a &lt;canvas&gt; element, which is captured and 
-    streamed in real-time via the Substream Web SDK.<br><br>
-    This same approach works for any canvas-based game engine: 
-    Unity WebGL, Phaser, Cocos, Construct, Three.js, PixiJS, etc.
+    <strong>How to play:</strong> Move your mouse over the canvas to control the paddle.
+    The Breakout-style game renders to a &lt;canvas&gt; element, which is captured and
+    streamed in real-time via the IVS Web Broadcast SDK.<br><br>
+    <strong>Works with any canvas-based game:</strong>
+    Unity WebGL, Phaser, Three.js, PixiJS, Cocos, Construct, and more.<br><br>
+    <strong>Serve locally:</strong> <code>python3 -m http.server 8080</code> then open
+    <a href="http://localhost:8080" style="color:#60a5fa;">localhost:8080</a>
   </div>
 
-  <!-- IVS Web Broadcast SDK (loaded from CDN for the demo) -->
-  <script src="https://web-broadcast.live-video.net/1.12.0/amazon-ivs-web-broadcast.js"></script>
+  <!-- IVS Web Broadcast SDK v1.32.0 (latest stable) -->
+  <script src="https://web-broadcast.live-video.net/1.32.0/amazon-ivs-web-broadcast.js"></script>
 
   <script>
     // ============================================
-    // SIMPLE BREAKOUT-STYLE DEMO GAME
+    // LOG PANEL
+    // ============================================
+
+    const logPanel = document.getElementById('log-panel');
+
+    function log(msg, level = 'info') {
+      const line = document.createElement('div');
+      line.className = 'log-line log-' + level;
+      const ts = new Date().toLocaleTimeString('en-US', { hour12: false });
+      line.textContent = `[${ts}] ${msg}`;
+      logPanel.appendChild(line);
+      logPanel.scrollTop = logPanel.scrollHeight;
+    }
+    function clearLog() { logPanel.innerHTML = ''; }
+
+    function setCheck(id, state) {
+      const dot = document.querySelector(`#${id} .dot`);
+      if (dot) dot.className = 'dot ' + state;
+    }
+
+    // ============================================
+    // PREFLIGHT CHECKS
+    // ============================================
+
+    (function runPreflightChecks() {
+      // 1. Protocol check
+      if (location.protocol === 'file:') {
+        setCheck('chk-protocol', 'fail');
+        log('Opened via file:// -- captureStream and WebRTC require HTTP. Use: python3 -m http.server 8080', 'err');
+      } else {
+        setCheck('chk-protocol', 'ok');
+        log('Protocol OK: ' + location.protocol + '//' + location.host, 'ok');
+      }
+
+      // 2. captureStream support
+      const testCanvas = document.createElement('canvas');
+      if (typeof testCanvas.captureStream === 'function') {
+        setCheck('chk-capture', 'ok');
+        log('canvas.captureStream() supported', 'ok');
+      } else {
+        setCheck('chk-capture', 'fail');
+        log('canvas.captureStream() NOT supported in this browser', 'err');
+      }
+
+      // 3. IVS SDK
+      if (typeof IVSBroadcastClient !== 'undefined' && IVSBroadcastClient.Stage) {
+        setCheck('chk-sdk', 'ok');
+        log('IVS Web Broadcast SDK loaded (Stage API available)', 'ok');
+      } else {
+        setCheck('chk-sdk', 'fail');
+        log('IVS Web Broadcast SDK failed to load. Check network or ad-blocker.', 'err');
+      }
+
+      // 4. Backend connectivity (async)
+      const backendUrl = document.getElementById('backendUrl').value.replace(/\/$/, '');
+      setCheck('chk-backend', 'working');
+      fetch(backendUrl + '/api/health', { mode: 'cors' })
+        .then(r => r.json())
+        .then(data => {
+          if (data.status === 'ok') {
+            setCheck('chk-backend', 'ok');
+            const features = Object.entries(data.features || {})
+              .filter(([, v]) => v)
+              .map(([k]) => k)
+              .join(', ');
+            log('Backend reachable: ' + features, 'ok');
+          } else {
+            setCheck('chk-backend', 'fail');
+            log('Backend returned unexpected status: ' + JSON.stringify(data), 'warn');
+          }
+        })
+        .catch(err => {
+          setCheck('chk-backend', 'fail');
+          log('Cannot reach backend: ' + err.message, 'err');
+        });
+    })();
+
+    // ============================================
+    // STREAMING STATE (declared early for game loop access)
+    // ============================================
+
+    let currentSession = null;
+
+    // ============================================
+    // BREAKOUT GAME
     // ============================================
 
     const canvas = document.getElementById('game-canvas');
     const ctx = canvas.getContext('2d');
 
-    // Polyfill roundRect for older browsers (Safari < 16, Firefox < 112)
     if (!ctx.roundRect) {
       CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
         r = Math.min(r, w / 2, h / 2);
@@ -138,10 +339,10 @@
         this.closePath();
       };
     }
+
     const W = canvas.width;
     const H = canvas.height;
 
-    // Game state
     let paddleX = W / 2 - 60;
     const paddleW = 120, paddleH = 16, paddleY = H - 40;
     let ballX = W / 2, ballY = H / 2, ballDX = 4, ballDY = -4, ballR = 10;
@@ -165,7 +366,6 @@
     }
     initBlocks();
 
-    // Mouse control
     canvas.addEventListener('mousemove', (e) => {
       const rect = canvas.getBoundingClientRect();
       const scaleX = W / rect.width;
@@ -173,13 +373,10 @@
       paddleX = Math.max(0, Math.min(W - paddleW, paddleX));
     });
 
-    // Game loop
     function gameLoop() {
-      // Clear
       ctx.fillStyle = '#111827';
       ctx.fillRect(0, 0, W, H);
 
-      // Draw blocks
       blocks.forEach(b => {
         if (!b.alive) return;
         ctx.fillStyle = b.color;
@@ -188,19 +385,16 @@
         ctx.fill();
       });
 
-      // Draw paddle
       ctx.fillStyle = '#60a5fa';
       ctx.beginPath();
       ctx.roundRect(paddleX, paddleY, paddleW, paddleH, 8);
       ctx.fill();
 
-      // Draw ball
       ctx.fillStyle = '#fff';
       ctx.beginPath();
       ctx.arc(ballX, ballY, ballR, 0, Math.PI * 2);
       ctx.fill();
 
-      // Ball shadow/glow
       ctx.shadowColor = '#60a5fa';
       ctx.shadowBlur = 15;
       ctx.beginPath();
@@ -208,27 +402,22 @@
       ctx.fill();
       ctx.shadowBlur = 0;
 
-      // Move ball
       ballX += ballDX;
       ballY += ballDY;
 
-      // Wall collisions
       if (ballX - ballR < 0 || ballX + ballR > W) ballDX = -ballDX;
       if (ballY - ballR < 0) ballDY = -ballDY;
 
-      // Paddle collision
       if (
         ballY + ballR >= paddleY &&
         ballY + ballR <= paddleY + paddleH + 8 &&
         ballX >= paddleX && ballX <= paddleX + paddleW
       ) {
         ballDY = -Math.abs(ballDY);
-        // Angle based on where ball hits paddle
         const hitPos = (ballX - paddleX) / paddleW - 0.5;
         ballDX = hitPos * 8;
       }
 
-      // Block collisions
       blocks.forEach(b => {
         if (!b.alive) return;
         if (
@@ -241,7 +430,6 @@
         }
       });
 
-      // Ball fell below paddle - reset
       if (ballY - ballR > H) {
         ballX = W / 2;
         ballY = H / 2;
@@ -249,19 +437,16 @@
         ballDY = -4;
       }
 
-      // All blocks destroyed - reset
       if (blocks.every(b => !b.alive)) {
         initBlocks();
         ballDX *= 1.1;
         ballDY *= 1.1;
       }
 
-      // Score
       ctx.fillStyle = '#fff';
       ctx.font = '20px system-ui';
-      ctx.fillText(`Score: ${score}`, 20, 35);
+      ctx.fillText('Score: ' + score, 20, 35);
 
-      // Streaming indicator
       if (currentSession && currentSession.isLive) {
         ctx.fillStyle = '#ef4444';
         ctx.beginPath();
@@ -277,10 +462,8 @@
     gameLoop();
 
     // ============================================
-    // STREAMING (uses Substream Web SDK pattern)
+    // STREAMING
     // ============================================
-
-    let currentSession = null;
 
     async function startStreaming() {
       const startBtn = document.getElementById('startBtn');
@@ -288,33 +471,53 @@
       const statusEl = document.getElementById('status');
       const viewerLinkEl = document.getElementById('viewerLink');
       const backendUrl = document.getElementById('backendUrl').value.replace(/\/$/, '');
+      const childId = document.getElementById('childId').value.trim() || 'demo-child-001';
 
       startBtn.disabled = true;
-      statusEl.className = 'status info';
+      statusEl.className = 'status-bar info';
       statusEl.textContent = 'Connecting...';
+      setCheck('chk-stage', 'working');
+
+      // Guard: preflight failures
+      if (location.protocol === 'file:') {
+        statusEl.className = 'status-bar error';
+        statusEl.textContent = 'Cannot stream from file://. Serve over HTTP (see instructions below).';
+        log('Blocked: file:// protocol', 'err');
+        startBtn.disabled = false;
+        return;
+      }
+      if (typeof IVSBroadcastClient === 'undefined' || !IVSBroadcastClient.Stage) {
+        statusEl.className = 'status-bar error';
+        statusEl.textContent = 'IVS SDK not loaded. Check network or disable ad-blocker.';
+        log('Blocked: IVS SDK missing', 'err');
+        startBtn.disabled = false;
+        return;
+      }
 
       try {
-        // Step 1: Get publish token from backend
-        const response = await fetch(`${backendUrl}/api/streams/web-publish`, {
+        // Step 1: Request publish token
+        log('Requesting publish token from backend...', 'info');
+        const response = await fetch(backendUrl + '/api/streams/web-publish', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer demo-token',
           },
-          body: JSON.stringify({ childId: 'demo-child-001' }),
+          body: JSON.stringify({ childId }),
         });
 
         if (!response.ok) {
           const err = await response.json().catch(() => ({}));
-          throw new Error(err.error || `HTTP ${response.status}`);
+          throw new Error(err.error || 'Backend returned HTTP ' + response.status);
         }
 
         const publishInfo = await response.json();
-        console.log('[Demo] Got publish info:', publishInfo);
+        log('Publish token received. Stream ID: ' + publishInfo.streamId, 'ok');
+        log('Stage ARN: ' + publishInfo.stageArn, 'info');
 
         // Step 2: Capture canvas
         const canvasStream = canvas.captureStream(30);
-        console.log('[Demo] Canvas capture started, tracks:', canvasStream.getTracks().length);
+        log('Canvas capture started (' + canvasStream.getTracks().length + ' track(s) at 30fps)', 'ok');
 
         // Step 3: Create IVS stage and publish
         const { Stage, LocalStageStream, SubscribeType, StageEvents } = IVSBroadcastClient;
@@ -332,16 +535,25 @@
         const stage = new Stage(publishInfo.publishToken, strategy);
 
         stage.on(StageEvents.STAGE_CONNECTION_STATE_CHANGED, (state) => {
-          console.log('[Demo] Stage connection state:', state);
+          log('Stage connection: ' + state, state === 'connected' ? 'ok' : 'info');
           if (state === 'connected') {
-            statusEl.className = 'status live';
+            setCheck('chk-stage', 'ok');
+            statusEl.className = 'status-bar live';
             statusEl.textContent = 'LIVE - Streaming to parents!';
             stopBtn.disabled = false;
+          } else if (state === 'disconnected' && currentSession) {
+            setCheck('chk-stage', 'fail');
+            log('Stage disconnected unexpectedly', 'warn');
           }
         });
 
+        stage.on(StageEvents.STAGE_PARTICIPANT_JOINED, (info) => {
+          log('Participant joined: ' + info.id + (info.isLocal ? ' (local)' : ' (remote)'), 'info');
+        });
+
+        log('Joining IVS stage...', 'info');
         await stage.join();
-        console.log('[Demo] Joined stage, publishing canvas stream');
+        log('Publishing canvas stream to IVS Real-Time stage', 'ok');
 
         currentSession = {
           streamId: publishInfo.streamId,
@@ -351,14 +563,22 @@
           isLive: true,
         };
 
-        // Show viewer link
-        viewerLinkEl.innerHTML = `Viewer URL: <a href="${publishInfo.viewerUrl}" target="_blank">${publishInfo.viewerUrl}</a>`;
+        viewerLinkEl.innerHTML = 'Viewer URL: <a href="' + publishInfo.viewerUrl + '" target="_blank">' + publishInfo.viewerUrl + '</a>';
         viewerLinkEl.style.display = 'block';
 
       } catch (err) {
         console.error('[Demo] Error:', err);
-        statusEl.className = 'status error';
-        statusEl.textContent = `Error: ${err.message}`;
+        setCheck('chk-stage', 'fail');
+        statusEl.className = 'status-bar error';
+
+        let userMsg = err.message;
+        if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+          userMsg = 'Cannot reach backend. Check URL and network.';
+        } else if (err.message.includes('CORS')) {
+          userMsg = 'CORS error. Backend may not allow this origin.';
+        }
+        statusEl.textContent = 'Error: ' + userMsg;
+        log('ERROR: ' + err.message, 'err');
         startBtn.disabled = false;
       }
     }
@@ -373,16 +593,13 @@
       const backendUrl = document.getElementById('backendUrl').value.replace(/\/$/, '');
 
       stopBtn.disabled = true;
+      log('Stopping stream...', 'info');
 
-      // Stop tracks
       currentSession.canvasStream.getTracks().forEach(t => t.stop());
-
-      // Leave stage
       try { currentSession.stage.leave(); } catch (e) { /* ignore */ }
 
-      // Notify backend
       try {
-        await fetch(`${backendUrl}/api/streams/web-publish`, {
+        await fetch(backendUrl + '/api/streams/web-publish', {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',
@@ -390,11 +607,15 @@
           },
           body: JSON.stringify({ streamId: currentSession.streamId }),
         });
-      } catch (e) { console.warn('[Demo] Backend stop notification failed:', e); }
+        log('Backend notified, stream released', 'ok');
+      } catch (e) {
+        log('Backend stop notification failed (non-critical): ' + e.message, 'warn');
+      }
 
       currentSession = null;
+      setCheck('chk-stage', 'pending');
 
-      statusEl.className = 'status info';
+      statusEl.className = 'status-bar info';
       statusEl.textContent = 'Stream stopped. Click "Start Streaming" to go live again.';
       viewerLinkEl.style.display = 'none';
       startBtn.disabled = false;
