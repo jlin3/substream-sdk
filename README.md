@@ -54,7 +54,32 @@ Test streaming immediately with our live demo:
 
 ---
 
-## Quick Start (Game Developers)
+## Quick Start: Web Games (HTML5 Canvas)
+
+Add two script tags to your page and call one function. No npm, no build step.
+
+```html
+<script src="https://web-broadcast.live-video.net/1.32.0/amazon-ivs-web-broadcast.js"></script>
+<script src="substream.js"></script>
+<script>
+  const session = await Substream.startStream({
+    canvas: document.getElementById('game-canvas'),
+    backendUrl: 'https://substream-sdk-production.up.railway.app',
+    childId: 'demo-child-001',
+    authToken: 'demo-token',
+  });
+  console.log('Viewer URL:', session.viewerUrl);
+</script>
+```
+
+Copy `substream.js` from [examples/web-game-demo/](examples/web-game-demo/).
+Works with Phaser, Three.js, PixiJS, Unity WebGL, Cocos, Construct, and any `<canvas>` game.
+
+**Full guide with complete integration examples:** [examples/web-game-demo/README.md](examples/web-game-demo/README.md)
+
+---
+
+## Quick Start: Unity Native
 
 ### 1. Import the SDK
 
@@ -88,7 +113,7 @@ streamControl.StopStreaming();
 
 Open the web viewer: `examples/web-viewer/index.html`
 
-**Full guide:** [SDK_STREAMING_GUIDE.md](SDK_STREAMING_GUIDE.md)
+**Full Unity guide:** [SDK_STREAMING_GUIDE.md](SDK_STREAMING_GUIDE.md)
 
 ---
 

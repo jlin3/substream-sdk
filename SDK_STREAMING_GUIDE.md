@@ -462,23 +462,26 @@ Construct) can stream using the **Web SDK** path instead.
 This uses `canvas.captureStream()` + the IVS Web Broadcast SDK -- no native plugins
 needed, runs entirely in the browser.
 
-See [examples/web-game-demo/](examples/web-game-demo/) for a complete working demo
-and [packages/web-sdk/](packages/web-sdk/) for the TypeScript SDK.
+See [examples/web-game-demo/](examples/web-game-demo/) for a complete working demo.
 
-Quick example:
+**Quickest path (no npm, no build step):** Add two script tags and call `Substream.startStream()`:
 
-```javascript
-import { SubstreamSDK } from '@substream/web-sdk';
-
-const stream = await SubstreamSDK.startStream({
-  backendUrl: 'https://substream-sdk-production.up.railway.app',
-  canvasElement: document.getElementById('game-canvas'),
-  childId: 'child-123',
-  authToken: 'your-jwt-token',
-});
-
-console.log('Viewer URL:', stream.viewerUrl);
+```html
+<script src="https://web-broadcast.live-video.net/1.32.0/amazon-ivs-web-broadcast.js"></script>
+<script src="substream.js"></script>
+<script>
+  const session = await Substream.startStream({
+    canvas: document.getElementById('game-canvas'),
+    backendUrl: 'https://substream-sdk-production.up.railway.app',
+    childId: 'demo-child-001',
+    authToken: 'demo-token',
+  });
+  console.log('Viewer URL:', session.viewerUrl);
+</script>
 ```
+
+Copy `substream.js` from `examples/web-game-demo/substream.js`.
+For TypeScript projects, see [packages/web-sdk/](packages/web-sdk/).
 
 ---
 

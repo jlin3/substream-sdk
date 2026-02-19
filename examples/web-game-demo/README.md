@@ -2,22 +2,17 @@
 
 Stream any HTML5 canvas game to parents in real-time via AWS IVS.
 
-This demo shows a Breakout-style game rendered on a `<canvas>` element, captured with `canvas.captureStream()`, and published to an IVS Real-Time stage using the IVS Web Broadcast SDK. Parents receive a viewer URL and watch via WebRTC with sub-second latency.
-
 ---
 
-## Quick Start
+## Quick Start (Try the Demo)
 
 ```bash
-# 1. Serve the demo over HTTP (required for WebRTC)
 cd examples/web-game-demo
 python3 -m http.server 8080
-
-# 2. Open in your browser
 open http://localhost:8080
 ```
 
-Click **Start Streaming**. The demo connects to the live backend, allocates an IVS stage, and begins publishing the canvas feed. A viewer URL is displayed once the stream is live.
+Click **Start Streaming**. The demo connects to the live backend, allocates an IVS Real-Time stage, and begins publishing the canvas feed. A viewer URL appears once the stream is live.
 
 ### Demo Credentials (pre-configured)
 
@@ -29,49 +24,117 @@ Click **Start Streaming**. The demo connects to the live backend, allocates an I
 
 ---
 
-## How It Works
+## Add Streaming to Your Existing Game (3 Steps)
 
-```
-Canvas Game (browser)
-    |
-    |  canvas.captureStream(30fps)
-    v
-MediaStream
-    |
-    |  IVS Web Broadcast SDK (Stage + LocalStageStream)
-    v
-AWS IVS Real-Time Stage
-    |
-    |  WebRTC subscribe
-    v
-Viewer Page (parent's browser)
+This works with **any** game that renders to a `<canvas>` element -- Phaser, Three.js, PixiJS, Unity WebGL, Cocos, Construct, or plain canvas.
+
+### Step 1: Add two script tags
+
+```html
+<!-- IVS Web Broadcast SDK (handles WebRTC publishing) -->
+<script src="https://web-broadcast.live-video.net/1.32.0/amazon-ivs-web-broadcast.js"></script>
+
+<!-- Substream integration (one-file, zero dependencies) -->
+<script src="substream.js"></script>
 ```
 
-1. The game draws frames to a `<canvas>` element at 1280x720.
-2. `canvas.captureStream(30)` produces a `MediaStream` with a video track.
-3. The IVS Web Broadcast SDK wraps that track as a `LocalStageStream` and publishes it to an IVS Real-Time stage.
-4. Parents open the viewer URL, which subscribes to the same stage and renders the video.
+Copy `substream.js` from this directory into your project, or reference it from the repo.
+
+### Step 2: Start streaming
+
+```javascript
+const session = await Substream.startStream({
+  canvas: document.getElementById('game-canvas'),  // your game's canvas element
+  backendUrl: 'https://substream-sdk-production.up.railway.app',
+  childId: 'demo-child-001',   // your player's ID
+  authToken: 'demo-token',     // your auth token
+  onLive: ({ viewerUrl }) => {
+    console.log('Stream is live! Viewer URL:', viewerUrl);
+    // Show viewerUrl to the parent, send via API, etc.
+  },
+});
+```
+
+### Step 3: Stop streaming
+
+```javascript
+await session.stop();
+```
+
+That's it. No npm install, no build step, no configuration files.
 
 ---
 
-## Integrating Your Own Game
+## Complete Integration Example
 
-Any game that renders to a `<canvas>` element works. Replace the Breakout game with your engine:
-
-### Phaser
+Here's a full working HTML page that integrates streaming into a Phaser game:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
-<script>
-  const config = {
-    type: Phaser.CANVAS, // must be CANVAS, not WEBGL
-    canvas: document.getElementById('game-canvas'),
-    width: 1280,
-    height: 720,
-    scene: { /* your scenes */ }
-  };
-  const game = new Phaser.Game(config);
-</script>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Game with Streaming</title>
+</head>
+<body>
+  <canvas id="game-canvas" width="1280" height="720"></canvas>
+  <button id="stream-btn">Start Streaming</button>
+  <p id="stream-status"></p>
+
+  <!-- Your game engine -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
+
+  <!-- Streaming (two script tags) -->
+  <script src="https://web-broadcast.live-video.net/1.32.0/amazon-ivs-web-broadcast.js"></script>
+  <script src="substream.js"></script>
+
+  <script>
+    // --- Your game code (unchanged) ---
+    const game = new Phaser.Game({
+      type: Phaser.AUTO,  // CANVAS or WEBGL -- both work
+      canvas: document.getElementById('game-canvas'),
+      width: 1280,
+      height: 720,
+      scene: {
+        create() { this.add.text(100, 100, 'My Game', { fontSize: 48 }); }
+      }
+    });
+
+    // --- Streaming integration (add this) ---
+    let session = null;
+    const btn = document.getElementById('stream-btn');
+    const status = document.getElementById('stream-status');
+
+    btn.onclick = async () => {
+      if (session) {
+        await session.stop();
+        session = null;
+        btn.textContent = 'Start Streaming';
+        status.textContent = 'Stream stopped.';
+        return;
+      }
+
+      btn.disabled = true;
+      status.textContent = 'Connecting...';
+
+      try {
+        session = await Substream.startStream({
+          canvas: document.getElementById('game-canvas'),
+          backendUrl: 'https://substream-sdk-production.up.railway.app',
+          childId: 'demo-child-001',
+          authToken: 'demo-token',
+          onLive: ({ viewerUrl }) => {
+            status.innerHTML = 'LIVE! <a href="' + viewerUrl + '" target="_blank">Open viewer</a>';
+          },
+        });
+        btn.textContent = 'Stop Streaming';
+      } catch (err) {
+        status.textContent = 'Error: ' + err.message;
+      }
+      btn.disabled = false;
+    };
+  </script>
+</body>
+</html>
 ```
 
 ### Three.js
@@ -80,57 +143,82 @@ Any game that renders to a `<canvas>` element works. Replace the Breakout game w
 const renderer = new THREE.WebGLRenderer({
   canvas: document.getElementById('game-canvas'),
 });
-// renderer draws to the same canvas; captureStream() captures it
+// The renderer draws to the canvas; Substream captures it automatically.
+// Just call Substream.startStream() with the same canvas element.
 ```
 
 ### Unity WebGL
 
-Unity WebGL builds render to a canvas element. After the build loads:
+After the Unity WebGL build loads and renders to its canvas:
 
 ```javascript
 const unityCanvas = document.querySelector('#unity-canvas');
-// Pass unityCanvas to captureStream() the same way
+const session = await Substream.startStream({
+  canvas: unityCanvas,
+  backendUrl: 'https://substream-sdk-production.up.railway.app',
+  childId: 'demo-child-001',
+  authToken: 'demo-token',
+});
 ```
 
 ### PixiJS / Cocos / Construct
 
-All of these render to `<canvas>`. Point `captureStream()` at the canvas element and the rest is identical.
+All render to `<canvas>`. Pass your canvas element to `Substream.startStream()` -- everything else is identical.
 
 ---
 
-## Preflight Checks
+## How It Works
 
-The demo runs automated checks on load:
+```
+Canvas Game (browser)
+    |
+    |  canvas.captureStream(30fps)
+    v
+MediaStream (video track)
+    |
+    |  IVS Web Broadcast SDK  (Stage + LocalStageStream)
+    v
+AWS IVS Real-Time Stage
+    |
+    |  WebRTC subscribe
+    v
+Viewer Page (parent's browser)
+```
 
-| Check | What it verifies |
-|-------|-----------------|
-| Protocol | Page served over HTTP/HTTPS (not `file://`) |
-| captureStream | `canvas.captureStream()` API available in the browser |
-| IVS SDK | IVS Web Broadcast SDK loaded from CDN |
-| Backend | `/api/health` endpoint reachable and returning `status: ok` |
-| Stage | IVS Real-Time stage connected (after clicking Start) |
+`captureStream()` works on both 2D canvas and WebGL canvas in all modern browsers (Chrome, Firefox, Safari, Edge).
 
-If any check fails, the event log panel shows the specific error.
+---
+
+## Production Auth
+
+The demo uses hardcoded `demo-token` / `demo-child-001` credentials. For production:
+
+1. **Your backend authenticates the player** and issues a JWT or session token.
+2. **Pass that token as `authToken`** to `Substream.startStream()`. The Substream backend validates it before allocating a stage.
+3. **The `childId` maps to your player's ID** in your system. The backend uses it to determine which parent(s) can view the stream.
+
+The Substream backend validates tokens in `IVSBackend/src/app/api/streams/web-publish/route.ts`. In the current implementation, `demo-token` + `demo-child-001` is a hardcoded demo bypass. For production, replace the `validateAuth()` function with your JWT verification logic.
+
+```
+Your Game  --(authToken + childId)--> Substream Backend  --(validate)--> Your Auth Service
+```
 
 ---
 
 ## Webhook Integration
 
-Register a webhook to receive stream lifecycle events:
+Get notified when streams start/stop and viewers join/leave:
 
 ```bash
-# Register
 curl -X POST https://substream-sdk-production.up.railway.app/api/webhooks \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://your-app.com/hooks/substream",
-    "events": ["stream.started", "stream.stopped", "viewer.joined"]
+    "events": ["stream.started", "stream.stopped", "viewer.joined", "viewer.left"]
   }'
-
-# Response includes a secret for HMAC verification
 ```
 
-Your endpoint receives POST requests with signed payloads:
+Your endpoint receives signed POST requests:
 
 ```json
 {
@@ -145,35 +233,45 @@ Your endpoint receives POST requests with signed payloads:
 }
 ```
 
-Verify the `X-Substream-Signature` header using HMAC-SHA256 with your secret.
+Verify `X-Substream-Signature` with HMAC-SHA256 using the `secret` from registration.
 
 ---
 
-## Requirements
+## Preflight Checks
 
-- A modern browser (Chrome, Firefox, Safari, Edge)
-- HTTP server (not `file://`) -- `python3 -m http.server` works fine
-- Network access to the backend (or run `IVSBackend/` locally)
+The demo page runs automated checks on load:
+
+| Check | What it verifies |
+|-------|-----------------|
+| Protocol | Page served over HTTP/HTTPS (not `file://`) |
+| captureStream | `canvas.captureStream()` API available |
+| IVS SDK | IVS Web Broadcast SDK loaded from CDN |
+| Backend | `/api/health` reachable and returning `status: ok` |
+| Stage | IVS Real-Time stage connected (after clicking Start) |
 
 ---
 
-## Using the Web SDK Package
+## Using the TypeScript SDK (npm)
 
-For production integration, use the `@substream/web-sdk` TypeScript package instead of the raw IVS SDK:
+For TypeScript projects with a build step, use `@substream/web-sdk` instead:
+
+```bash
+npm install amazon-ivs-web-broadcast
+# Then copy packages/web-sdk/ into your project (not yet on npm)
+```
 
 ```typescript
 import { SubstreamSDK } from '@substream/web-sdk';
 
 const stream = await SubstreamSDK.startStream({
-  backendUrl: 'https://your-backend.example.com',
-  canvasElement: document.getElementById('game-canvas'),
+  backendUrl: 'https://substream-sdk-production.up.railway.app',
+  canvasElement: document.getElementById('game-canvas') as HTMLCanvasElement,
   childId: 'child-123',
   authToken: 'jwt-token',
   onLive: ({ viewerUrl }) => console.log('Live at', viewerUrl),
 });
 
-// Later
 await stream.stop();
 ```
 
-See `packages/web-sdk/` for the full API.
+See `packages/web-sdk/` for the full typed API.
