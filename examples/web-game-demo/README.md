@@ -159,34 +159,56 @@ const renderer = new THREE.WebGLRenderer({
 
 ### Unity WebGL
 
-Script loading order is critical for audio -- `captureAudio()` must run before Unity creates its AudioContext:
-
-```html
-<!-- 1. Streaming SDKs + audio capture (BEFORE Unity) -->
+Step 1: Add the streaming SDKs and audio capture
+Add the following at the end of the <head> of your HTML:
+<!-- Streaming SDKs + audio capture -->
 <script src="https://web-broadcast.live-video.net/1.32.0/amazon-ivs-web-broadcast.js"></script>
 <script src="substream.js"></script>
 <script>Substream.captureAudio();</script>
 
-<!-- 2. Unity WebGL build (creates AudioContext for game audio) -->
-<script src="Build/UnityLoader.js"></script>
-<script>
-  var unityInstance = UnityLoader.instantiate("unity-container", "Build/build.json");
-</script>
+Step 2: Make sure your Unity canvas exists in the <body> of your HTML:
+<div id="unity-container">
+  <canvas id="unity-canvas" width="960" height="600"></canvas>
+</div>
 
-<!-- 3. Start streaming after the game is running -->
-<script>
-  async function goLive() {
-    const unityCanvas = document.querySelector('#unity-canvas');
-    const session = await Substream.startStream({
-      canvas: unityCanvas,
-      backendUrl: 'https://substream-sdk-production.up.railway.app',
-      childId: 'demo-child-001',
-      authToken: 'demo-token',
-    });
-    console.log('Live at:', session.viewerUrl);
+Step 3: Add the streaming start/stop setup
+Add the following inside the .then() callback of createUnityInstance(), right after Unity has loaded:
+// --- Substream streaming integration ---
+let session = null;
+
+async function startStreaming() {
+  session = await Substream.startStream({
+    canvas: canvas,
+    backendUrl: 'https://substream-sdk-production.up.railway.app',
+    childId: 'demo-child-001',
+    authToken: 'demo-token',
+    onLive: ({ viewerUrl }) => {
+      console.log('Stream is live! Viewer URL:', viewerUrl);
+      alert('Stream live! Open: ' + viewerUrl);
+    },
+  });
+}
+
+async function stopStreaming() {
+  if (session) {
+    await session.stop();
+    session = null;
+    console.log('Stream stopped');
   }
-</script>
-```
+}
+
+// Expose functions to buttons or UI
+window.startStreaming = startStreaming;
+window.stopStreaming = stopStreaming;
+
+
+Step 4: Optional — Add buttons in your HTML to start/stop streaming
+Add the following in the <body> before <script>:
+<!-- Start/Stop buttons for streaming -->
+<div id="stream-controls" style="margin: 10px;">
+  <button onclick="startStreaming()">Start Streaming</button>
+  <button onclick="stopStreaming()">Stop Streaming</button>
+</div>
 
 ### PixiJS / Cocos / Construct
 
