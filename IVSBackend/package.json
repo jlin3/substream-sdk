@@ -20,28 +20,39 @@
   "dependencies": {
     "@aws-sdk/client-ivs": "^3.940.0",
     "@aws-sdk/client-ivs-realtime": "^3.940.0",
+    "@aws-sdk/client-ivschat": "^3.997.0",
     "@aws-sdk/client-s3": "^3.940.0",
-    "amazon-ivs-web-broadcast": "^1.19.0",
     "@prisma/adapter-pg": "^7.0.1",
     "@prisma/client": "^7.0.1",
+    "amazon-ivs-web-broadcast": "^1.19.0",
+    "bullmq": "^5.70.1",
     "dotenv": "^17.2.3",
+    "ioredis": "^5.9.3",
     "jose": "^6.1.2",
     "next": "^15.2.8",
     "pg": "^8.16.3",
+    "pino": "^10.3.1",
+    "pino-pretty": "^13.1.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.4",
     "@types/json-schema": "^7.0.15",
     "@types/node": "^20",
     "@types/pg": "^8.15.6",
+    "@types/pino": "^7.0.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^11.0.0",
+    "eslint": "^10.0.2",
+    "eslint-config-next": "^16.1.6",
     "prisma": "^7.0.1",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "typescript-eslint": "^8.56.1"
   },
   "engines": {
     "node": ">=18"

@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createStreamSession, StreamingError } from '@/lib/streaming';
 import { createRealTimeSession } from '@/lib/streaming/stream-realtime-service';
+import { requireAuth, type AuthContext } from '@/lib/auth';
 
 export async function POST(
   request: NextRequest,
@@ -25,33 +26,20 @@ export async function POST(
     const searchParams = request.nextUrl.searchParams;
     const mode = searchParams.get('mode') || 'rtmps';
     
-    // Auth check
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json(
-        { error: 'Unauthorized', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      );
-    }
-    
-    const requestingUserId = extractUserIdFromAuth(authHeader);
-    if (!requestingUserId) {
-      return NextResponse.json(
-        { error: 'Invalid authentication', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) return authResult;
+    const auth: AuthContext = authResult;
 
     if (mode === 'webrtc') {
       // New WebRTC mode using IVS Real-Time
-      const result = await createRealTimeSession(childId, requestingUserId);
+      const result = await createRealTimeSession(childId, auth.userId);
       return NextResponse.json({
         mode: 'webrtc',
         ...result,
       }, { status: 201 });
     } else {
       // Legacy RTMPS mode
-      const result = await createStreamSession(childId, requestingUserId);
+      const result = await createStreamSession(childId, auth.userId);
       return NextResponse.json({
         mode: 'rtmps',
         ...result,
@@ -72,21 +60,4 @@ export async function POST(
       { status: 500 }
     );
   }
-}
-
-function extractUserIdFromAuth(authHeader: string): string | null {
-  const match = authHeader.match(/^Bearer\s+(.+)$/);
-  if (!match) return null;
-  
-  const token = match[1];
-  
-  // Demo token mapping for SDK users to test immediately
-  const demoTokens: Record<string, string> = {
-    'demo-token': 'demo-user-001',
-    'demo-viewer-token': 'demo-viewer-001',
-    'test-token': 'test-user-id',
-    'test-parent-token': 'test-parent-user-id',
-  };
-  
-  return demoTokens[token] || token;
 }

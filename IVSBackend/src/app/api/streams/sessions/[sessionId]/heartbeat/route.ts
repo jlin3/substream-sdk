@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { StreamingError } from '@/lib/streaming';
 import { prisma } from '@/lib/prisma';
+import { requireAuth, type AuthContext } from '@/lib/auth';
 
 interface HeartbeatPayload {
   currentBitrateKbps?: number;
@@ -23,14 +24,9 @@ export async function POST(
     const { sessionId } = await params;
     const body: HeartbeatPayload = await request.json();
     
-    // Auth check
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json(
-        { error: 'Unauthorized', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) return authResult;
+    const _auth: AuthContext = authResult;
 
     // Find session
     const session = await prisma.childStreamSession.findUnique({

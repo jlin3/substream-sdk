@@ -17,12 +17,16 @@ const TAG_LENGTH = 16;
  */
 function getEncryptionKey(): Buffer {
   const keyHex = process.env.STREAM_KEY_ENCRYPTION_KEY;
-  
+
   if (!keyHex) {
-    // Use a default demo key (NOT secure for production with real users!)
-    console.warn('[Encryption] STREAM_KEY_ENCRYPTION_KEY not set - using demo key');
-    // Demo key - this allows SDK testing without full setup
-    return Buffer.from('8af6b8fb7572d8f31767f27b809445ccf1dc97e5c64073a46ecaccdb7b0c333c', 'hex');
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'STREAM_KEY_ENCRYPTION_KEY must be set in production. ' +
+        'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"',
+      );
+    }
+    console.warn('[Encryption] STREAM_KEY_ENCRYPTION_KEY not set — using ephemeral dev key');
+    return Buffer.from(randomBytes(32));
   }
 
   if (keyHex.length !== 64) {

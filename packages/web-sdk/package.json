@@ -1,11 +1,20 @@
 {
   "name": "@substream/web-sdk",
-  "version": "0.1.0",
-  "description": "Stream any HTML5 canvas game to parents via Substream SDK",
+  "version": "1.0.0",
+  "description": "Stream any HTML5 canvas game to viewers via Substream + AWS IVS",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist", "src"],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
@@ -14,11 +23,28 @@
   "peerDependencies": {
     "amazon-ivs-web-broadcast": "^1.19.0"
   },
-  "keywords": ["substream", "streaming", "ivs", "webrtc", "canvas", "game"],
+  "keywords": [
+    "substream",
+    "streaming",
+    "ivs",
+    "webrtc",
+    "canvas",
+    "game",
+    "live",
+    "broadcast",
+    "phaser",
+    "three.js",
+    "pixijs",
+    "unity-webgl"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/jlin3/substream-sdk.git",
     "directory": "packages/web-sdk"
+  },
+  "homepage": "https://github.com/jlin3/substream-sdk/tree/main/packages/web-sdk#readme",
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }

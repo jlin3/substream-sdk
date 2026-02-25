@@ -1,18 +1,21 @@
 /**
  * Webhook Service
  *
- * Manages webhook registrations and dispatches events with retry logic.
- * Uses an in-memory store for v1; move to Prisma model for persistence
- * across deploys.
+ * Manages webhook registrations (persisted in Postgres) and dispatches
+ * events via BullMQ for reliable, retryable delivery. Falls back to
+ * in-memory delivery when Redis is unavailable.
  *
  * Supported events:
- *   stream.started  - game starts publishing
- *   stream.stopped  - game stops publishing
- *   viewer.joined   - parent connects to watch
- *   viewer.left     - parent disconnects
+ *   stream.started  — game starts publishing
+ *   stream.stopped  — game stops publishing
+ *   viewer.joined   — viewer connects to watch
+ *   viewer.left     — viewer disconnects
  */
 
 import { createHmac, randomUUID } from 'crypto';
+import { Queue, Worker } from 'bullmq';
+import { prisma } from '../prisma';
+import { redis, isRedisAvailable } from '../redis';
 
 // ============================================
 // TYPES
@@ -50,25 +53,79 @@ interface DeliveryAttempt {
 }
 
 // ============================================
-// IN-MEMORY STORE
+// IN-MEMORY FALLBACK (when Redis is unavailable)
 // ============================================
 
-const registrations = new Map<string, WebhookRegistration>();
+const memRegistrations = new Map<string, WebhookRegistration>();
 const recentDeliveries: DeliveryAttempt[] = [];
 const MAX_DELIVERY_LOG = 200;
 
 // ============================================
-// REGISTRATION CRUD
+// BULLMQ QUEUE (lazy-initialized)
 // ============================================
 
-export function registerWebhook(opts: {
+let webhookQueue: Queue | null = null;
+let webhookWorker: Worker | null = null;
+
+async function getQueue(): Promise<Queue | null> {
+  if (webhookQueue) return webhookQueue;
+  if (!(await isRedisAvailable())) return null;
+
+  webhookQueue = new Queue('webhooks', {
+    connection: redis,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 2000 },
+      removeOnComplete: 1000,
+      removeOnFail: 5000,
+    },
+  });
+
+  webhookWorker = new Worker(
+    'webhooks',
+    async (job) => {
+      const { endpoint, payload } = job.data as {
+        endpoint: { id: string; url: string; secretHash: string };
+        payload: WebhookPayload;
+      };
+      await attemptDelivery(endpoint, payload, job.attemptsMade + 1);
+    },
+    { connection: redis, concurrency: 10 },
+  );
+
+  webhookWorker.on('failed', (job, err) => {
+    console.warn(`[Webhooks] Job ${job?.id} failed:`, err.message);
+  });
+
+  return webhookQueue;
+}
+
+// ============================================
+// REGISTRATION CRUD (DB-backed + memory fallback)
+// ============================================
+
+export async function registerWebhook(opts: {
   url: string;
   events: WebhookEvent[];
   secret?: string;
   description?: string;
-}): WebhookRegistration {
+  appId?: string;
+}): Promise<WebhookRegistration> {
   const id = randomUUID();
   const secret = opts.secret || randomUUID().replace(/-/g, '');
+
+  if (opts.appId) {
+    await prisma.webhookEndpoint.create({
+      data: {
+        id,
+        appId: opts.appId,
+        url: opts.url,
+        secretHash: hashSecret(secret),
+        events: opts.events,
+        description: opts.description,
+      },
+    });
+  }
 
   const reg: WebhookRegistration = {
     id,
@@ -79,22 +136,39 @@ export function registerWebhook(opts: {
     description: opts.description,
   };
 
-  registrations.set(id, reg);
-  console.log(`[Webhooks] Registered ${id} -> ${opts.url} for [${opts.events.join(', ')}]`);
+  memRegistrations.set(id, reg);
   return reg;
 }
 
+function hashSecret(secret: string): string {
+  return createHmac('sha256', 'substream-webhook').update(secret).digest('hex');
+}
+
 export function listWebhooks(): WebhookRegistration[] {
-  return Array.from(registrations.values());
+  return Array.from(memRegistrations.values());
+}
+
+export async function listWebhooksForApp(appId: string): Promise<WebhookRegistration[]> {
+  const endpoints = await prisma.webhookEndpoint.findMany({
+    where: { appId, isActive: true },
+  });
+  return endpoints.map((e) => ({
+    id: e.id,
+    url: e.url,
+    secret: '***',
+    events: e.events as WebhookEvent[],
+    createdAt: e.createdAt.toISOString(),
+    description: e.description ?? undefined,
+  }));
 }
 
 export function getWebhook(id: string): WebhookRegistration | undefined {
-  return registrations.get(id);
+  return memRegistrations.get(id);
 }
 
 export function deleteWebhook(id: string): boolean {
-  const existed = registrations.delete(id);
-  if (existed) console.log(`[Webhooks] Deleted ${id}`);
+  const existed = memRegistrations.delete(id);
+  prisma.webhookEndpoint.update({ where: { id }, data: { isActive: false } }).catch(() => {});
   return existed;
 }
 
@@ -102,23 +176,10 @@ export function deleteWebhook(id: string): boolean {
 // DISPATCH
 // ============================================
 
-const RETRY_DELAYS_MS = [0, 2_000, 10_000]; // immediate, 2s, 10s
-const DELIVERY_TIMEOUT_MS = 10_000;
-
-/**
- * Fire a webhook event to all matching registrations.
- * Dispatch is non-blocking -- callers don't wait for delivery.
- */
 export function dispatchWebhookEvent(
   event: WebhookEvent,
   data: Record<string, unknown>,
 ): void {
-  const matching = Array.from(registrations.values()).filter(r =>
-    r.events.includes(event),
-  );
-
-  if (matching.length === 0) return;
-
   const payload: WebhookPayload = {
     id: randomUUID(),
     event,
@@ -126,38 +187,83 @@ export function dispatchWebhookEvent(
     data,
   };
 
-  console.log(`[Webhooks] Dispatching ${event} (${payload.id}) to ${matching.length} endpoint(s)`);
+  // In-memory registrations
+  const matching = Array.from(memRegistrations.values()).filter((r) =>
+    r.events.includes(event),
+  );
 
-  for (const reg of matching) {
-    deliverWithRetry(reg, payload).catch(err => {
-      console.error(`[Webhooks] Delivery failed permanently for ${reg.id}:`, err);
-    });
+  if (matching.length > 0) {
+    for (const reg of matching) {
+      enqueueOrDeliver(
+        { id: reg.id, url: reg.url, secretHash: hashSecret(reg.secret) },
+        payload,
+      );
+    }
+  }
+
+  // DB-persisted registrations (async, best-effort)
+  dispatchToDbEndpoints(event, payload).catch((err) =>
+    console.error('[Webhooks] DB dispatch error:', err),
+  );
+}
+
+async function dispatchToDbEndpoints(event: WebhookEvent, payload: WebhookPayload): Promise<void> {
+  const endpoints = await prisma.webhookEndpoint.findMany({
+    where: { isActive: true, events: { has: event } },
+  });
+
+  for (const ep of endpoints) {
+    if (memRegistrations.has(ep.id)) continue; // already dispatched via memory
+    enqueueOrDeliver({ id: ep.id, url: ep.url, secretHash: ep.secretHash }, payload);
   }
 }
 
+async function enqueueOrDeliver(
+  endpoint: { id: string; url: string; secretHash: string },
+  payload: WebhookPayload,
+): Promise<void> {
+  const queue = await getQueue();
+
+  if (queue) {
+    await queue.add('deliver', { endpoint, payload });
+    return;
+  }
+
+  // Fallback: fire-and-forget in memory
+  deliverWithRetry(endpoint, payload).catch((err) =>
+    console.error(`[Webhooks] Delivery failed for ${endpoint.id}:`, err),
+  );
+}
+
+// ============================================
+// DELIVERY
+// ============================================
+
+const RETRY_DELAYS_MS = [0, 2_000, 10_000];
+const DELIVERY_TIMEOUT_MS = 10_000;
+
 async function deliverWithRetry(
-  reg: WebhookRegistration,
+  endpoint: { id: string; url: string; secretHash: string },
   payload: WebhookPayload,
 ): Promise<void> {
   for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
     const delay = RETRY_DELAYS_MS[attempt];
     if (delay > 0) await sleep(delay);
-
-    const result = await attemptDelivery(reg, payload, attempt + 1);
+    const result = await attemptDelivery(endpoint, payload, attempt + 1);
     if (result.success) return;
   }
 }
 
 async function attemptDelivery(
-  reg: WebhookRegistration,
+  endpoint: { id: string; url: string; secretHash: string },
   payload: WebhookPayload,
   attempt: number,
 ): Promise<{ success: boolean }> {
   const body = JSON.stringify(payload);
-  const signature = sign(body, reg.secret);
+  const signature = 'sha256=' + createHmac('sha256', endpoint.secretHash).update(body).digest('hex');
 
   const record: DeliveryAttempt = {
-    webhookId: reg.id,
+    webhookId: endpoint.id,
     payloadId: payload.id,
     attempt,
     status: null,
@@ -168,7 +274,7 @@ async function attemptDelivery(
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS);
 
-    const resp = await fetch(reg.url, {
+    const resp = await fetch(endpoint.url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -183,6 +289,17 @@ async function attemptDelivery(
     clearTimeout(timer);
     record.status = resp.status;
 
+    // Persist delivery record
+    prisma.webhookDelivery.create({
+      data: {
+        endpointId: endpoint.id,
+        event: payload.event,
+        payloadId: payload.id,
+        attempt,
+        status: resp.status,
+      },
+    }).catch(() => {});
+
     if (resp.ok) {
       logDelivery(record);
       return { success: true };
@@ -190,12 +307,21 @@ async function attemptDelivery(
 
     record.error = `HTTP ${resp.status}`;
     logDelivery(record);
-    console.warn(`[Webhooks] ${reg.url} returned ${resp.status} (attempt ${attempt})`);
     return { success: false };
   } catch (err) {
     record.error = err instanceof Error ? err.message : String(err);
     logDelivery(record);
-    console.warn(`[Webhooks] ${reg.url} delivery error (attempt ${attempt}): ${record.error}`);
+
+    prisma.webhookDelivery.create({
+      data: {
+        endpointId: endpoint.id,
+        event: payload.event,
+        payloadId: payload.id,
+        attempt,
+        error: record.error,
+      },
+    }).catch(() => {});
+
     return { success: false };
   }
 }
@@ -204,20 +330,12 @@ async function attemptDelivery(
 // SIGNING
 // ============================================
 
-function sign(body: string, secret: string): string {
-  return 'sha256=' + createHmac('sha256', secret).update(body).digest('hex');
-}
-
-/**
- * Verify a webhook signature (for consumers to validate payloads).
- * Exported so integrators can use the same logic.
- */
 export function verifySignature(
   body: string,
   signature: string,
   secret: string,
 ): boolean {
-  const expected = sign(body, secret);
+  const expected = 'sha256=' + createHmac('sha256', secret).update(body).digest('hex');
   return expected === signature;
 }
 
@@ -233,9 +351,7 @@ function logDelivery(attempt: DeliveryAttempt): void {
 }
 
 export function getRecentDeliveries(webhookId?: string): DeliveryAttempt[] {
-  if (webhookId) {
-    return recentDeliveries.filter(d => d.webhookId === webhookId);
-  }
+  if (webhookId) return recentDeliveries.filter((d) => d.webhookId === webhookId);
   return [...recentDeliveries];
 }
 
@@ -244,5 +360,5 @@ export function getRecentDeliveries(webhookId?: string): DeliveryAttempt[] {
 // ============================================
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

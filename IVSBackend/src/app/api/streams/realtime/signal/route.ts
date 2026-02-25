@@ -13,8 +13,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getStage, isValidStageArn } from '@/lib/streaming/ivs-realtime-client';
-import { StreamingError, StreamingErrorCode } from '@/lib/streaming/types';
+import { getStage } from '@/lib/streaming/ivs-realtime-client';
+
+function isValidStageArn(arn: string): boolean {
+  return /^arn:aws:ivs:[a-z0-9-]+:\d+:stage\/[A-Za-z0-9]+$/.test(arn);
+}
+import { StreamingError } from '@/lib/streaming/types';
 
 interface SignalingRequest {
   stageArn: string;

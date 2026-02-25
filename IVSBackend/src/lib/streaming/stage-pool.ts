@@ -1,15 +1,12 @@
 /**
  * Stage Pool Allocator for IVS Real-Time
- * 
+ *
  * Pre-creates stages to handle burst creation requests.
- * CreateStage API is rate-limited to 5 TPS, so if many kids hit "Go Live"
+ * CreateStage API is rate-limited to 5 TPS, so if many players hit "Go Live"
  * simultaneously, we need a pool of ready stages.
- * 
- * Strategy:
- * 1. Maintain a pool of pre-created stages
- * 2. On allocation request, pop from pool and tag with streamId
- * 3. On release, delete stage and async create replacement
- * 4. Background job maintains pool at target size
+ *
+ * State is stored in Redis so that multiple server instances share the same
+ * pool. Falls back to in-memory Maps when Redis is unavailable.
  */
 
 import {
@@ -17,9 +14,8 @@ import {
   deleteStage,
   listStages,
   createParticipantToken,
-  type IVSStage,
-  type IVSParticipantTokenResponse,
 } from './ivs-realtime-client';
+import { redis, isRedisAvailable } from '../redis';
 
 // ============================================
 // TYPES
@@ -53,117 +49,179 @@ export interface SubscribeAllocation {
 }
 
 export interface StagePoolConfig {
-  targetPoolSize: number;       // Number of stages to keep ready
-  maxPoolSize: number;          // Maximum stages to create
-  stagePrefix: string;          // Prefix for stage names
-  region: string;               // AWS region
-  replenishInterval: number;    // ms between replenish checks
-  stageMaxAge: number;          // ms before unused stage is recycled
+  targetPoolSize: number;
+  maxPoolSize: number;
+  stagePrefix: string;
+  region: string;
+  replenishInterval: number;
+  stageMaxAge: number;
 }
 
 // ============================================
-// DEFAULT CONFIGURATION
+// CONFIGURATION
 // ============================================
 
 const DEFAULT_CONFIG: StagePoolConfig = {
-  targetPoolSize: 50,           // Keep 50 stages ready
-  maxPoolSize: 200,             // Don't exceed 200 stages in pool
-  stagePrefix: 'kid-stream',
+  targetPoolSize: parseInt(process.env.STAGE_POOL_TARGET || '50', 10),
+  maxPoolSize: parseInt(process.env.STAGE_POOL_MAX || '500', 10),
+  stagePrefix: 'substream',
   region: process.env.AWS_REGION || 'us-east-1',
-  replenishInterval: 30000,     // Check every 30 seconds
-  stageMaxAge: 3600000,         // Recycle unused stages after 1 hour
+  replenishInterval: 30000,
+  stageMaxAge: 3600000,
+};
+
+const WHIP_GLOBAL_ENDPOINT = 'https://global.whip.live-video.net';
+
+const REDIS_KEY = {
+  available: 'stagepool:available',  // sorted set: arn -> createdAt timestamp
+  inUse: 'stagepool:inuse',          // hash: arn -> JSON { streamId, allocatedAt }
+  lock: 'stagepool:replenish-lock',
 };
 
 // ============================================
-// GLOBAL WHIP ENDPOINT
+// IN-MEMORY FALLBACK
 // ============================================
 
-// AWS IVS WHIP global endpoint - handles 307 redirects to regional endpoints
-const WHIP_GLOBAL_ENDPOINT = 'https://global.whip.live-video.net';
+const memPool: Map<string, PooledStage> = new Map();
 
 // ============================================
 // STAGE POOL CLASS
 // ============================================
 
 class StagePoolAllocator {
-  private pool: Map<string, PooledStage> = new Map();
   private config: StagePoolConfig;
   private replenishTimer: NodeJS.Timeout | null = null;
-  private isReplenishing: boolean = false;
-  private initialized: boolean = false;
+  private initialized = false;
+  private useRedis = false;
 
   constructor(config: Partial<StagePoolConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
-  /**
-   * Initialize the pool by loading existing stages and starting replenish loop
-   */
   async initialize(): Promise<void> {
-    if (this.initialized) {
-      return;
-    }
+    if (this.initialized) return;
 
-    console.log('[StagePool] Initializing stage pool...');
-    
-    // Load existing pool stages from AWS
+    this.useRedis = await isRedisAvailable();
+    console.log(`[StagePool] Redis ${this.useRedis ? 'connected' : 'unavailable — using memory fallback'}`);
+
     await this.loadExistingStages();
-    
-    // Start background replenish loop
     this.startReplenishLoop();
-    
     this.initialized = true;
-    console.log(`[StagePool] Initialized with ${this.getAvailableCount()} available stages`);
+    console.log(`[StagePool] Initialized — ${await this.getAvailableCount()} available stages`);
   }
 
-  /**
-   * Load existing stages that match our prefix (from previous runs)
-   */
+  // ----------------------------------------
+  // STORAGE ABSTRACTION
+  // ----------------------------------------
+
+  private async addAvailable(arn: string, name: string): Promise<void> {
+    const now = Date.now();
+    if (this.useRedis) {
+      await redis.zadd(REDIS_KEY.available, now, JSON.stringify({ arn, name, createdAt: now }));
+    } else {
+      memPool.set(arn, { arn, name, createdAt: new Date(now), inUse: false });
+    }
+  }
+
+  private async popAvailable(): Promise<{ arn: string; name: string } | null> {
+    if (this.useRedis) {
+      const results = await redis.zpopmin(REDIS_KEY.available, 1);
+      if (results.length < 2) return null;
+      try { return JSON.parse(results[0]); } catch { return null; }
+    } else {
+      for (const [, stage] of memPool) {
+        if (!stage.inUse) {
+          memPool.delete(stage.arn);
+          return { arn: stage.arn, name: stage.name };
+        }
+      }
+      return null;
+    }
+  }
+
+  private async markInUse(arn: string, streamId: string): Promise<void> {
+    if (this.useRedis) {
+      await redis.hset(REDIS_KEY.inUse, arn, JSON.stringify({ streamId, allocatedAt: Date.now() }));
+    } else {
+      const existing = memPool.get(arn);
+      if (existing) {
+        existing.inUse = true;
+        existing.streamId = streamId;
+        existing.allocatedAt = new Date();
+      } else {
+        memPool.set(arn, { arn, name: '', createdAt: new Date(), inUse: true, streamId, allocatedAt: new Date() });
+      }
+    }
+  }
+
+  private async removeInUse(arn: string): Promise<void> {
+    if (this.useRedis) {
+      await redis.hdel(REDIS_KEY.inUse, arn);
+    } else {
+      memPool.delete(arn);
+    }
+  }
+
+  private async findArnByStreamId(streamId: string): Promise<{ arn: string } | null> {
+    if (this.useRedis) {
+      const all = await redis.hgetall(REDIS_KEY.inUse);
+      for (const [arn, json] of Object.entries(all)) {
+        try {
+          const data = JSON.parse(json);
+          if (data.streamId === streamId) return { arn };
+        } catch { continue; }
+      }
+      return null;
+    } else {
+      for (const stage of memPool.values()) {
+        if (stage.streamId === streamId) return { arn: stage.arn };
+      }
+      return null;
+    }
+  }
+
+  async getAvailableCount(): Promise<number> {
+    if (this.useRedis) return redis.zcard(REDIS_KEY.available);
+    let count = 0;
+    for (const s of memPool.values()) { if (!s.inUse) count++; }
+    return count;
+  }
+
+  private async getInUseCount(): Promise<number> {
+    if (this.useRedis) return redis.hlen(REDIS_KEY.inUse);
+    let count = 0;
+    for (const s of memPool.values()) { if (s.inUse) count++; }
+    return count;
+  }
+
+  // ----------------------------------------
+  // POOL OPERATIONS
+  // ----------------------------------------
+
   private async loadExistingStages(): Promise<void> {
     try {
       const stages = await listStages();
-      
       for (const stage of stages) {
         if (stage.name.startsWith(this.config.stagePrefix)) {
-          // Check if stage is in use (has active session)
           const inUse = !!stage.activeSessionId;
-          
-          this.pool.set(stage.arn, {
-            arn: stage.arn,
-            name: stage.name,
-            createdAt: new Date(), // Unknown, use now
-            inUse,
-            streamId: stage.tags?.streamId,
-            allocatedAt: inUse ? new Date() : undefined,
-          });
+          if (inUse) {
+            await this.markInUse(stage.arn, stage.tags?.streamId || 'unknown');
+          } else {
+            await this.addAvailable(stage.arn, stage.name);
+          }
         }
       }
-      
-      console.log(`[StagePool] Loaded ${this.pool.size} existing stages`);
     } catch (error) {
       console.error('[StagePool] Error loading existing stages:', error);
     }
   }
 
-  /**
-   * Start the background replenish loop
-   */
   private startReplenishLoop(): void {
-    if (this.replenishTimer) {
-      return;
-    }
-
-    this.replenishTimer = setInterval(async () => {
-      await this.replenish();
-    }, this.config.replenishInterval);
-
-    // Also run immediately
+    if (this.replenishTimer) return;
+    this.replenishTimer = setInterval(() => this.replenish(), this.config.replenishInterval);
     this.replenish();
   }
 
-  /**
-   * Stop the background replenish loop
-   */
   stopReplenishLoop(): void {
     if (this.replenishTimer) {
       clearInterval(this.replenishTimer);
@@ -171,206 +229,118 @@ class StagePoolAllocator {
     }
   }
 
-  /**
-   * Replenish the pool to target size
-   */
   private async replenish(): Promise<void> {
-    if (this.isReplenishing) {
-      return;
+    // Distributed lock: only one instance replenishes at a time
+    if (this.useRedis) {
+      const acquired = await redis.set(REDIS_KEY.lock, '1', 'EX', 60, 'NX');
+      if (!acquired) return;
     }
 
-    this.isReplenishing = true;
-
     try {
-      const availableCount = this.getAvailableCount();
-      const totalCount = this.pool.size;
-      
-      // Clean up old unused stages
-      await this.cleanupOldStages();
-      
-      // Create new stages if below target
+      const available = await this.getAvailableCount();
+      const inUse = await this.getInUseCount();
+      const total = available + inUse;
+
       const toCreate = Math.min(
-        this.config.targetPoolSize - availableCount,
-        this.config.maxPoolSize - totalCount,
-        5 // Create max 5 at a time to stay under rate limit
+        this.config.targetPoolSize - available,
+        this.config.maxPoolSize - total,
+        5,
       );
 
       if (toCreate > 0) {
-        console.log(`[StagePool] Creating ${toCreate} new stages (available: ${availableCount}, target: ${this.config.targetPoolSize})`);
-        
-        // Create stages sequentially to respect rate limit
+        console.log(`[StagePool] Creating ${toCreate} stages (available: ${available}, target: ${this.config.targetPoolSize})`);
         for (let i = 0; i < toCreate; i++) {
           try {
             await this.createPoolStage();
-            // Small delay between creates to avoid rate limit
-            await new Promise(resolve => setTimeout(resolve, 250));
+            await new Promise((r) => setTimeout(r, 250));
           } catch (error) {
             console.error('[StagePool] Error creating stage:', error);
-            break; // Stop if we hit rate limit
+            break;
           }
         }
       }
+
+      await this.cleanupOldStages();
     } finally {
-      this.isReplenishing = false;
+      if (this.useRedis) {
+        await redis.del(REDIS_KEY.lock).catch(() => {});
+      }
     }
   }
 
-  /**
-   * Create a new stage for the pool
-   */
-  private async createPoolStage(): Promise<PooledStage> {
+  private async createPoolStage(): Promise<{ arn: string; name: string }> {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 8);
     const name = `${this.config.stagePrefix}-${timestamp}-${random}`;
 
     const stage = await createStage({
       name,
-      tags: {
-        pool: 'true',
-        createdAt: new Date().toISOString(),
-      },
+      tags: { pool: 'true', createdAt: new Date().toISOString() },
     });
 
-    const pooledStage: PooledStage = {
-      arn: stage.arn,
-      name: stage.name,
-      createdAt: new Date(),
-      inUse: false,
-    };
-
-    this.pool.set(stage.arn, pooledStage);
-    console.log(`[StagePool] Created stage: ${stage.name}`);
-    
-    return pooledStage;
+    await this.addAvailable(stage.arn, stage.name);
+    return { arn: stage.arn, name: stage.name };
   }
 
-  /**
-   * Clean up old unused stages to prevent stale pool
-   */
   private async cleanupOldStages(): Promise<void> {
-    const now = Date.now();
-    const toDelete: string[] = [];
-
-    for (const [arn, stage] of this.pool.entries()) {
-      if (!stage.inUse) {
-        const age = now - stage.createdAt.getTime();
-        if (age > this.config.stageMaxAge) {
+    if (!this.useRedis) {
+      const now = Date.now();
+      const toDelete: string[] = [];
+      for (const [arn, stage] of memPool.entries()) {
+        if (!stage.inUse && now - stage.createdAt.getTime() > this.config.stageMaxAge) {
           toDelete.push(arn);
         }
       }
+      for (const arn of toDelete.slice(0, 3)) {
+        try { await deleteStage(arn); memPool.delete(arn); } catch {}
+      }
+      return;
     }
 
-    // Delete old stages (max 3 at a time)
-    for (const arn of toDelete.slice(0, 3)) {
+    const cutoff = Date.now() - this.config.stageMaxAge;
+    const old = await redis.zrangebyscore(REDIS_KEY.available, '-inf', cutoff, 'LIMIT', 0, 3);
+    for (const json of old) {
       try {
+        const { arn } = JSON.parse(json);
         await deleteStage(arn);
-        this.pool.delete(arn);
-        console.log(`[StagePool] Deleted old stage: ${arn}`);
-      } catch (error) {
-        console.error(`[StagePool] Error deleting stage ${arn}:`, error);
-      }
+        await redis.zrem(REDIS_KEY.available, json);
+      } catch {}
     }
   }
 
-  /**
-   * Get count of available (not in use) stages
-   */
-  getAvailableCount(): number {
-    let count = 0;
-    for (const stage of this.pool.values()) {
-      if (!stage.inUse) count++;
-    }
-    return count;
-  }
+  // ----------------------------------------
+  // PUBLIC API
+  // ----------------------------------------
 
-  /**
-   * Get total pool size
-   */
-  getTotalCount(): number {
-    return this.pool.size;
-  }
+  async allocate(streamId: string, userId: string, streamerId: string): Promise<StageAllocation> {
+    if (!this.initialized) await this.initialize();
 
-  /**
-   * Get pool status
-   */
-  getStatus(): { available: number; inUse: number; total: number } {
-    let available = 0;
-    let inUse = 0;
-    
-    for (const stage of this.pool.values()) {
-      if (stage.inUse) {
-        inUse++;
-      } else {
-        available++;
-      }
-    }
-    
-    return { available, inUse, total: this.pool.size };
-  }
+    let stage = await this.popAvailable();
 
-  /**
-   * Allocate a stage for a new stream
-   * Returns WHIP connection info and publish token
-   */
-  async allocate(
-    streamId: string,
-    userId: string,
-    childId: string
-  ): Promise<StageAllocation> {
-    // Ensure pool is initialized
-    if (!this.initialized) {
-      await this.initialize();
-    }
-
-    // Find available stage
-    let stage: PooledStage | null = null;
-    
-    for (const s of this.pool.values()) {
-      if (!s.inUse) {
-        stage = s;
-        break;
-      }
-    }
-
-    // If no available stage, create one on-demand (slower)
     if (!stage) {
-      console.log('[StagePool] No available stages, creating on-demand');
+      console.log('[StagePool] Pool empty — creating on-demand');
       stage = await this.createPoolStage();
+      // Re-pop since createPoolStage adds to available set
+      const popped = await this.popAvailable();
+      if (popped) stage = popped;
     }
 
-    // Mark as in use
-    stage.inUse = true;
-    stage.streamId = streamId;
-    stage.allocatedAt = new Date();
+    await this.markInUse(stage.arn, streamId);
 
-    // Create publish token for this stage
-    // Wrapped in try/catch to rollback stage allocation on failure
     let tokenResponse;
     try {
       tokenResponse = await createParticipantToken({
         stageArn: stage.arn,
         userId,
         capabilities: ['PUBLISH'],
-        duration: 60, // 1 hour for WHIP sessions
-        attributes: {
-          role: 'publisher',
-          childId,
-          streamId,
-        },
+        duration: 60,
+        attributes: { role: 'publisher', streamerId, streamId },
       });
     } catch (error) {
-      // Rollback: release the stage so it's not permanently stuck as in-use
-      console.error(`[StagePool] Token creation failed, rolling back stage ${stage.name}:`, error);
-      stage.inUse = false;
-      stage.streamId = undefined;
-      stage.allocatedAt = undefined;
+      await this.removeInUse(stage.arn);
+      await this.addAvailable(stage.arn, stage.name);
       throw error;
     }
-
-    // Use the global WHIP endpoint. The JWT contains a stage-specific base URL
-    // but it's missing the path component that the 307 redirect provides.
-    // The global endpoint with auto-redirect is the correct approach per AWS docs.
-    console.log(`[StagePool] Allocated stage ${stage.name} for stream ${streamId}`);
 
     return {
       stageArn: stage.arn,
@@ -383,23 +353,17 @@ class StagePoolAllocator {
     };
   }
 
-  /**
-   * Create a subscribe token for a viewer (parent)
-   */
   async createSubscribeToken(
     stageArn: string,
     userId: string,
-    streamId: string
+    streamId: string,
   ): Promise<SubscribeAllocation> {
     const tokenResponse = await createParticipantToken({
       stageArn,
       userId,
       capabilities: ['SUBSCRIBE'],
-      duration: 60, // 1 hour
-      attributes: {
-        role: 'viewer',
-        streamId,
-      },
+      duration: 60,
+      attributes: { role: 'viewer', streamId },
     });
 
     return {
@@ -411,131 +375,76 @@ class StagePoolAllocator {
     };
   }
 
-  /**
-   * Release a stage back to the pool (after stream ends)
-   * AWS recommends deleting stages after use to avoid quota issues
-   */
   async release(stageArn: string): Promise<void> {
-    const stage = this.pool.get(stageArn);
-    
-    if (!stage) {
-      console.warn(`[StagePool] Attempted to release unknown stage: ${stageArn}`);
-      return;
-    }
-
-    console.log(`[StagePool] Releasing stage ${stage.name}`);
-
-    // Delete the stage (AWS recommendation for cleanup)
     try {
       await deleteStage(stageArn);
-      this.pool.delete(stageArn);
-      console.log(`[StagePool] Deleted stage ${stage.name}`);
     } catch (error) {
       console.error(`[StagePool] Error deleting stage ${stageArn}:`, error);
-      // Mark as not in use so it can be reused or cleaned up later
-      stage.inUse = false;
-      stage.streamId = undefined;
-      stage.allocatedAt = undefined;
     }
-
-    // Trigger async replenish to maintain pool size
-    this.replenish().catch(console.error);
+    await this.removeInUse(stageArn);
+    this.replenish().catch(() => {});
   }
 
-  /**
-   * Find stage by stream ID
-   */
-  findByStreamId(streamId: string): PooledStage | null {
-    for (const stage of this.pool.values()) {
-      if (stage.streamId === streamId) {
-        return stage;
-      }
-    }
-    return null;
+  findByStreamId(streamId: string): Promise<{ arn: string } | null> {
+    return this.findArnByStreamId(streamId);
   }
 
-  /**
-   * Shutdown the pool (cleanup)
-   */
+  async getStatus(): Promise<{ available: number; inUse: number; total: number }> {
+    const available = await this.getAvailableCount();
+    const inUse = await this.getInUseCount();
+    return { available, inUse, total: available + inUse };
+  }
+
   async shutdown(): Promise<void> {
-    console.log('[StagePool] Shutting down...');
     this.stopReplenishLoop();
-    
-    // Note: We don't delete all stages on shutdown as they may still be in use
-    // The cleanup job will handle old stages on next startup
-    
     this.initialized = false;
   }
 }
 
 // ============================================
-// SINGLETON INSTANCE
+// SINGLETON
 // ============================================
 
 let poolInstance: StagePoolAllocator | null = null;
 
-/**
- * Get the singleton stage pool instance
- */
-export function getStagePool(): StagePoolAllocator {
+function getStagePool(): StagePoolAllocator {
   if (!poolInstance) {
     poolInstance = new StagePoolAllocator();
   }
   return poolInstance;
 }
 
-/**
- * Initialize the stage pool (call on app startup)
- */
 export async function initializeStagePool(): Promise<void> {
   const pool = getStagePool();
   await pool.initialize();
 }
 
-/**
- * Allocate a stage for a new stream
- */
 export async function allocateStage(
   streamId: string,
   userId: string,
-  childId: string
+  streamerId: string,
 ): Promise<StageAllocation> {
-  const pool = getStagePool();
-  return pool.allocate(streamId, userId, childId);
+  return getStagePool().allocate(streamId, userId, streamerId);
 }
 
-/**
- * Create a subscribe token for a viewer
- */
 export async function createSubscribeTokenForStream(
   stageArn: string,
   userId: string,
-  streamId: string
+  streamId: string,
 ): Promise<SubscribeAllocation> {
-  const pool = getStagePool();
-  return pool.createSubscribeToken(stageArn, userId, streamId);
+  return getStagePool().createSubscribeToken(stageArn, userId, streamId);
 }
 
-/**
- * Release a stage after stream ends
- */
 export async function releaseStage(stageArn: string): Promise<void> {
-  const pool = getStagePool();
-  return pool.release(stageArn);
+  return getStagePool().release(stageArn);
 }
 
-/**
- * Get stage pool status
- */
-export function getStagePoolStatus(): { available: number; inUse: number; total: number } {
-  const pool = getStagePool();
-  return pool.getStatus();
+export function getStagePoolStatus(): Promise<{ available: number; inUse: number; total: number }> {
+  return getStagePool().getStatus();
 }
 
-/**
- * Find stage by stream ID
- */
-export function findStageByStreamId(streamId: string): PooledStage | null {
-  const pool = getStagePool();
-  return pool.findByStreamId(streamId);
+export async function findStageByStreamId(streamId: string): Promise<PooledStage | null> {
+  const result = await getStagePool().findByStreamId(streamId);
+  if (!result) return null;
+  return { arn: result.arn, name: '', createdAt: new Date(), inUse: true, streamId };
 }
