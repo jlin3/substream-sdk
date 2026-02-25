@@ -235,6 +235,13 @@
 
   <!-- IVS Web Broadcast SDK v1.32.0 (latest stable) -->
   <script src="https://web-broadcast.live-video.net/1.32.0/amazon-ivs-web-broadcast.js"></script>
+  <!-- Substream integration (audio capture + streaming) -->
+  <script src="substream.js"></script>
+  <script>
+    // Enable audio capture BEFORE any game engine creates its AudioContext.
+    // This patches AudioNode.connect to tee game audio into the stream.
+    Substream.captureAudio();
+  </script>
 
   <script>
     // ============================================
@@ -515,9 +522,18 @@
         log('Publish token received. Stream ID: ' + publishInfo.streamId, 'ok');
         log('Stage ARN: ' + publishInfo.stageArn, 'info');
 
-        // Step 2: Capture canvas
+        // Step 2: Capture canvas (video) + merge audio
         const canvasStream = canvas.captureStream(30);
-        log('Canvas capture started (' + canvasStream.getTracks().length + ' track(s) at 30fps)', 'ok');
+        log('Canvas capture started (' + canvasStream.getTracks().length + ' video track(s) at 30fps)', 'ok');
+
+        // Step 2b: Merge any captured audio tracks
+        const audioStream = Substream._getAudioStream ? Substream._getAudioStream() : null;
+        if (audioStream) {
+          audioStream.getAudioTracks().forEach(t => canvasStream.addTrack(t));
+          log('Audio track(s) merged: ' + audioStream.getAudioTracks().length, 'ok');
+        } else {
+          log('No audio tracks captured (game may not have started audio yet)', 'info');
+        }
 
         // Step 3: Create IVS stage and publish
         const { Stage, LocalStageStream, SubscribeType, StageEvents } = IVSBroadcastClient;

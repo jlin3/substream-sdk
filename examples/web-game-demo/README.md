@@ -24,11 +24,11 @@ Click **Start Streaming**. The demo connects to the live backend, allocates an I
 
 ---
 
-## Add Streaming to Your Existing Game (3 Steps)
+## Add Streaming to Your Existing Game (4 Steps)
 
-This works with **any** game that renders to a `<canvas>` element -- Phaser, Three.js, PixiJS, Unity WebGL, Cocos, Construct, or plain canvas.
+This works with **any** game that renders to a `<canvas>` element -- Phaser, Three.js, PixiJS, Unity WebGL, Cocos, Construct, or plain canvas. Video and audio are both captured.
 
-### Step 1: Add two script tags
+### Step 1: Add two script tags and enable audio capture
 
 ```html
 <!-- IVS Web Broadcast SDK (handles WebRTC publishing) -->
@@ -36,11 +36,20 @@ This works with **any** game that renders to a `<canvas>` element -- Phaser, Thr
 
 <!-- Substream integration (one-file, zero dependencies) -->
 <script src="substream.js"></script>
+
+<!-- Enable audio capture BEFORE the game engine loads -->
+<script>Substream.captureAudio();</script>
 ```
 
 Copy `substream.js` from this directory into your project, or reference it from the repo.
 
-### Step 2: Start streaming
+**Important:** `Substream.captureAudio()` must be called **before** the game engine creates its AudioContext. This patches `AudioNode.connect` to tee game audio into a capturable stream while still playing through speakers normally.
+
+### Step 2: Load your game engine
+
+Load Unity WebGL, Phaser, Three.js, etc. after the `captureAudio()` call.
+
+### Step 3: Start streaming
 
 ```javascript
 const session = await Substream.startStream({
@@ -55,7 +64,7 @@ const session = await Substream.startStream({
 });
 ```
 
-### Step 3: Stop streaming
+### Step 4: Stop streaming
 
 ```javascript
 await session.stop();
@@ -80,12 +89,13 @@ Here's a full working HTML page that integrates streaming into a Phaser game:
   <button id="stream-btn">Start Streaming</button>
   <p id="stream-status"></p>
 
-  <!-- Your game engine -->
-  <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
-
-  <!-- Streaming (two script tags) -->
+  <!-- 1. Streaming SDKs (load BEFORE the game engine) -->
   <script src="https://web-broadcast.live-video.net/1.32.0/amazon-ivs-web-broadcast.js"></script>
   <script src="substream.js"></script>
+  <script>Substream.captureAudio();</script>
+
+  <!-- 2. Game engine (loads AFTER captureAudio so game audio is captured) -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
 
   <script>
     // --- Your game code (unchanged) ---
@@ -149,16 +159,33 @@ const renderer = new THREE.WebGLRenderer({
 
 ### Unity WebGL
 
-After the Unity WebGL build loads and renders to its canvas:
+Script loading order is critical for audio -- `captureAudio()` must run before Unity creates its AudioContext:
 
-```javascript
-const unityCanvas = document.querySelector('#unity-canvas');
-const session = await Substream.startStream({
-  canvas: unityCanvas,
-  backendUrl: 'https://substream-sdk-production.up.railway.app',
-  childId: 'demo-child-001',
-  authToken: 'demo-token',
-});
+```html
+<!-- 1. Streaming SDKs + audio capture (BEFORE Unity) -->
+<script src="https://web-broadcast.live-video.net/1.32.0/amazon-ivs-web-broadcast.js"></script>
+<script src="substream.js"></script>
+<script>Substream.captureAudio();</script>
+
+<!-- 2. Unity WebGL build (creates AudioContext for game audio) -->
+<script src="Build/UnityLoader.js"></script>
+<script>
+  var unityInstance = UnityLoader.instantiate("unity-container", "Build/build.json");
+</script>
+
+<!-- 3. Start streaming after the game is running -->
+<script>
+  async function goLive() {
+    const unityCanvas = document.querySelector('#unity-canvas');
+    const session = await Substream.startStream({
+      canvas: unityCanvas,
+      backendUrl: 'https://substream-sdk-production.up.railway.app',
+      childId: 'demo-child-001',
+      authToken: 'demo-token',
+    });
+    console.log('Live at:', session.viewerUrl);
+  }
+</script>
 ```
 
 ### PixiJS / Cocos / Construct
@@ -172,20 +199,49 @@ All render to `<canvas>`. Pass your canvas element to `Substream.startStream()` 
 ```
 Canvas Game (browser)
     |
-    |  canvas.captureStream(30fps)
-    v
-MediaStream (video track)
+    ├── canvas.captureStream(30fps) ──> video track
     |
-    |  IVS Web Broadcast SDK  (Stage + LocalStageStream)
+    └── AudioContext.destination ──> (monkey-patched) ──> audio track
+                                         |
+                                         ├── speakers (unchanged)
+                                         └── MediaStreamAudioDestinationNode
+    |
+    v
+Combined MediaStream (video + audio tracks)
+    |
+    |  IVS Web Broadcast SDK  (Stage + LocalStageStream per track)
     v
 AWS IVS Real-Time Stage
     |
-    |  WebRTC subscribe
+    |  WebRTC subscribe (video + audio)
     v
 Viewer Page (parent's browser)
 ```
 
-`captureStream()` works on both 2D canvas and WebGL canvas in all modern browsers (Chrome, Firefox, Safari, Edge).
+- `captureStream()` captures video from both 2D canvas and WebGL canvas.
+- `Substream.captureAudio()` patches `AudioNode.connect` to tee any audio routed to the speakers into a capturable `MediaStream`. Game audio plays through speakers normally.
+- Both tracks are published to the IVS stage and received by the viewer.
+
+---
+
+## Audio Capture
+
+### Why is this needed?
+
+`canvas.captureStream()` only captures video. Game engines (Unity WebGL, Phaser, etc.) play audio through the Web Audio API's `AudioContext`, which is completely separate from the canvas. Without `captureAudio()`, the stream has video but silent audio.
+
+### How it works
+
+`Substream.captureAudio()` monkey-patches `AudioNode.prototype.connect`. When any audio node connects to `AudioContext.destination` (the speakers), the patch also connects it to a `MediaStreamAudioDestinationNode`. This creates an audio track that mirrors what plays through the speakers, without affecting the game's audio at all.
+
+### Troubleshooting audio
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| No audio on viewer | `captureAudio()` not called, or called after game engine loaded | Move `Substream.captureAudio()` BEFORE the game engine's script tag |
+| Audio on viewer is muted | Browser autoplay policy | Click the "Unmute" button on the viewer page |
+| Audio captured but silent | Game hasn't started playing audio yet | Audio only appears once the game actually triggers sound (e.g. after user interaction) |
+| Some audio missing | Game uses multiple AudioContexts or Web Audio nodes that don't route through destination | Uncommon; most engines route all audio through a single AudioContext |
 
 ---
 

@@ -8,6 +8,10 @@
  * Usage:
  *   import { SubstreamSDK } from '@substream/web-sdk';
  * 
+ *   // Call BEFORE the game engine loads to capture its audio
+ *   SubstreamSDK.captureAudio();
+ * 
+ *   // After the game is running:
  *   const stream = await SubstreamSDK.startStream({
  *     backendUrl: 'https://your-backend.up.railway.app',
  *     canvasElement: document.getElementById('game-canvas'),
@@ -15,10 +19,7 @@
  *     authToken: 'jwt-token',
  *   });
  * 
- *   // Get the viewer URL to share with parents
  *   console.log(stream.viewerUrl);
- * 
- *   // Stop streaming
  *   stream.stop();
  */
 
@@ -37,8 +38,8 @@ export interface SubstreamConfig {
   authToken: string;
   /** Capture frame rate (default: 30) */
   fps?: number;
-  /** Include audio from an AudioContext (optional) */
-  audioContext?: AudioContext;
+  /** Include captured audio in stream (default: true) */
+  audio?: boolean;
   /** Called when stream goes live */
   onLive?: (info: { streamId: string; viewerUrl: string }) => void;
   /** Called on error */
@@ -69,15 +70,70 @@ interface WebPublishResponse {
 }
 
 // ============================================
+// AUDIO CAPTURE
+//
+// canvas.captureStream() only captures video.
+// Game engines play audio via their own AudioContext routed to
+// ctx.destination (speakers). We monkey-patch AudioNode.connect
+// to tee audio destined for speakers into a MediaStream we can
+// publish alongside the video.
+// ============================================
+
+let audioPatched = false;
+const capturedAudioStreams: MediaStream[] = [];
+let origConnect: typeof AudioNode.prototype.connect | null = null;
+
+// ============================================
 // SDK
 // ============================================
 
 export class SubstreamSDK {
   /**
+   * Enable automatic audio capture by monkey-patching AudioNode.connect.
+   * Call this BEFORE the game engine creates its AudioContext
+   * (before Unity loader, before Phaser, etc.).
+   *
+   * Audio still plays through speakers normally.
+   */
+  static captureAudio(): void {
+    if (audioPatched) return;
+    audioPatched = true;
+
+    origConnect = AudioNode.prototype.connect;
+    const savedConnect = origConnect;
+
+    (AudioNode.prototype as any).connect = function (
+      dest: AudioNode | AudioParam,
+      ...rest: unknown[]
+    ): AudioNode | void {
+      const result = (savedConnect as any).apply(this, [dest, ...rest]);
+
+      if (
+        dest instanceof AudioDestinationNode &&
+        this.context &&
+        !(this as any)._substreamTeed
+      ) {
+        try {
+          const streamDest = (this.context as AudioContext).createMediaStreamDestination();
+          savedConnect.call(this, streamDest);
+          (this as any)._substreamTeed = true;
+
+          const track = streamDest.stream.getAudioTracks()[0];
+          if (track) {
+            capturedAudioStreams.push(streamDest.stream);
+            console.log('[Substream] Audio tee created for node connecting to destination');
+          }
+        } catch {
+          // Some node types can't fan-out; safe to ignore
+        }
+      }
+
+      return result;
+    };
+  }
+
+  /**
    * Start streaming a canvas element to parents via IVS.
-   * 
-   * @param config - Stream configuration
-   * @returns A session object with stream info and stop() method
    */
   static async startStream(config: SubstreamConfig): Promise<SubstreamSession> {
     const {
@@ -86,13 +142,12 @@ export class SubstreamSDK {
       childId,
       authToken,
       fps = 30,
-      audioContext,
+      audio = true,
       onLive,
       onError,
       onStopped,
     } = config;
 
-    // Validate inputs
     if (!canvasElement || !(canvasElement instanceof HTMLCanvasElement)) {
       throw new Error('SubstreamSDK: canvasElement must be an HTMLCanvasElement');
     }
@@ -102,46 +157,40 @@ export class SubstreamSDK {
 
     console.log('[Substream] Starting stream...');
 
-    // Step 1: Request a publish token from the backend
     const publishInfo = await requestPublishToken(backendUrl, childId, authToken);
     console.log(`[Substream] Got stream ${publishInfo.streamId}, viewer: ${publishInfo.viewerUrl}`);
 
-    // Step 2: Capture canvas as MediaStream
+    // Capture canvas (video only)
     const canvasStream = canvasElement.captureStream(fps);
     console.log(`[Substream] Canvas capture started at ${fps}fps, tracks: ${canvasStream.getTracks().length}`);
 
-    // Step 3: Optionally add audio
-    if (audioContext) {
-      try {
-        const dest = audioContext.createMediaStreamDestination();
-        const audioTrack = dest.stream.getAudioTracks()[0];
-        if (audioTrack) {
-          canvasStream.addTrack(audioTrack);
-          console.log('[Substream] Audio track added from AudioContext');
+    // Merge captured audio tracks
+    if (audio) {
+      const audioStream = getCapturedAudioStream();
+      if (audioStream) {
+        for (const track of audioStream.getAudioTracks()) {
+          canvasStream.addTrack(track);
         }
-      } catch (e) {
-        console.warn('[Substream] Could not add audio:', e);
+        console.log(`[Substream] Added ${audioStream.getAudioTracks().length} audio track(s)`);
+      } else {
+        console.log('[Substream] No captured audio tracks (call SubstreamSDK.captureAudio() before the game loads)');
       }
     }
 
-    // Step 4: Import IVS Web Broadcast SDK and publish
     const IVSModule = await import('amazon-ivs-web-broadcast');
     const { Stage, LocalStageStream, SubscribeType, StageEvents } = IVSModule as any;
 
-    // Wrap tracks as LocalStageStream instances
     const localStreams = canvasStream.getTracks().map(
       (track: MediaStreamTrack) => new LocalStageStream(track)
     );
-    console.log(`[Substream] Created ${localStreams.length} LocalStageStream(s)`);
+    console.log(`[Substream] Publishing ${localStreams.length} track(s): ${canvasStream.getTracks().map(t => t.kind).join(', ')}`);
 
-    // Create publish-only strategy
     const strategy = {
       stageStreamsToPublish: () => localStreams,
       shouldPublishParticipant: () => true,
       shouldSubscribeToParticipant: () => SubscribeType.NONE,
     };
 
-    // Create and join stage
     const stage = new Stage(publishInfo.publishToken, strategy);
     let isLive = false;
 
@@ -165,7 +214,6 @@ export class SubstreamSDK {
     await stage.join();
     console.log('[Substream] Joined stage, publishing...');
 
-    // Build session object
     const session: SubstreamSession = {
       streamId: publishInfo.streamId,
       viewerUrl: publishInfo.viewerUrl,
@@ -174,13 +222,9 @@ export class SubstreamSDK {
         console.log('[Substream] Stopping stream...');
         isLive = false;
 
-        // Stop all tracks
         canvasStream.getTracks().forEach(t => t.stop());
+        try { stage.leave(); } catch { /* ignore */ }
 
-        // Leave the stage
-        try { stage.leave(); } catch (e) { /* ignore */ }
-
-        // Notify backend
         try {
           await fetch(`${backendUrl}/api/streams/web-publish`, {
             method: 'DELETE',
@@ -190,8 +234,8 @@ export class SubstreamSDK {
             },
             body: JSON.stringify({ streamId: publishInfo.streamId }),
           });
-        } catch (e) {
-          console.warn('[Substream] Failed to notify backend of stop:', e);
+        } catch {
+          console.warn('[Substream] Failed to notify backend of stop');
         }
 
         console.log('[Substream] Stream stopped');
@@ -206,6 +250,20 @@ export class SubstreamSDK {
 // ============================================
 // HELPERS
 // ============================================
+
+function getCapturedAudioStream(): MediaStream | null {
+  if (capturedAudioStreams.length === 0) return null;
+
+  const combined = new MediaStream();
+  for (const s of capturedAudioStreams) {
+    for (const track of s.getAudioTracks()) {
+      if (track.readyState === 'live') {
+        combined.addTrack(track);
+      }
+    }
+  }
+  return combined.getAudioTracks().length > 0 ? combined : null;
+}
 
 async function requestPublishToken(
   backendUrl: string,
@@ -231,5 +289,4 @@ async function requestPublishToken(
   return response.json();
 }
 
-// Default export for convenience
 export default SubstreamSDK;
