@@ -1,0 +1,11 @@
+---
+description: Enforce correct GitHub remote for all git push operations
+alwaysApply: true
+---
+
+# Git Remote Policy
+
+- Never push to the `dreamtreelab` GitHub organization. That is not our repo.
+- The only valid remote is `origin` pointing to `github.com/jlin3/substream-sdk`.
+- Before any `git push`, verify `git remote -v` shows `jlin3` in the URL.
+- If a `dreamtreelab` remote exists, remove it immediately with `git remote remove <name>`.

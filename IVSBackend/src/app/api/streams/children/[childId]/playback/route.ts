@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlaybackForParent, StreamingError } from '@/lib/streaming';
 import { getRealTimePlaybackForParent } from '@/lib/streaming/stream-realtime-service';
+import { requireAuth, type AuthContext } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
@@ -25,34 +26,20 @@ export async function GET(
     const searchParams = request.nextUrl.searchParams;
     const mode = searchParams.get('mode') || 'hls';
     
-    // TODO: Replace with actual auth extraction from session/token
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json(
-        { error: 'Unauthorized', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      );
-    }
-    
-    // Extract parent user ID from auth
-    const parentUserId = extractUserIdFromAuth(authHeader);
-    if (!parentUserId) {
-      return NextResponse.json(
-        { error: 'Invalid authentication', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) return authResult;
+    const auth: AuthContext = authResult;
 
     if (mode === 'webrtc') {
       // New WebRTC mode using IVS Real-Time
-      const result = await getRealTimePlaybackForParent(parentUserId, childId);
+      const result = await getRealTimePlaybackForParent(auth.userId, childId);
       return NextResponse.json({
         mode: 'webrtc',
         ...result,
       });
     } else {
       // Legacy HLS mode
-      const result = await getPlaybackForParent(parentUserId, childId);
+      const result = await getPlaybackForParent(auth.userId, childId);
       return NextResponse.json({
         mode: 'hls',
         ...result,
@@ -73,21 +60,4 @@ export async function GET(
       { status: 500 }
     );
   }
-}
-
-function extractUserIdFromAuth(authHeader: string): string | null {
-  const match = authHeader.match(/^Bearer\s+(.+)$/);
-  if (!match) return null;
-  
-  const token = match[1];
-  
-  // Demo token mapping for SDK users to test immediately
-  const demoTokens: Record<string, string> = {
-    'demo-token': 'demo-user-001',
-    'demo-viewer-token': 'demo-viewer-001',
-    'test-token': 'test-user-id',
-    'test-parent-token': 'test-parent-user-id',
-  };
-  
-  return demoTokens[token] || token;
 }
