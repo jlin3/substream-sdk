@@ -1,24 +1,22 @@
 /**
  * Substream Web SDK
- * 
- * Enables any HTML5 canvas game to stream to parents via IVS Real-Time.
+ *
+ * Enables any HTML5 canvas game to stream via IVS Real-Time.
  * Works with all game engines that render to <canvas>: Unity WebGL,
  * Phaser, Cocos, Construct, Three.js, PixiJS, etc.
- * 
+ *
  * Usage:
  *   import { SubstreamSDK } from '@substream/web-sdk';
- * 
- *   // Call BEFORE the game engine loads to capture its audio
+ *
  *   SubstreamSDK.captureAudio();
- * 
- *   // After the game is running:
+ *
  *   const stream = await SubstreamSDK.startStream({
  *     backendUrl: 'https://your-backend.up.railway.app',
  *     canvasElement: document.getElementById('game-canvas'),
- *     childId: 'child-123',
- *     authToken: 'jwt-token',
+ *     streamerId: 'player-456',
+ *     authToken: 'sk_live_xxx or jwt',
  *   });
- * 
+ *
  *   console.log(stream.viewerUrl);
  *   stream.stop();
  */
@@ -28,14 +26,18 @@
 // ============================================
 
 export interface SubstreamConfig {
-  /** Backend API URL (e.g., https://substream-sdk-production.up.railway.app) */
+  /** Backend API URL */
   backendUrl: string;
   /** The canvas element to capture and stream */
   canvasElement: HTMLCanvasElement;
-  /** Child/player ID */
-  childId: string;
-  /** Auth token for API calls */
+  /** Streamer/player ID (preferred) */
+  streamerId?: string;
+  /** @deprecated Use streamerId instead */
+  childId?: string;
+  /** Auth token (API key or JWT) */
   authToken: string;
+  /** Stream title (shown to viewers) */
+  title?: string;
   /** Capture frame rate (default: 30) */
   fps?: number;
   /** Include captured audio in stream (default: true) */
@@ -46,6 +48,8 @@ export interface SubstreamConfig {
   onError?: (error: Error) => void;
   /** Called when stream stops */
   onStopped?: () => void;
+  /** Called when stream is reconnecting after a drop */
+  onReconnecting?: () => void;
 }
 
 export interface SubstreamSession {
@@ -115,7 +119,7 @@ export class SubstreamSDK {
       ) {
         try {
           const streamDest = (this.context as AudioContext).createMediaStreamDestination();
-          savedConnect.call(this, streamDest);
+          (savedConnect as Function).call(this, streamDest);
           (this as any)._substreamTeed = true;
 
           const track = streamDest.stream.getAudioTracks()[0];
@@ -139,8 +143,10 @@ export class SubstreamSDK {
     const {
       backendUrl,
       canvasElement,
+      streamerId,
       childId,
       authToken,
+      title,
       fps = 30,
       audio = true,
       onLive,
@@ -148,16 +154,18 @@ export class SubstreamSDK {
       onStopped,
     } = config;
 
+    const resolvedStreamerId = streamerId || childId;
+
     if (!canvasElement || !(canvasElement instanceof HTMLCanvasElement)) {
       throw new Error('SubstreamSDK: canvasElement must be an HTMLCanvasElement');
     }
     if (!backendUrl) throw new Error('SubstreamSDK: backendUrl is required');
-    if (!childId) throw new Error('SubstreamSDK: childId is required');
+    if (!resolvedStreamerId) throw new Error('SubstreamSDK: streamerId is required');
     if (!authToken) throw new Error('SubstreamSDK: authToken is required');
 
     console.log('[Substream] Starting stream...');
 
-    const publishInfo = await requestPublishToken(backendUrl, childId, authToken);
+    const publishInfo = await requestPublishToken(backendUrl, resolvedStreamerId, authToken, title);
     console.log(`[Substream] Got stream ${publishInfo.streamId}, viewer: ${publishInfo.viewerUrl}`);
 
     // Capture canvas (video only)
@@ -267,8 +275,9 @@ function getCapturedAudioStream(): MediaStream | null {
 
 async function requestPublishToken(
   backendUrl: string,
-  childId: string,
+  streamerId: string,
   authToken: string,
+  title?: string,
 ): Promise<WebPublishResponse> {
   const response = await fetch(`${backendUrl}/api/streams/web-publish`, {
     method: 'POST',
@@ -276,7 +285,7 @@ async function requestPublishToken(
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${authToken}`,
     },
-    body: JSON.stringify({ childId }),
+    body: JSON.stringify({ streamerId, title }),
   });
 
   if (!response.ok) {

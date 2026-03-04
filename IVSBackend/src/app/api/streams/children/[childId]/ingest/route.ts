@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getIngestProvisioning, StreamingError } from '@/lib/streaming';
 import { getRealTimeIngestProvisioning } from '@/lib/streaming/stream-realtime-service';
+import { requireAuth, type AuthContext } from '@/lib/auth';
 
 export async function POST(
   request: NextRequest,
@@ -25,35 +26,20 @@ export async function POST(
     const searchParams = request.nextUrl.searchParams;
     const mode = searchParams.get('mode') || 'rtmps';
     
-    // TODO: Replace with actual auth extraction from session/token
-    // This should come from your auth system
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json(
-        { error: 'Unauthorized', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      );
-    }
-    
-    // Extract user ID from auth (placeholder - implement based on your auth)
-    const requestingUserId = extractUserIdFromAuth(authHeader);
-    if (!requestingUserId) {
-      return NextResponse.json(
-        { error: 'Invalid authentication', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) return authResult;
+    const auth: AuthContext = authResult;
 
     if (mode === 'webrtc') {
       // New WebRTC mode using IVS Real-Time
-      const result = await getRealTimeIngestProvisioning(childId, requestingUserId);
+      const result = await getRealTimeIngestProvisioning(childId, auth.userId);
       return NextResponse.json({
         mode: 'webrtc',
         ...result,
       });
     } else {
       // Legacy RTMPS mode (requires FFmpeg native library)
-      const result = await getIngestProvisioning(childId, requestingUserId);
+      const result = await getIngestProvisioning(childId, auth.userId);
       return NextResponse.json({
         mode: 'rtmps',
         ...result,
@@ -77,31 +63,4 @@ export async function POST(
       { status: 500 }
     );
   }
-}
-
-/**
- * Extract user ID from auth header
- * Supports demo tokens for SDK testing
- */
-function extractUserIdFromAuth(authHeader: string): string | null {
-  const match = authHeader.match(/^Bearer\s+(.+)$/);
-  if (!match) return null;
-  
-  const token = match[1];
-  
-  // Demo token mapping for SDK users to test immediately
-  const demoTokens: Record<string, string> = {
-    'demo-token': 'demo-user-001',           // Demo child (streamer)
-    'demo-viewer-token': 'demo-viewer-001',  // Demo parent (viewer)
-    'test-token': 'test-user-id',            // Test child
-    'test-parent-token': 'test-parent-user-id', // Test parent
-  };
-  
-  if (demoTokens[token]) {
-    return demoTokens[token];
-  }
-  
-  // TODO: In production, verify JWT and extract user ID
-  // For now, treat the token as a user ID (development only)
-  return token;
 }

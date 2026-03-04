@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getVODsForChild, StreamingError } from '@/lib/streaming';
+import { requireAuth, type AuthContext } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
@@ -20,24 +21,11 @@ export async function GET(
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
     const cursor = searchParams.get('cursor') || undefined;
     
-    // Auth check
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json(
-        { error: 'Unauthorized', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      );
-    }
-    
-    const parentUserId = extractUserIdFromAuth(authHeader);
-    if (!parentUserId) {
-      return NextResponse.json(
-        { error: 'Invalid authentication', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) return authResult;
+    const auth: AuthContext = authResult;
 
-    const result = await getVODsForChild(parentUserId, childId, limit, cursor);
+    const result = await getVODsForChild(auth.userId, childId, limit, cursor);
 
     return NextResponse.json({
       childId,
@@ -62,21 +50,4 @@ export async function GET(
       { status: 500 }
     );
   }
-}
-
-function extractUserIdFromAuth(authHeader: string): string | null {
-  const match = authHeader.match(/^Bearer\s+(.+)$/);
-  if (!match) return null;
-  
-  const token = match[1];
-  
-  // Demo token mapping for SDK users to test immediately
-  const demoTokens: Record<string, string> = {
-    'demo-token': 'demo-user-001',
-    'demo-viewer-token': 'demo-viewer-001',
-    'test-token': 'test-user-id',
-    'test-parent-token': 'test-parent-user-id',
-  };
-  
-  return demoTokens[token] || token;
 }
