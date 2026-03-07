@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+google-cloud-storage
+google-cloud-videointelligence
+google-cloud-aiplatform
+pydub
+numpy
+pydantic
+python-multipart
