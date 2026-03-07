@@ -1,7 +1,7 @@
 /**
  * Prisma Client Singleton
- * Prevents multiple instances in development with hot reloading
- * Uses Prisma 7's adapter-based connection
+ * Prevents multiple instances in development with hot reloading.
+ * Uses Prisma 7's adapter-based connection with explicit pool tuning.
  */
 
 import { PrismaClient } from '../generated/prisma/client';
@@ -10,7 +10,6 @@ import pg from 'pg';
 
 const { Pool } = pg;
 
-// Singleton pattern for Next.js
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
@@ -18,10 +17,14 @@ const globalForPrisma = globalThis as unknown as {
 function createPrismaClient(): PrismaClient {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
+    max: parseInt(process.env.DB_POOL_MAX || '20', 10),
+    min: parseInt(process.env.DB_POOL_MIN || '2', 10),
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
   });
-  
+
   const adapter = new PrismaPg(pool);
-  
+
   return new PrismaClient({ adapter });
 }
 

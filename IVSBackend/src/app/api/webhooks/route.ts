@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const reg = registerWebhook({
+    const reg = await registerWebhook({
       url: body.url,
       events: events as WebhookEvent[],
       secret: body.secret,
