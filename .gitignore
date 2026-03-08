@@ -86,3 +86,6 @@ IVSBackend/.env
 .env
 *.tsbuildinfo
 .DS_Store
+
+# Build outputs
+packages/web-sdk/dist/

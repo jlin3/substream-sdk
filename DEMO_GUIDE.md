@@ -1,8 +1,76 @@
-# IVS Streaming Demo Guide
+# Livewave Demo Guide
 
-This guide shows how to demo the IVS streaming system step-by-step.
+End-to-end demo of the Substream SDK streaming platform.
 
-## Demo Options
+## Demo Overview
+
+The demo showcases three capabilities:
+
+1. **SDK Integration** -- A web game uses the Substream SDK to go live
+2. **Dashboard** -- livewave.ai shows live streams, recordings, and highlights for the org
+3. **AI Highlights** -- The highlight service generates a highlight reel from a recording
+
+## Quick Start (Full E2E Demo)
+
+### Prerequisites
+
+- PostgreSQL running locally
+- Node 20+, pnpm
+- AWS credentials configured in `.env`
+
+### Step 1: Set Up the Backend
+
+```bash
+cd IVSBackend
+pnpm install
+pnpm db:generate
+pnpm db:push          # Push schema to database
+pnpm db:seed          # Seed demo org + sample data
+pnpm dev              # Start on localhost:3000
+```
+
+### Step 2: Start Streaming from the Game Demo
+
+```bash
+cd examples/web-game-demo
+python3 -m http.server 8080
+```
+
+Open `http://localhost:8080`. The config should show:
+- **Backend**: `http://localhost:3000` (change from the Railway URL)
+- **Org ID**: `org-livewave-demo`
+- **Streamer Name**: anything you like
+- **Title**: anything you like
+
+Click **Start Streaming**. The game goes live via IVS Real-Time.
+
+### Step 3: Log into the Dashboard
+
+Open `http://localhost:3000/login`:
+- **Organization**: `livewave-demo`
+- **Demo Code**: `livewave123` (or whatever `DEMO_ORG_CODE` is set to in `.env`)
+
+You'll land on the dashboard showing the live stream.
+
+### Step 4: Watch the Live Stream
+
+Click **Live Streams** in the sidebar. You should see your stream with a "LIVE" badge.
+Click **Watch** to view it in real-time.
+
+### Step 5: End the Stream & See the Recording
+
+Go back to the game demo and click **Stop Streaming**.
+In the dashboard, navigate to **Recordings**. The stream should appear as a recording.
+
+### Step 6: Generate a Highlight
+
+On the recording card, click **Generate Highlight**.
+The highlight service will process the recording and generate a highlight reel.
+Check progress under **Highlights** in the sidebar.
+
+---
+
+## Demo Levels
 
 | Demo Level | What It Shows | Requirements |
 |------------|---------------|--------------|

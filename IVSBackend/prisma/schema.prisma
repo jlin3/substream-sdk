@@ -243,6 +243,88 @@ model PlaybackKeyPair {
 }
 
 // ============================================
+// ORGANIZATION & PLATFORM MODELS
+// ============================================
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  logoUrl     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  streams     Stream[]
+  highlights  Highlight[]
+
+  @@index([slug])
+}
+
+model Stream {
+  id            String       @id @default(uuid())
+  orgId         String
+  org           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  streamerId    String
+  streamerName  String?
+  title         String?
+  status        StreamStatus @default(IDLE)
+
+  ivsStageArn   String?
+  playbackUrl   String?
+  recordingUrl  String?
+  thumbnailUrl  String?
+
+  startedAt     DateTime?
+  endedAt       DateTime?
+  durationSecs  Int?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  highlights    Highlight[]
+
+  @@index([orgId])
+  @@index([status])
+  @@index([streamerId])
+  @@index([startedAt])
+}
+
+enum StreamStatus {
+  IDLE
+  LIVE
+  ENDED
+  RECORDED
+}
+
+model Highlight {
+  id           String          @id @default(uuid())
+  orgId        String
+  org          Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  streamId     String?
+  stream       Stream?         @relation(fields: [streamId], references: [id])
+  title        String
+  videoUrl     String?
+  thumbnailUrl String?
+  duration     Int?
+  status       HighlightStatus @default(PENDING)
+  jobId        String?         @unique
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([orgId])
+  @@index([streamId])
+  @@index([status])
+  @@index([jobId])
+}
+
+enum HighlightStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ============================================
 // ADMIN & AUDIT
 // ============================================
 

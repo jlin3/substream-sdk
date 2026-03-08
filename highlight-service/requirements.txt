@@ -7,3 +7,4 @@ pydub
 numpy
 pydantic
 python-multipart
+boto3

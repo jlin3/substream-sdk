@@ -18,6 +18,7 @@ from pipeline.segment_scoring import score_segments
 from pipeline.highlight_selection import select_highlights
 from pipeline.assembly import assemble_highlight_reel
 from services.gcs_client import download_video, upload_highlight, generate_signed_url
+from services.s3_client import is_s3_uri, s3_to_gcs
 
 logger = logging.getLogger(__name__)
 
@@ -54,11 +55,20 @@ async def _execute(
 
     # --- Step 1: Download source video ---
     logger.info("[%s] Step 1/6: Downloading source video", job_id)
-    video_path = await loop.run_in_executor(None, download_video, video_uri, work_dir)
+
+    # S3 URIs need to be bridged to GCS for Video Intelligence
+    gcs_uri_for_analysis = video_uri
+    if is_s3_uri(video_uri):
+        logger.info("[%s] S3 source detected — bridging to GCS", job_id)
+        video_path, gcs_uri_for_analysis = await loop.run_in_executor(
+            None, s3_to_gcs, video_uri, job_id, work_dir,
+        )
+    else:
+        video_path = await loop.run_in_executor(None, download_video, video_uri, work_dir)
 
     # --- Step 2 & 3: Scene analysis and audio analysis (in parallel) ---
     logger.info("[%s] Steps 2-3: Running scene + audio analysis in parallel", job_id)
-    scene_future = loop.run_in_executor(None, analyze_scenes, video_uri)
+    scene_future = loop.run_in_executor(None, analyze_scenes, gcs_uri_for_analysis)
     audio_future = loop.run_in_executor(None, analyze_audio, video_path, work_dir)
 
     scene_result, audio_result = await asyncio.gather(scene_future, audio_future)

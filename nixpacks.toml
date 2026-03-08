@@ -11,4 +11,4 @@ cmds = ["cd IVSBackend && pnpm install"]
 cmds = ["cd IVSBackend && pnpm db:generate && pnpm build"]
 
 [start]
-cmd = "cd IVSBackend && pnpm start"
+cmd = "cd IVSBackend && npx prisma db push --skip-generate && pnpm start"

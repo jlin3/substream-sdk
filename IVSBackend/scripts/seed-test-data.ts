@@ -166,6 +166,59 @@ async function seed() {
   console.log('✅ Linked test parent to test child\n');
 
   // =========================================================================
+  // ORGANIZATION DATA - For livewave.ai demo
+  // =========================================================================
+  console.log('🏢 Creating demo organization...\n');
+
+  const demoOrg = await prisma.organization.upsert({
+    where: { slug: 'livewave-demo' },
+    update: {},
+    create: {
+      id: 'org-livewave-demo',
+      name: 'Livewave Demo',
+      slug: 'livewave-demo',
+    },
+  });
+  console.log('✅ Demo organization:', demoOrg.slug);
+
+  // Sample completed streams with recordings
+  const sampleStreams = [
+    {
+      id: 'stream-sample-001',
+      orgId: demoOrg.id,
+      streamerId: 'demo-child-001',
+      streamerName: 'Demo Streamer',
+      title: 'Epic Breakout Session',
+      status: 'RECORDED' as const,
+      startedAt: new Date(Date.now() - 3600_000 * 3),
+      endedAt: new Date(Date.now() - 3600_000 * 2),
+      durationSecs: 3600,
+    },
+    {
+      id: 'stream-sample-002',
+      orgId: demoOrg.id,
+      streamerId: 'demo-child-001',
+      streamerName: 'Demo Streamer',
+      title: 'Late Night Gaming',
+      status: 'RECORDED' as const,
+      startedAt: new Date(Date.now() - 86400_000),
+      endedAt: new Date(Date.now() - 86400_000 + 2700_000),
+      durationSecs: 2700,
+    },
+  ];
+
+  for (const stream of sampleStreams) {
+    await prisma.stream.upsert({
+      where: { id: stream.id },
+      update: {},
+      create: stream,
+    });
+    console.log(`✅ Sample stream: ${stream.title}`);
+  }
+
+  console.log('');
+
+  // =========================================================================
   // SUMMARY
   // =========================================================================
   console.log('═══════════════════════════════════════════════════════════════');
@@ -181,6 +234,14 @@ async function seed() {
   console.log('');
   console.log('    Parent ID:   demo-viewer-001');
   console.log('    Auth Token:  demo-viewer-token');
+  console.log('');
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('');
+  console.log('  🏢 LIVEWAVE DEMO ORG');
+  console.log('');
+  console.log('    Org Slug:    livewave-demo');
+  console.log('    Demo Code:   Set DEMO_ORG_CODE in .env');
+  console.log('    Login at:    https://livewave.ai/login');
   console.log('');
   console.log('═══════════════════════════════════════════════════════════════');
   console.log('');

@@ -16,13 +16,17 @@ class JobStatus(str, Enum):
 class HighlightRequest(BaseModel):
     video_uri: str = Field(
         ...,
-        description="GCS URI of the source gameplay video (gs://bucket/path/file.webm)",
+        description="Video URI: GCS (gs://bucket/path) or S3 (s3://bucket/key)",
     )
     target_duration_seconds: int = Field(
         default=90,
         ge=15,
         le=300,
         description="Desired length of the highlight reel in seconds",
+    )
+    title: Optional[str] = Field(
+        default=None,
+        description="Title for the generated highlight",
     )
     game_title: Optional[str] = Field(
         default=None,
@@ -31,9 +35,9 @@ class HighlightRequest(BaseModel):
 
     @field_validator("video_uri")
     @classmethod
-    def validate_gcs_uri(cls, v: str) -> str:
-        if not v.startswith("gs://"):
-            raise ValueError("video_uri must be a GCS URI starting with gs://")
+    def validate_video_uri(cls, v: str) -> str:
+        if not v.startswith("gs://") and not v.startswith("s3://"):
+            raise ValueError("video_uri must be a GCS URI (gs://) or S3 URI (s3://)")
         return v
 
 

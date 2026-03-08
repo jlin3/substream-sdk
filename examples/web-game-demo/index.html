@@ -162,7 +162,7 @@
 </head>
 <body>
   <h1>Substream Web Game Demo</h1>
-  <p class="subtitle">Stream any HTML5 canvas game to parents via IVS Real-Time</p>
+  <p class="subtitle">Stream any HTML5 canvas game via IVS Real-Time</p>
 
   <div class="main-layout">
     <!-- Left: game + controls -->
@@ -172,8 +172,16 @@
       <div class="config">
         <label>Backend:</label>
         <input id="backendUrl" type="text" value="https://substream-sdk-production.up.railway.app" />
-        <label>Child ID:</label>
+        <label>Streamer ID:</label>
         <input id="childId" type="text" value="demo-child-001" style="min-width:120px;flex:0 1 auto;" />
+      </div>
+      <div class="config">
+        <label>Org ID:</label>
+        <input id="orgId" type="text" value="org-livewave-demo" style="min-width:140px;flex:0 1 auto;" placeholder="Organization ID" />
+        <label>Name:</label>
+        <input id="streamerName" type="text" value="Demo Player" style="min-width:100px;flex:0 1 auto;" placeholder="Streamer name" />
+        <label>Title:</label>
+        <input id="streamTitle" type="text" value="Live Breakout Session" style="min-width:120px;flex:0 1 auto;" placeholder="Stream title" />
       </div>
 
       <div class="controls">
@@ -479,6 +487,9 @@
       const viewerLinkEl = document.getElementById('viewerLink');
       const backendUrl = document.getElementById('backendUrl').value.replace(/\/$/, '');
       const childId = document.getElementById('childId').value.trim() || 'demo-child-001';
+      const orgId = document.getElementById('orgId').value.trim();
+      const streamerName = document.getElementById('streamerName').value.trim();
+      const streamTitle = document.getElementById('streamTitle').value.trim();
 
       startBtn.disabled = true;
       statusEl.className = 'status-bar info';
@@ -510,7 +521,7 @@
             'Content-Type': 'application/json',
             'Authorization': 'Bearer demo-token',
           },
-          body: JSON.stringify({ childId }),
+          body: JSON.stringify({ childId, orgId, streamerName, title: streamTitle }),
         });
 
         if (!response.ok) {
@@ -579,7 +590,10 @@
           isLive: true,
         };
 
-        viewerLinkEl.innerHTML = 'Viewer URL: <a href="' + publishInfo.viewerUrl + '" target="_blank">' + publishInfo.viewerUrl + '</a>';
+        const dashboardUrl = backendUrl + '/dashboard/streams/' + publishInfo.streamId;
+        viewerLinkEl.innerHTML =
+          'Viewer: <a href="' + publishInfo.viewerUrl + '" target="_blank">' + publishInfo.viewerUrl + '</a>' +
+          (orgId ? '<br>Dashboard: <a href="' + dashboardUrl + '" target="_blank">' + dashboardUrl + '</a>' : '');
         viewerLinkEl.style.display = 'block';
 
       } catch (err) {

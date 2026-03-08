@@ -132,7 +132,12 @@ window.Substream = (function () {
         'Content-Type': 'application/json',
         Authorization: 'Bearer ' + opts.authToken,
       },
-      body: JSON.stringify({ childId: opts.childId }),
+      body: JSON.stringify({
+        childId: opts.childId,
+        orgId: opts.orgId,
+        streamerName: opts.streamerName,
+        title: opts.title,
+      }),
     });
 
     if (!resp.ok) {

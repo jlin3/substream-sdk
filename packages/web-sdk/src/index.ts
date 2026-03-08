@@ -36,6 +36,10 @@ export interface SubstreamConfig {
   childId?: string;
   /** Auth token (API key or JWT) */
   authToken: string;
+  /** Organization ID (associates the stream with an org on the dashboard) */
+  orgId?: string;
+  /** Display name for the streamer */
+  streamerName?: string;
   /** Stream title (shown to viewers) */
   title?: string;
   /** Capture frame rate (default: 30) */
@@ -146,6 +150,8 @@ export class SubstreamSDK {
       streamerId,
       childId,
       authToken,
+      orgId,
+      streamerName,
       title,
       fps = 30,
       audio = true,
@@ -165,7 +171,11 @@ export class SubstreamSDK {
 
     console.log('[Substream] Starting stream...');
 
-    const publishInfo = await requestPublishToken(backendUrl, resolvedStreamerId, authToken, title);
+    const publishInfo = await requestPublishToken(backendUrl, resolvedStreamerId, authToken, {
+      title,
+      orgId,
+      streamerName,
+    });
     console.log(`[Substream] Got stream ${publishInfo.streamId}, viewer: ${publishInfo.viewerUrl}`);
 
     // Capture canvas (video only)
@@ -277,7 +287,7 @@ async function requestPublishToken(
   backendUrl: string,
   streamerId: string,
   authToken: string,
-  title?: string,
+  opts?: { title?: string; orgId?: string; streamerName?: string },
 ): Promise<WebPublishResponse> {
   const response = await fetch(`${backendUrl}/api/streams/web-publish`, {
     method: 'POST',
@@ -285,7 +295,12 @@ async function requestPublishToken(
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${authToken}`,
     },
-    body: JSON.stringify({ streamerId, title }),
+    body: JSON.stringify({
+      streamerId,
+      title: opts?.title,
+      orgId: opts?.orgId,
+      streamerName: opts?.streamerName,
+    }),
   });
 
   if (!response.ok) {

@@ -24,3 +24,7 @@ MIN_VIDEO_DURATION_SECONDS = int(os.environ.get("MIN_VIDEO_DURATION_SECONDS", "6
 DEFAULT_HIGHLIGHT_DURATION_SECONDS = int(os.environ.get("DEFAULT_HIGHLIGHT_DURATION_SECONDS", "90"))
 
 TEMP_DIR = os.environ.get("TEMP_DIR", "/tmp/highlight-service")
+
+# AWS S3 configuration (for recordings from IVS)
+AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
+S3_RECORDING_BUCKET = os.environ.get("S3_RECORDING_BUCKET", "")

@@ -16,6 +16,7 @@ import {
 } from '@/lib/streaming/stage-pool';
 import { dispatchWebhookEvent } from '@/lib/webhooks/webhook-service';
 import { requireAuth, requireScopes, type AuthContext } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
 // ============================================
 // POST - Start Web Publish Stream
@@ -50,12 +51,36 @@ export async function POST(request: NextRequest) {
     const protocol = request.headers.get('x-forwarded-proto') || 'https';
     const viewerUrl = `${protocol}://${baseUrl}/viewer/${streamId}`;
 
+    // Create a Stream record if an org exists for this auth context
+    const orgId = body.orgId || auth.orgId;
+    try {
+      const org = await prisma.organization.findFirst({
+        where: { id: orgId },
+      });
+      if (org) {
+        await prisma.stream.create({
+          data: {
+            id: streamId,
+            orgId: org.id,
+            streamerId,
+            streamerName: body.streamerName || null,
+            title: body.title || null,
+            status: 'LIVE',
+            ivsStageArn: allocation.stageArn,
+            startedAt: new Date(),
+          },
+        });
+      }
+    } catch {
+      // Non-critical: stream works even without the org record
+    }
+
     dispatchWebhookEvent('stream.started', {
       streamId,
       streamerId,
       stageArn: allocation.stageArn,
       viewerUrl,
-      orgId: auth.orgId,
+      orgId,
     });
 
     return NextResponse.json(
@@ -105,6 +130,37 @@ export async function DELETE(request: NextRequest) {
     }
 
     await releaseStage(stage.arn);
+
+    // Update Stream record to ENDED
+    const now = new Date();
+    try {
+      const existingStream = await prisma.stream.findUnique({
+        where: { id: body.streamId },
+      });
+      if (existingStream) {
+        const durationSecs = existingStream.startedAt
+          ? Math.floor((now.getTime() - existingStream.startedAt.getTime()) / 1000)
+          : null;
+
+        // Construct likely S3 recording path from the IVS stage ARN
+        const bucket = process.env.S3_RECORDING_BUCKET;
+        const recordingUrl = bucket && existingStream.ivsStageArn
+          ? `s3://${bucket}/ivs/v1/${existingStream.ivsStageArn.split(':').pop()}/${body.streamId}/`
+          : null;
+
+        await prisma.stream.update({
+          where: { id: body.streamId },
+          data: {
+            status: recordingUrl ? 'RECORDED' : 'ENDED',
+            endedAt: now,
+            durationSecs,
+            recordingUrl,
+          },
+        });
+      }
+    } catch {
+      // Non-critical
+    }
 
     dispatchWebhookEvent('stream.stopped', { streamId: body.streamId });
 
