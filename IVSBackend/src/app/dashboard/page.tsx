@@ -60,7 +60,11 @@ export default async function DashboardOverview() {
               </p>
             ) : (
               recentStreams.map((s) => (
-                <div key={s.id} className="px-5 py-3 flex items-center justify-between">
+                <Link
+                  key={s.id}
+                  href={`/dashboard/streams/${s.id}`}
+                  className="px-5 py-3 flex items-center justify-between hover:bg-white/5 transition-colors"
+                >
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{s.title || 'Untitled Stream'}</p>
                     <p className="text-xs text-white/40">
@@ -69,7 +73,7 @@ export default async function DashboardOverview() {
                     </p>
                   </div>
                   <StatusBadge status={s.status} />
-                </div>
+                </Link>
               ))
             )}
           </div>

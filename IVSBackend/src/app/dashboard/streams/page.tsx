@@ -80,7 +80,10 @@ function StreamCard({ stream }: { stream: StreamWithCount }) {
       : null;
 
   return (
-    <div className="rounded-xl border border-white/10 bg-surface-100 px-5 py-4 flex items-center justify-between gap-4">
+    <Link
+      href={`/dashboard/streams/${stream.id}`}
+      className="rounded-xl border border-white/10 bg-surface-100 px-5 py-4 flex items-center justify-between gap-4 hover:border-white/20 transition-colors"
+    >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p className="text-sm font-medium truncate">{stream.title || 'Untitled Stream'}</p>
@@ -94,20 +97,14 @@ function StreamCard({ stream }: { stream: StreamWithCount }) {
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {stream.status === 'LIVE' && (
-          <Link
-            href={`/dashboard/streams/${stream.id}`}
-            className="rounded-lg bg-live/20 text-live px-3 py-1.5 text-xs font-medium hover:bg-live/30 transition-colors"
-          >
-            Watch
-          </Link>
+          <span className="rounded-lg bg-live/20 text-live px-3 py-1.5 text-xs font-medium">
+            Watch Live
+          </span>
         )}
-        {stream.recordingUrl && (
-          <Link
-            href={`/dashboard/vods?stream=${stream.id}`}
-            className="rounded-lg bg-white/5 px-3 py-1.5 text-xs font-medium text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-          >
-            Recording
-          </Link>
+        {(stream.status === 'RECORDED' || stream.status === 'ENDED') && (
+          <span className="rounded-lg bg-white/5 px-3 py-1.5 text-xs font-medium text-white/60">
+            View Details
+          </span>
         )}
         {stream._count.highlights > 0 && (
           <span className="text-xs text-brand-400">
@@ -115,7 +112,7 @@ function StreamCard({ stream }: { stream: StreamWithCount }) {
           </span>
         )}
       </div>
-    </div>
+    </Link>
   );
 }
 

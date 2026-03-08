@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { GenerateHighlightButton } from './generate-button';
 
 export default async function VodsPage() {
@@ -35,7 +36,10 @@ export default async function VodsPage() {
               className="rounded-xl border border-white/10 bg-surface-100 overflow-hidden"
             >
               {/* Thumbnail / Placeholder */}
-              <div className="aspect-video bg-surface-300 flex items-center justify-center relative">
+              <Link
+                href={`/dashboard/streams/${r.id}`}
+                className="block aspect-video bg-surface-300 flex items-center justify-center relative hover:bg-surface-400 transition-colors"
+              >
                 {r.thumbnailUrl ? (
                   <img src={r.thumbnailUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
@@ -49,35 +53,23 @@ export default async function VodsPage() {
                     {formatDuration(r.durationSecs)}
                   </span>
                 )}
-              </div>
+              </Link>
 
               {/* Info */}
               <div className="p-4 space-y-3">
-                <div>
+                <Link href={`/dashboard/streams/${r.id}`} className="block hover:text-brand-400 transition-colors">
                   <p className="text-sm font-medium truncate">{r.title || 'Untitled Stream'}</p>
                   <p className="text-xs text-white/40 mt-0.5">
                     {r.streamerName || r.streamerId}
                     {r.endedAt && <> &middot; {formatDate(r.endedAt)}</>}
                   </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <GenerateHighlightButton
-                    streamId={r.id}
-                    orgSlug={session.orgSlug}
-                    hasRecording={!!r.recordingUrl}
-                    existingHighlights={r._count.highlights}
-                  />
-                  {r.recordingUrl && (
-                    <a
-                      href={r.recordingUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-lg bg-white/5 px-3 py-1.5 text-xs font-medium text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-                    >
-                      Download
-                    </a>
-                  )}
-                </div>
+                </Link>
+                <GenerateHighlightButton
+                  streamId={r.id}
+                  orgSlug={session.orgSlug}
+                  hasRecording={!!r.recordingUrl}
+                  existingHighlights={r._count.highlights}
+                />
               </div>
             </div>
           ))}

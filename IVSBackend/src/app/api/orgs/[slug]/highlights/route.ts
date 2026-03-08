@@ -59,32 +59,30 @@ export async function POST(
     return NextResponse.json({ error: 'Stream not found' }, { status: 404 });
   }
 
-  if (!stream.recordingUrl) {
-    return NextResponse.json(
-      { error: 'Stream has no recording available' },
-      { status: 400 },
-    );
-  }
-
   const highlightServiceUrl = process.env.HIGHLIGHT_SERVICE_URL || 'http://localhost:8080';
 
   let jobId: string | null = null;
-  try {
-    const hlRes = await fetch(`${highlightServiceUrl}/api/v1/highlights`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        video_uri: stream.recordingUrl,
-        title: `Highlights: ${stream.title || 'Untitled Stream'}`,
-      }),
-    });
+  let hlStatus: 'PENDING' | 'PROCESSING' = 'PENDING';
 
-    if (hlRes.ok) {
-      const hlData = await hlRes.json();
-      jobId = hlData.job_id || null;
+  if (stream.recordingUrl) {
+    try {
+      const hlRes = await fetch(`${highlightServiceUrl}/api/v1/highlights`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          video_uri: stream.recordingUrl,
+          title: `Highlights: ${stream.title || 'Untitled Stream'}`,
+        }),
+      });
+
+      if (hlRes.ok) {
+        const hlData = await hlRes.json();
+        jobId = hlData.job_id || null;
+        hlStatus = 'PROCESSING';
+      }
+    } catch {
+      // Highlight service may not be running; create record anyway
     }
-  } catch {
-    // Highlight service may not be running; create record anyway for demo
   }
 
   const highlight = await prisma.highlight.create({
@@ -92,7 +90,7 @@ export async function POST(
       orgId: session.orgId,
       streamId: stream.id,
       title: `Highlights: ${stream.title || 'Untitled Stream'}`,
-      status: jobId ? 'PROCESSING' : 'PENDING',
+      status: hlStatus,
       jobId,
     },
   });
