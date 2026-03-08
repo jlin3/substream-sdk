@@ -8,7 +8,7 @@ buildCommand = "npm install && npx prisma generate && npm run build"
 
 [deploy]
 # Run prisma db push at startup to apply schema changes, then start the app
-startCommand = "npx prisma db push && pnpm start"
+startCommand = "npx prisma db push && npm start"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 60
 restartPolicyType = "on_failure"
