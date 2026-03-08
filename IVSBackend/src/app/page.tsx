@@ -29,19 +29,19 @@ export default function LandingPage() {
             Watch live, browse recordings, and get AI-generated highlights
             &mdash; all from one dashboard.
           </p>
-          <div className="flex gap-4 justify-center pt-4">
+          <div className="flex gap-4 justify-center pt-4 flex-wrap">
+            <Link
+              href="/demo"
+              className="rounded-lg bg-brand-600 px-6 py-3 text-sm font-semibold hover:bg-brand-500 transition-colors"
+            >
+              Try the SDK Demo
+            </Link>
             <Link
               href="/login"
-              className="rounded-lg bg-brand-600 px-6 py-3 text-sm font-semibold hover:bg-brand-500 transition-colors"
+              className="rounded-lg border border-white/20 px-6 py-3 text-sm font-semibold hover:bg-white/5 transition-colors"
             >
               Open Dashboard
             </Link>
-            <a
-              href="#how-it-works"
-              className="rounded-lg border border-white/20 px-6 py-3 text-sm font-semibold hover:bg-white/5 transition-colors"
-            >
-              How It Works
-            </a>
           </div>
         </div>
       </main>

@@ -43,7 +43,7 @@ export default async function StreamViewerPage({
       {/* Video area */}
       <div className="rounded-xl border border-white/10 bg-surface-100 overflow-hidden">
         {stream.status === 'LIVE' && stream.ivsStageArn ? (
-          <StreamViewer streamId={stream.id} orgSlug={session.orgSlug} />
+          <StreamViewer streamId={stream.id} />
         ) : stream.recordingUrl ? (
           <div className="aspect-video bg-black flex items-center justify-center">
             <video

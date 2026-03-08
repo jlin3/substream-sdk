@@ -181,8 +181,22 @@ async function seed() {
   });
   console.log('✅ Demo organization:', demoOrg.slug);
 
-  // Sample completed streams with recordings
+  const HALO_HIGHLIGHT_GCS = 'gs://substream-highlights/highlights/fab5652f-cf3b-4d44-8388-fe7e129afe6f/fab5652f-cf3b-4d44-8388-fe7e129afe6f.mp4';
+
+  // Sample streams
   const sampleStreams = [
+    {
+      id: 'stream-halo-ctf',
+      orgId: demoOrg.id,
+      streamerId: 'player-spartan117',
+      streamerName: 'Spartan-117',
+      title: 'Halo Infinite — CTF on Fragmentation',
+      status: 'RECORDED' as const,
+      startedAt: new Date(Date.now() - 86400_000 * 2),
+      endedAt: new Date(Date.now() - 86400_000 * 2 + 480_000),
+      durationSecs: 480,
+      recordingUrl: HALO_HIGHLIGHT_GCS,
+    },
     {
       id: 'stream-sample-001',
       orgId: demoOrg.id,
@@ -194,17 +208,6 @@ async function seed() {
       endedAt: new Date(Date.now() - 3600_000 * 2),
       durationSecs: 3600,
     },
-    {
-      id: 'stream-sample-002',
-      orgId: demoOrg.id,
-      streamerId: 'demo-child-001',
-      streamerName: 'Demo Streamer',
-      title: 'Late Night Gaming',
-      status: 'RECORDED' as const,
-      startedAt: new Date(Date.now() - 86400_000),
-      endedAt: new Date(Date.now() - 86400_000 + 2700_000),
-      durationSecs: 2700,
-    },
   ];
 
   for (const stream of sampleStreams) {
@@ -215,6 +218,67 @@ async function seed() {
     });
     console.log(`✅ Sample stream: ${stream.title}`);
   }
+
+  // Halo highlight — real pipeline output
+  const haloPipelineData = {
+    source_duration: 480,
+    highlight_duration: 75,
+    segments_analyzed: 51,
+    segments_selected: 7,
+    processing_time_seconds: 390,
+    model: 'gemini-3.1-pro-preview',
+    steps: [
+      { name: 'Download', duration_sec: 12, detail: 'Fetched 8 min recording from cloud storage' },
+      { name: 'Scene Analysis', duration_sec: 95, detail: 'Google Cloud Video Intelligence API — shot detection, labels, text, object tracking' },
+      { name: 'Audio Analysis', duration_sec: 8, detail: 'Local RMS energy analysis via pydub/numpy' },
+      { name: 'Segment Scoring', duration_sec: 180, detail: 'Gemini 3.1 Pro scored 51 segments from sampled frames' },
+      { name: 'Highlight Selection', duration_sec: 0.2, detail: 'Weighted scoring: Gemini 50%, Video Intel 25%, Audio 25%' },
+      { name: 'Assembly', duration_sec: 45, detail: 'FFmpeg crossfade transitions + loudnorm audio normalization' },
+    ],
+    segments: [
+      { start: 107.0, end: 116.1, duration: 9.1, score: 50, label: 'Player grabs the enemy flag', selected: true },
+      { start: 184.0, end: 186.1, duration: 2.1, score: 79, label: 'Sniping an enemy on a moving vehicle', selected: true },
+      { start: 199.0, end: 201.1, duration: 2.1, score: 51, label: 'Standard multiplayer firefight', selected: true },
+      { start: 296.0, end: 298.5, duration: 2.5, score: 66, label: 'Sniper Rifle kill', selected: true },
+      { start: 340.0, end: 345.7, duration: 5.7, score: 59, label: 'Ambushing enemies near a Warthog', selected: true },
+      { start: 370.0, end: 412.7, duration: 42.7, score: 50, label: 'Kills and a destroyed vehicle', selected: true },
+      { start: 426.0, end: 436.8, duration: 10.8, score: 56, label: 'Active Camo stealth attack on enemy vehicle', selected: true },
+      { start: 15.0, end: 30.0, duration: 15.0, score: 22, label: 'Initial spawn and traversal', selected: false },
+      { start: 45.0, end: 60.0, duration: 15.0, score: 18, label: 'Walking toward objective', selected: false },
+      { start: 60.0, end: 75.0, duration: 15.0, score: 31, label: 'Minor firefight, no kills', selected: false },
+      { start: 135.0, end: 150.0, duration: 15.0, score: 28, label: 'Vehicle boarding', selected: false },
+      { start: 225.0, end: 240.0, duration: 15.0, score: 15, label: 'Respawn and traversal', selected: false },
+    ],
+  };
+
+  await prisma.highlight.upsert({
+    where: { id: 'highlight-halo-ctf' },
+    update: { videoUrl: HALO_HIGHLIGHT_GCS, pipelineData: haloPipelineData },
+    create: {
+      id: 'highlight-halo-ctf',
+      orgId: demoOrg.id,
+      streamId: 'stream-halo-ctf',
+      title: 'Halo Infinite CTF — Best Moments',
+      videoUrl: HALO_HIGHLIGHT_GCS,
+      duration: 75,
+      status: 'COMPLETED',
+      pipelineData: haloPipelineData,
+    },
+  });
+  console.log('✅ Halo highlight (COMPLETED with pipeline data)');
+
+  await prisma.highlight.upsert({
+    where: { id: 'highlight-processing' },
+    update: {},
+    create: {
+      id: 'highlight-processing',
+      orgId: demoOrg.id,
+      streamId: 'stream-sample-001',
+      title: 'Highlights: Epic Breakout Session',
+      status: 'PROCESSING',
+    },
+  });
+  console.log('✅ Processing highlight (demo state)');
 
   console.log('');
 

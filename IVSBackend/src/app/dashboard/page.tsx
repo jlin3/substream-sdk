@@ -38,10 +38,10 @@ export default async function DashboardOverview() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Live Now" value={liveStreams} accent={liveStreams > 0} />
-        <StatCard label="Total Streams" value={totalStreams} />
-        <StatCard label="Recordings" value={recorded} />
-        <StatCard label="Highlights" value={totalHighlights} />
+        <Link href="/dashboard/streams"><StatCard label="Live Now" value={liveStreams} accent={liveStreams > 0} /></Link>
+        <Link href="/dashboard/streams"><StatCard label="Total Streams" value={totalStreams} /></Link>
+        <Link href="/dashboard/vods"><StatCard label="Recordings" value={recorded} /></Link>
+        <Link href="/dashboard/highlights"><StatCard label="Highlights" value={totalHighlights} /></Link>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
@@ -118,7 +118,7 @@ export default async function DashboardOverview() {
 
 function StatCard({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-surface-100 px-5 py-4">
+    <div className="rounded-xl border border-white/10 bg-surface-100 px-5 py-4 hover:border-white/20 transition-colors">
       <p className="text-xs text-white/50 uppercase tracking-wide">{label}</p>
       <p className={`text-3xl font-bold mt-1 ${accent ? 'text-live' : ''}`}>{value}</p>
     </div>

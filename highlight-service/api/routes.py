@@ -116,6 +116,19 @@ async def list_highlights():
     ]
 
 
+@router.get("/signed-url")
+async def get_signed_url(uri: str):
+    """Generate a signed download URL for a GCS object."""
+    if not uri.startswith("gs://"):
+        raise HTTPException(status_code=400, detail="URI must start with gs://")
+    from services.gcs_client import generate_signed_url
+    try:
+        url = generate_signed_url(uri, expiry_seconds=86400)
+        return {"url": url}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.get("/highlights/{job_id}", response_model=HighlightResponse)
 async def get_highlight(job_id: str):
     """Poll for highlight generation status and results."""

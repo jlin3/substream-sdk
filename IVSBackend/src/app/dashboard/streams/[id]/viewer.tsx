@@ -1,14 +1,27 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
+
+const IvsRealTimeViewer = dynamic(
+  () => import('@/components/IvsRealTimeViewer'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="aspect-video bg-black flex items-center justify-center">
+        <p className="text-white/30 text-sm">Loading IVS viewer...</p>
+      </div>
+    ),
+  },
+);
 
 interface ViewerToken {
-  token: string;
+  subscribeToken: string;
   stageArn: string;
   participantId: string;
 }
 
-export function StreamViewer({ streamId, orgSlug }: { streamId: string; orgSlug: string }) {
+export function StreamViewer({ streamId }: { streamId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [viewerData, setViewerData] = useState<ViewerToken | null>(null);
 
@@ -18,10 +31,11 @@ export function StreamViewer({ streamId, orgSlug }: { streamId: string; orgSlug:
         const res = await fetch(`/api/streams/${streamId}/viewer`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orgSlug }),
+          body: JSON.stringify({ parentUserId: 'dashboard-viewer' }),
         });
         if (!res.ok) {
-          setError('Could not get viewer token');
+          const data = await res.json().catch(() => ({}));
+          setError(data.error || `Failed to get viewer token (HTTP ${res.status})`);
           return;
         }
         const data = await res.json();
@@ -31,7 +45,7 @@ export function StreamViewer({ streamId, orgSlug }: { streamId: string; orgSlug:
       }
     }
     fetchToken();
-  }, [streamId, orgSlug]);
+  }, [streamId]);
 
   if (error) {
     return (
@@ -44,16 +58,19 @@ export function StreamViewer({ streamId, orgSlug }: { streamId: string; orgSlug:
   if (!viewerData) {
     return (
       <div className="aspect-video bg-black flex items-center justify-center">
-        <p className="text-white/30 text-sm">Connecting to live stream...</p>
+        <div className="text-center space-y-2">
+          <div className="w-6 h-6 border-2 border-brand-400 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-white/30 text-sm">Connecting to live stream...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="aspect-video bg-black flex items-center justify-center">
-      <p className="text-white/50 text-sm">
-        Live stream connected. IVS Real-Time viewer active.
-      </p>
-    </div>
+    <IvsRealTimeViewer
+      token={viewerData.subscribeToken}
+      stageArn={viewerData.stageArn}
+      participantId={viewerData.participantId}
+    />
   );
 }
