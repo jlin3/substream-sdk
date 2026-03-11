@@ -84,6 +84,7 @@ export default async function WatchPage() {
       liveStreams={serializedLive}
       recordings={serializedRecordings}
       highlights={resolvedHighlights}
+      orgSlug={session.orgSlug}
     />
   );
 }
