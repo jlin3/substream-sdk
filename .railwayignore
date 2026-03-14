@@ -1,16 +1,5 @@
-# Only IVSBackend and highlight-service are deployed
+# Ignore WebappBackend - we're only deploying IVSBackend
 WebappBackend/
-UnityProject/
-examples/
-packages/
-docs/
-.specstory/
-.cursor/
-
-# Build artifacts
-IVSBackend/.next/
-**/.next/
-**/dist/
 
 # Standard ignores
 node_modules/
@@ -19,4 +8,3 @@ node_modules/
 .env
 .env.*
 !.env.example
-.DS_Store
