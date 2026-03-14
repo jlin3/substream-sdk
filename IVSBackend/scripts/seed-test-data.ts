@@ -183,40 +183,29 @@ async function seed() {
 
   const HALO_HIGHLIGHT_GCS = 'gs://substream-highlights/highlights/fab5652f-cf3b-4d44-8388-fe7e129afe6f/fab5652f-cf3b-4d44-8388-fe7e129afe6f.mp4';
 
-  // Sample streams
+  const DAY = 86400_000;
+  const HOUR = 3600_000;
+
   const sampleStreams = [
-    {
-      id: 'stream-halo-ctf',
-      orgId: demoOrg.id,
-      streamerId: 'player-spartan117',
-      streamerName: 'Spartan-117',
-      title: 'Halo Infinite — CTF on Fragmentation',
-      status: 'RECORDED' as const,
-      startedAt: new Date(Date.now() - 86400_000 * 2),
-      endedAt: new Date(Date.now() - 86400_000 * 2 + 480_000),
-      durationSecs: 480,
-      recordingUrl: HALO_HIGHLIGHT_GCS,
-    },
-    {
-      id: 'stream-sample-001',
-      orgId: demoOrg.id,
-      streamerId: 'demo-child-001',
-      streamerName: 'Demo Streamer',
-      title: 'Epic Breakout Session',
-      status: 'RECORDED' as const,
-      startedAt: new Date(Date.now() - 3600_000 * 3),
-      endedAt: new Date(Date.now() - 3600_000 * 2),
-      durationSecs: 3600,
-    },
+    { id: 'stream-halo-ctf', streamerId: 'player-spartan117', streamerName: 'Spartan-117', title: 'Halo Infinite — CTF on Fragmentation', status: 'RECORDED' as const, startedAt: new Date(Date.now() - DAY * 2), endedAt: new Date(Date.now() - DAY * 2 + 480_000), durationSecs: 480, recordingUrl: HALO_HIGHLIGHT_GCS },
+    { id: 'stream-sample-001', streamerId: 'demo-child-001', streamerName: 'Demo Streamer', title: 'Epic Breakout Session', status: 'RECORDED' as const, startedAt: new Date(Date.now() - HOUR * 3), endedAt: new Date(Date.now() - HOUR * 2), durationSecs: 3600 },
+    { id: 'stream-fn-arena', streamerId: 'player-xnova', streamerName: 'xNova', title: 'Fortnite — Arena Ranked Grind', status: 'RECORDED' as const, startedAt: new Date(Date.now() - HOUR * 8), endedAt: new Date(Date.now() - HOUR * 6), durationSecs: 7200 },
+    { id: 'stream-rl-tourney', streamerId: 'player-shadowfox', streamerName: 'ShadowFox', title: 'Rocket League — 2v2 Tournament', status: 'RECORDED' as const, startedAt: new Date(Date.now() - DAY * 1), endedAt: new Date(Date.now() - DAY * 1 + 2400_000), durationSecs: 2400 },
+    { id: 'stream-val-comp', streamerId: 'player-phantomace', streamerName: 'PhantomAce', title: 'Valorant — Competitive Ascent', status: 'RECORDED' as const, startedAt: new Date(Date.now() - HOUR * 14), endedAt: new Date(Date.now() - HOUR * 12), durationSecs: 5400 },
+    { id: 'stream-mc-build', streamerId: 'player-blocksmith', streamerName: 'BlockSmith', title: 'Minecraft — Mega Castle Build', status: 'RECORDED' as const, startedAt: new Date(Date.now() - DAY * 3), endedAt: new Date(Date.now() - DAY * 3 + 10800_000), durationSecs: 10800 },
+    { id: 'stream-halo-slayer', streamerId: 'player-spartan117', streamerName: 'Spartan-117', title: 'Halo Infinite — Team Slayer', status: 'RECORDED' as const, startedAt: new Date(Date.now() - HOUR * 28), endedAt: new Date(Date.now() - HOUR * 27), durationSecs: 3000 },
+    { id: 'stream-fn-creative', streamerId: 'player-xnova', streamerName: 'xNova', title: 'Fortnite — Creative Zone Wars', status: 'RECORDED' as const, startedAt: new Date(Date.now() - DAY * 4), endedAt: new Date(Date.now() - DAY * 4 + 1800_000), durationSecs: 1800 },
+    { id: 'stream-apex-ranked', streamerId: 'player-viperstrike', streamerName: 'ViperStrike', title: 'Apex Legends — Diamond Ranked Push', status: 'RECORDED' as const, startedAt: new Date(Date.now() - HOUR * 5), endedAt: new Date(Date.now() - HOUR * 3.5), durationSecs: 5400 },
+    { id: 'stream-val-unrated', streamerId: 'player-phantomace', streamerName: 'PhantomAce', title: 'Valorant — Unrated with Friends', status: 'ENDED' as const, startedAt: new Date(Date.now() - HOUR * 48), endedAt: new Date(Date.now() - HOUR * 47), durationSecs: 3600 },
   ];
 
-  for (const stream of sampleStreams) {
+  for (const s of sampleStreams) {
     await prisma.stream.upsert({
-      where: { id: stream.id },
+      where: { id: s.id },
       update: {},
-      create: stream,
+      create: { orgId: demoOrg.id, ...s },
     });
-    console.log(`✅ Sample stream: ${stream.title}`);
+    console.log(`✅ Stream: ${s.title}`);
   }
 
   // Halo highlight — real pipeline output
@@ -279,6 +268,22 @@ async function seed() {
     },
   });
   console.log('✅ Processing highlight (demo state)');
+
+  const extraHighlights = [
+    { id: 'highlight-fn-clutch', streamId: 'stream-fn-arena', title: 'Fortnite — Insane 1v4 Clutch', duration: 45, status: 'COMPLETED' as const },
+    { id: 'highlight-rl-ot', streamId: 'stream-rl-tourney', title: 'Rocket League — OT Ceiling Shot', duration: 30, status: 'COMPLETED' as const },
+    { id: 'highlight-val-ace', streamId: 'stream-val-comp', title: 'Valorant — Operator Ace on Ascent', duration: 55, status: 'COMPLETED' as const },
+    { id: 'highlight-apex-squad', streamId: 'stream-apex-ranked', title: 'Apex — Squad Wipe with Kraber', duration: 40, status: 'COMPLETED' as const },
+  ];
+
+  for (const h of extraHighlights) {
+    await prisma.highlight.upsert({
+      where: { id: h.id },
+      update: {},
+      create: { orgId: demoOrg.id, ...h },
+    });
+    console.log(`✅ Highlight: ${h.title}`);
+  }
 
   console.log('');
 

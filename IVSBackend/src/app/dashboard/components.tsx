@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Overview', icon: OverviewIcon },
+  { href: '/dashboard/browse', label: 'Browse', icon: BrowseIcon },
   { href: '/dashboard/watch', label: 'Watch', icon: WatchIcon },
   { href: '/dashboard/streams', label: 'Live Streams', icon: StreamIcon },
   { href: '/dashboard/vods', label: 'Recordings', icon: VodIcon },
@@ -80,6 +81,16 @@ export function DashboardShell({
 }
 
 // ─── Icons (simple SVG) ─────────────────────────────────────────
+
+function BrowseIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? 'text-brand-400' : 'text-white/40'}>
+      <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M8 1.5v13M1.5 8h13" stroke="currentColor" strokeWidth="1" opacity="0.4" />
+      <circle cx="8" cy="8" r="1.5" fill="currentColor" />
+    </svg>
+  );
+}
 
 function WatchIcon({ active }: { active: boolean }) {
   return (
