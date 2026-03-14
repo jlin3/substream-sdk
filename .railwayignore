@@ -7,6 +7,11 @@ docs/
 .specstory/
 .cursor/
 
+# Build artifacts
+IVSBackend/.next/
+**/.next/
+**/dist/
+
 # Standard ignores
 node_modules/
 .git/
