@@ -117,7 +117,6 @@ export default async function BrowsePage() {
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide">
             {highlights.map((h) => {
-              const game = extractGame(h.stream?.title || h.title);
               return (
                 <Link
                   key={h.id}
