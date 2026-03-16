@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { VideoPlayer } from '@/components/VideoPlayer';
 
 const IvsRealTimeViewer = dynamic(
   () => import('@/components/IvsRealTimeViewer'),
@@ -18,11 +19,11 @@ interface LiveStream {
 interface Recording {
   id: string; title: string | null; streamerName: string | null;
   streamerId: string; status: string; recordingUrl: string | null;
-  durationSecs: number | null; endedAt: string | null;
+  thumbnailUrl: string | null; durationSecs: number | null; endedAt: string | null;
 }
 interface HighlightItem {
   id: string; title: string; videoUrl: string | null;
-  duration: number | null; status: string;
+  thumbnailUrl: string | null; duration: number | null; status: string;
   streamTitle: string | null; streamerName: string | null; createdAt: string;
 }
 interface Comment { id: string; name: string; text: string; time: string; avatar: string; }
@@ -210,7 +211,7 @@ export function WatchPlayer({
                   </div>
                 )
               ) : nowPlaying.url ? (
-                <video key={nowPlaying.id} src={nowPlaying.url} controls autoPlay className="w-full aspect-video" />
+                <VideoPlayer key={nowPlaying.id} url={nowPlaying.url} autoPlay />
               ) : (
                 <div className="aspect-video flex items-center justify-center">
                   <p className="text-white/20 text-sm">No playable video available</p>
@@ -295,8 +296,12 @@ export function WatchPlayer({
               <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide">
                 {completedHighlights.map((h) => (
                   <button key={h.id} onClick={() => selectHighlight(h)} className={`shrink-0 w-44 rounded-lg overflow-hidden border transition-colors text-left ${nowPlaying?.id === h.id ? 'border-brand-500 bg-brand-600/10' : 'border-white/10 bg-surface-200 hover:border-white/20'}`}>
-                    <div className="aspect-video bg-surface-300 flex items-center justify-center relative">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white/10"><path d="M12 2l3 7.5h7.5l-6 5.25 2.25 7.5L12 17.25 5.25 22.25 7.5 14.75 1.5 9.5H9L12 2z" fill="currentColor" /></svg>
+                    <div className="aspect-video bg-surface-300 flex items-center justify-center relative overflow-hidden">
+                      {h.thumbnailUrl ? (
+                        <img src={h.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white/10"><path d="M12 2l3 7.5h7.5l-6 5.25 2.25 7.5L12 17.25 5.25 22.25 7.5 14.75 1.5 9.5H9L12 2z" fill="currentColor" /></svg>
+                      )}
                       {h.duration && <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[10px] px-1 py-0.5 rounded">{fmtDur(h.duration)}</span>}
                     </div>
                     <div className="p-2">
@@ -318,8 +323,12 @@ export function WatchPlayer({
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                 {recordings.map((r) => (
                   <button key={r.id} onClick={() => selectRecording(r)} className={`rounded-lg overflow-hidden border transition-colors text-left ${nowPlaying?.id === r.id ? 'border-brand-500 bg-brand-600/10' : 'border-white/10 bg-surface-200 hover:border-white/20'}`}>
-                    <div className="aspect-video bg-surface-300 flex items-center justify-center relative">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white/10"><rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" /><path d="M10 9l5 3-5 3V9z" fill="currentColor" /></svg>
+                    <div className="aspect-video bg-surface-300 flex items-center justify-center relative overflow-hidden">
+                      {r.thumbnailUrl ? (
+                        <img src={r.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white/10"><rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" /><path d="M10 9l5 3-5 3V9z" fill="currentColor" /></svg>
+                      )}
                       {r.durationSecs && <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[10px] px-1 py-0.5 rounded">{fmtDur(r.durationSecs)}</span>}
                     </div>
                     <div className="p-2">

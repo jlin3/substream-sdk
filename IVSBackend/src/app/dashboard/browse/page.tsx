@@ -123,10 +123,14 @@ export default async function BrowsePage() {
                   href={`/dashboard/highlights/${h.id}`}
                   className="shrink-0 w-56 rounded-xl overflow-hidden border border-white/10 bg-surface-100 hover:border-brand-500/50 hover:scale-[1.02] transition-all group"
                 >
-                  <div className="aspect-video bg-surface-300 flex items-center justify-center relative">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-white/8 group-hover:text-white/15 transition-colors">
-                      <path d="M12 2l3 7.5h7.5l-6 5.25 2.25 7.5L12 17.25 5.25 22.25 7.5 14.75 1.5 9.5H9L12 2z" fill="currentColor" />
-                    </svg>
+                  <div className="aspect-video bg-surface-300 flex items-center justify-center relative overflow-hidden">
+                    {h.thumbnailUrl ? (
+                      <img src={h.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-white/8 group-hover:text-white/15 transition-colors">
+                        <path d="M12 2l3 7.5h7.5l-6 5.25 2.25 7.5L12 17.25 5.25 22.25 7.5 14.75 1.5 9.5H9L12 2z" fill="currentColor" />
+                      </svg>
+                    )}
                     {h.duration && (
                       <span className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
                         {fmtDur(h.duration)}
@@ -200,11 +204,15 @@ export default async function BrowsePage() {
                   href={`/dashboard/streams/${s.id}`}
                   className="rounded-xl overflow-hidden border border-white/10 bg-surface-100 hover:border-white/25 hover:scale-[1.02] transition-all group"
                 >
-                  <div className="aspect-video bg-surface-300 flex items-center justify-center relative">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-white/8 group-hover:text-white/15 transition-colors">
-                      <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
-                      <path d="M10 9l5 3-5 3V9z" fill="currentColor" />
-                    </svg>
+                  <div className="aspect-video bg-surface-300 flex items-center justify-center relative overflow-hidden">
+                    {s.thumbnailUrl ? (
+                      <img src={s.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-white/8 group-hover:text-white/15 transition-colors">
+                        <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                        <path d="M10 9l5 3-5 3V9z" fill="currentColor" />
+                      </svg>
+                    )}
                     {s.durationSecs && (
                       <span className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
                         {fmtDur(s.durationSecs)}

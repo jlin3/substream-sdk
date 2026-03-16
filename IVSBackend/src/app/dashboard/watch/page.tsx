@@ -49,6 +49,7 @@ export default async function WatchPage() {
         id: h.id,
         title: h.title,
         videoUrl,
+        thumbnailUrl: h.thumbnailUrl,
         duration: h.duration,
         status: h.status,
         streamTitle: h.stream?.title || null,
@@ -75,6 +76,7 @@ export default async function WatchPage() {
     streamerId: r.streamerId,
     status: r.status,
     recordingUrl: r.recordingUrl,
+    thumbnailUrl: r.thumbnailUrl,
     durationSecs: r.durationSecs,
     endedAt: r.endedAt?.toISOString() || null,
   }));

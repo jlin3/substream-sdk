@@ -4,6 +4,7 @@ import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { StreamViewer } from './viewer';
 import { GenerateHighlightButton } from '../../vods/generate-button';
+import { VideoPlayer } from '@/components/VideoPlayer';
 
 export default async function StreamViewerPage({
   params,
@@ -45,14 +46,7 @@ export default async function StreamViewerPage({
         {stream.status === 'LIVE' && stream.ivsStageArn ? (
           <StreamViewer streamId={stream.id} />
         ) : stream.recordingUrl ? (
-          <div className="aspect-video bg-black flex items-center justify-center">
-            <video
-              src={stream.recordingUrl}
-              controls
-              className="w-full h-full"
-              poster={stream.thumbnailUrl || undefined}
-            />
-          </div>
+          <VideoPlayer url={stream.recordingUrl} poster={stream.thumbnailUrl || undefined} />
         ) : (
           <div className="aspect-video bg-surface-300 flex items-center justify-center">
             <div className="text-center space-y-3">

@@ -1,14 +1,7 @@
 'use client';
 
+import { VideoPlayer } from '@/components/VideoPlayer';
+
 export function HighlightVideo({ url }: { url: string }) {
-  return (
-    <div className="aspect-video bg-black">
-      <video
-        src={url}
-        controls
-        autoPlay
-        className="w-full h-full"
-      />
-    </div>
-  );
+  return <VideoPlayer url={url} autoPlay />;
 }
