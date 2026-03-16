@@ -10,9 +10,9 @@ export function VideoPlayer({ url, autoPlay, poster }: { url: string; autoPlay?:
   const ytId = parseYouTubeId(url);
   if (ytId) {
     return (
-      <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+      <div className="relative w-full bg-black" style={{ paddingBottom: '56.25%' }}>
         <iframe
-          src={`https://www.youtube.com/embed/${ytId}?autoplay=${autoPlay ? 1 : 0}&rel=0&modestbranding=1`}
+          src={`https://www.youtube.com/embed/${ytId}?rel=0&modestbranding=1${autoPlay ? '&autoplay=1&mute=1' : ''}`}
           title="Video player"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
