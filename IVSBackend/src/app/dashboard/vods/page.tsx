@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { GenerateHighlightButton } from './generate-button';
 
+export const dynamic = 'force-dynamic';
+
 export default async function VodsPage() {
   const session = await getSession();
   if (!session) redirect('/login');

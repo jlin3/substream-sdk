@@ -7,6 +7,8 @@ import { HighlightVideo } from './video';
 import { VideoPlayer } from '@/components/VideoPlayer';
 import { SegmentTimeline } from './timeline';
 
+export const dynamic = 'force-dynamic';
+
 interface PipelineStep {
   name: string;
   duration_sec: number;

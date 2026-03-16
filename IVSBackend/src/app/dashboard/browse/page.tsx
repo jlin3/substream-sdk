@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 
+export const dynamic = 'force-dynamic';
+
 const AVATARS: Record<string, string> = {
   'Spartan-117': '🎖️', 'xNova': '⚡', 'ShadowFox': '🦊',
   'PhantomAce': '🃏', 'BlockSmith': '🧱', 'ViperStrike': '🐍',

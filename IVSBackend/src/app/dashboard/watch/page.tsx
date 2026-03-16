@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import { WatchPlayer } from './player';
 
+export const dynamic = 'force-dynamic';
+
 export default async function WatchPage() {
   const session = await getSession();
   if (!session) redirect('/login');
