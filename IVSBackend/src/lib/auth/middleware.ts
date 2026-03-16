@@ -70,8 +70,8 @@ export async function authenticate(request: NextRequest): Promise<AuthContext | 
 
   const token = match[1];
 
-  // 1. Demo tokens (non-production only)
-  if (process.env.NODE_ENV !== 'production' && DEMO_TOKENS[token]) {
+  // 1. Demo tokens — allowed when DEMO_ORG_CODE is configured or in dev
+  if ((process.env.DEMO_ORG_CODE || process.env.NODE_ENV !== 'production') && DEMO_TOKENS[token]) {
     return DEMO_TOKENS[token];
   }
 
