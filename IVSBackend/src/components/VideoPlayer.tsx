@@ -10,13 +10,14 @@ export function VideoPlayer({ url, autoPlay, poster }: { url: string; autoPlay?:
   const ytId = parseYouTubeId(url);
   if (ytId) {
     return (
-      <div className="aspect-video bg-black">
+      <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
         <iframe
-          src={`https://www.youtube-nocookie.com/embed/${ytId}?autoplay=${autoPlay ? 1 : 0}&rel=0&modestbranding=1`}
+          src={`https://www.youtube.com/embed/${ytId}?autoplay=${autoPlay ? 1 : 0}&rel=0&modestbranding=1`}
+          title="Video player"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
-          className="w-full h-full border-0"
-        />
+          className="absolute inset-0 w-full h-full border-0"
+        ></iframe>
       </div>
     );
   }
