@@ -10,6 +10,8 @@ const NAV_ITEMS = [
   { href: '/dashboard/streams', label: 'Live Streams', icon: StreamIcon },
   { href: '/dashboard/vods', label: 'Recordings', icon: VodIcon },
   { href: '/dashboard/highlights', label: 'Highlights', icon: HighlightIcon },
+  { href: '/dashboard/billing', label: 'Usage & Billing', icon: BillingIcon },
+  { href: '/dashboard/keys', label: 'API Keys', icon: KeyIcon },
 ];
 
 export function DashboardShell({
@@ -35,7 +37,7 @@ export function DashboardShell({
       <aside className="w-56 shrink-0 border-r border-white/10 bg-surface-100 flex flex-col">
         <div className="px-4 py-5 border-b border-white/10">
           <Link href="/" className="text-lg font-bold tracking-tight">
-            <span className="text-brand-400">live</span>wave
+            <span className="text-brand-400">sub</span>stream
           </Link>
           <p className="text-xs text-white/40 mt-1 truncate">{orgName}</p>
         </div>
@@ -135,6 +137,25 @@ function HighlightIcon({ active }: { active: boolean }) {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? 'text-brand-400' : 'text-white/40'}>
       <path d="M8 1l2 5h5l-4 3.5 1.5 5L8 11.5 3.5 14.5 5 9.5 1 6h5l2-5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function BillingIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? 'text-brand-400' : 'text-white/40'}>
+      <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M1.5 6h13" stroke="currentColor" strokeWidth="1" opacity="0.4" />
+      <path d="M4.5 9h3M4.5 11h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function KeyIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? 'text-brand-400' : 'text-white/40'}>
+      <circle cx="5.5" cy="6.5" r="3" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M8 8.5l6 6M11.5 12l2 2M10 11l2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }

@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Livewave',
-  description: 'Live game streaming and highlights powered by Substream SDK',
+  title: 'Substream',
+  description: 'Live streaming SDK for games — stream any canvas with 5 lines of code',
   icons: { icon: '/favicon.ico' },
 };
 

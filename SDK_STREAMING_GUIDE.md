@@ -41,7 +41,7 @@ Want to test streaming immediately? Use our demo credentials:
 | **Viewer Token** | `demo-viewer-token` (for web viewer - watches the stream) |
 | **Demo Viewer** | Open `examples/web-viewer/index.html` in your browser |
 
-> **Note**: Demo credentials allow you to test streaming immediately. The streaming token is for the Unity child, the viewer token is for the parent watching. For production use, integrate with k-ID authentication.
+> **Note**: Demo credentials allow you to test streaming immediately. The streaming token is for the Unity child, the viewer token is for the parent watching. For production use, integrate with your own authentication system.
 
 ### Quick Test Steps (WebRTC Mode - Recommended)
 
@@ -219,9 +219,9 @@ By default, pressing `U` toggles streaming on/off. You can disable this by remov
 
 Once streaming starts, viewers can watch via:
 
-### Option A: k-ID Dashboard
+### Option A: Substream Dashboard
 
-1. Log into the k-ID parent dashboard
+1. Log into the Substream dashboard
 2. Navigate to **Live Streams**
 3. Click **Watch** on the active stream
 
@@ -341,7 +341,7 @@ If you see "stub" messages, the SDK is working but needs the native library for 
 
 ### Full Test (With Backend)
 
-1. Get test credentials from k-ID
+1. Get test credentials from Substream
 2. Configure `IVSStreamControl` with your credentials
 3. Press Play → Press `U`
 4. Open the web viewer to see your stream!
@@ -517,7 +517,7 @@ with the secret returned during registration.
 1. Check the [Troubleshooting](#troubleshooting) section
 2. Review Unity Console logs (filter by "[IVS]")
 3. For web game issues, check the Event Log panel in the demo
-4. Contact k-ID support with your `childId` and error messages
+4. Contact support with your `childId` and error messages
 
 ---
 

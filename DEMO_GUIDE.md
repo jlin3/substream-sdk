@@ -1,16 +1,39 @@
-# Livewave Demo Guide
+# Substream Demo Guide
 
 End-to-end demo of the Substream SDK streaming platform.
 
-## Demo Overview
+## Demo Flow
 
 The demo showcases three capabilities:
 
-1. **SDK Integration** -- A web game uses the Substream SDK to go live
-2. **Dashboard** -- livewave.ai shows live streams, recordings, and highlights for the org
-3. **AI Highlights** -- The highlight service generates a highlight reel from a recording
+1. **SDK Integration** — A web game uses the Substream SDK to go live
+2. **Dashboard** — Browse live streams, recordings, and AI highlights
+3. **AI Highlights** — Generate highlight reels from recordings automatically
 
-## Quick Start (Full E2E Demo)
+---
+
+## Option A: Hosted Demo (No Setup)
+
+Everything is deployed. Just open these links:
+
+1. **Landing page**: https://substream-sdk-production.up.railway.app
+2. **Interactive demo**: https://substream-sdk-production.up.railway.app/demo
+3. **Dashboard** (auto-login): https://substream-sdk-production.up.railway.app/api/auth/demo-auto
+
+### Walkthrough
+
+1. Open the **Landing page** — shows the value prop and code snippet
+2. Click **Try the Live Demo** — you'll see a Breakout game on a canvas
+3. Click **Start Streaming** — the game goes live via IVS WebRTC
+4. Click **Open Dashboard** in the top nav — auto-logs you into the dashboard
+5. Go to **Live Streams** — your stream appears with a LIVE badge
+6. Stop streaming, then navigate to **Recordings** — the VOD appears
+7. Click **Generate Highlight** on any recording
+8. Check **Highlights** — see completed AI highlight reels with pipeline visualization
+
+---
+
+## Option B: Local Development (Full E2E)
 
 ### Prerequisites
 
@@ -24,346 +47,81 @@ The demo showcases three capabilities:
 cd IVSBackend
 pnpm install
 pnpm db:generate
-pnpm db:push          # Push schema to database
-pnpm db:seed          # Seed demo org + sample data
-pnpm dev              # Start on localhost:3000
+pnpm db:push
+pnpm db:seed
+pnpm dev
 ```
 
-### Step 2: Start Streaming from the Game Demo
+### Step 2: Open the Demo
+
+Navigate to `http://localhost:3000`. The landing page loads with:
+- **Try the Live Demo** → `/demo` (interactive Breakout game)
+- **Explore the Dashboard** → `/api/auth/demo-auto` (auto-login, no credentials needed)
+
+### Step 3: Stream from the Standalone Game Demo (Optional)
 
 ```bash
 cd examples/web-game-demo
 python3 -m http.server 8080
 ```
 
-Open `http://localhost:8080`. The config should show:
-- **Backend**: `http://localhost:3000` (change from the Railway URL)
-- **Org ID**: `org-livewave-demo`
-- **Streamer Name**: anything you like
-- **Title**: anything you like
-
-Click **Start Streaming**. The game goes live via IVS Real-Time.
-
-### Step 3: Log into the Dashboard
-
-Open `http://localhost:3000/login`:
-- **Organization**: `livewave-demo`
-- **Demo Code**: `livewave123` (or whatever `DEMO_ORG_CODE` is set to in `.env`)
-
-You'll land on the dashboard showing the live stream.
-
-### Step 4: Watch the Live Stream
-
-Click **Live Streams** in the sidebar. You should see your stream with a "LIVE" badge.
-Click **Watch** to view it in real-time.
-
-### Step 5: End the Stream & See the Recording
-
-Go back to the game demo and click **Stop Streaming**.
-In the dashboard, navigate to **Recordings**. The stream should appear as a recording.
-
-### Step 6: Generate a Highlight
-
-On the recording card, click **Generate Highlight**.
-The highlight service will process the recording and generate a highlight reel.
-Check progress under **Highlights** in the sidebar.
+Open `http://localhost:8080`. Update the config to point at `http://localhost:3000`.
 
 ---
 
 ## Demo Levels
 
-| Demo Level | What It Shows | Requirements |
-|------------|---------------|--------------|
-| **Level 0: Web Game** | Canvas game streaming end-to-end | Browser only (no backend setup) |
-| **Level 1: API Only** | Backend works, API responses | Database only |
-| **Level 2: External Stream** | Full IVS pipeline | AWS credentials + OBS/FFmpeg |
-| **Level 3: Unity Integration** | Complete system | All above + native FFmpeg lib |
+| Level | What It Shows | Requirements |
+|-------|---------------|--------------|
+| **Level 0: Hosted** | Full demo via deployed URLs | Browser only |
+| **Level 1: Local** | Backend + dashboard + game demo | Database + Node |
+| **Level 2: Full IVS** | Live streaming with real IVS stages | AWS credentials |
+| **Level 3: Unity** | Complete system with Unity SDK | All above + Unity |
 
 ---
 
-## Level 0: Web Game Demo (Easiest -- No Setup)
+## Demo Credentials
 
-This demonstrates the full streaming pipeline using a browser-based canvas game.
-No backend setup, no Unity, no AWS credentials needed on your machine -- everything
-uses the live hosted backend.
+| Setting | Value |
+|---------|-------|
+| **API** | `https://substream-sdk-production.up.railway.app` |
+| **Child ID** | `demo-child-001` |
+| **Auth Token** | `demo-token` |
+| **Viewer Token** | `demo-viewer-token` |
+| **Dashboard** | Auto-login via `/api/auth/demo-auto` |
 
-### Step 1: Serve the Demo
-
-```bash
-cd examples/web-game-demo
-python3 -m http.server 8080
-```
-
-### Step 2: Open in Browser
-
-Navigate to `http://localhost:8080`. You should see:
-- A Breakout-style game rendering on a canvas
-- Preflight checks (all green if setup is correct)
-- An event log panel
-
-### Step 3: Start Streaming
-
-Click **Start Streaming**. The demo will:
-1. Request a publish token from the live backend
-2. Capture the canvas at 30fps via `canvas.captureStream()`
-3. Publish to an IVS Real-Time stage via WebRTC
-4. Display a **Viewer URL** that parents can open to watch
-
-### Step 4: Watch the Stream
-
-Open the displayed Viewer URL in a second browser tab (or send it to someone).
-They will see the game in real-time with sub-second latency.
-
-### What This Proves
-
-- The IVS backend is operational and allocating stages
-- Canvas capture and WebRTC publishing work end-to-end
-- The same approach works for any canvas-based game (Phaser, Three.js, Unity WebGL, etc.)
-
-### Troubleshooting
-
-| Symptom | Fix |
-|---------|-----|
-| Preflight check "Backend reachable" fails | Check network, VPN, or try `curl https://substream-sdk-production.up.railway.app/api/health` |
-| "IVS SDK not loaded" | Disable ad-blocker, check console for CDN errors |
-| Opened via `file://` | Must serve over HTTP -- use `python3 -m http.server` |
+For manual login: org slug `substream-demo`, code is the `DEMO_ORG_CODE` env var (default: `livewave123`).
 
 ---
 
-## Level 1: API Demo (No AWS Required)
+## What to Demo (Script)
 
-This demonstrates the backend API is functional.
+### For Technical Audiences
 
-### Step 1: Start Backend
+1. Show the landing page — code snippet demonstrates simplicity
+2. Open the live demo — play the game, start streaming, show the event log
+3. Open the dashboard — show live stream appearing in real-time
+4. Navigate recordings — show automatic cloud recording
+5. Generate a highlight — show the AI pipeline visualization
+6. Show the highlight detail — pipeline steps, segment scoring, source vs output
 
-```bash
-cd IVSBackend
-pnpm install
-pnpm db:generate
+### For Business Audiences
 
-# Set up database (local PostgreSQL or Supabase)
-# Edit .env with DATABASE_URL
-
-pnpm db:migrate
-pnpm dev
-```
-
-### Step 2: Seed Test Data
-
-```bash
-npx tsx scripts/seed-test-data.ts
-```
-
-### Step 3: Test Health Endpoint
-
-```bash
-curl http://localhost:3000/api/health
-```
-
-Expected:
-```json
-{
-  "status": "ok",
-  "features": {
-    "database": true,
-    "awsIvs": false,
-    ...
-  }
-}
-```
-
-### Step 4: Test Ingest Endpoint (Will Fail Without AWS)
-
-```bash
-curl -X POST http://localhost:3000/api/streams/children/test-child-id/ingest \
-  -H "Authorization: Bearer test-user-id" \
-  -H "Content-Type: application/json"
-```
-
-This will return an error about missing AWS credentials - **that's expected!** It proves the API routing and auth work.
+1. Landing page — "5 lines of code to add streaming to any game"
+2. Dashboard overview — stats, streams, recordings, highlights at a glance
+3. Browse tab — Twitch-style content discovery feed
+4. Highlights — AI-generated content that drives engagement
+5. Usage/billing tab — stream hours, viewer counts, estimated revenue
 
 ---
 
-## Level 2: Full IVS Pipeline Demo (With AWS)
+## Sample Data
 
-### Prerequisites
-- AWS account with IVS access
-- S3 bucket for recordings
-- IVS recording configuration
-- IVS playback key pair
+The seed script creates:
 
-### Step 1: Configure AWS Credentials
+- **10 streams** with YouTube gaming content (Halo, Fortnite, Rocket League, Valorant, Apex, Minecraft)
+- **6 highlights** with real AI pipeline data (segment scoring, processing steps)
+- **Demo users** for streaming and viewing
+- **Demo organization** (`substream-demo`)
 
-Edit `IVSBackend/.env`:
-```bash
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=your-key
-AWS_SECRET_ACCESS_KEY=your-secret
-IVS_RECORDING_CONFIG_ARN=arn:aws:ivs:...
-IVS_PLAYBACK_KEY_PAIR_ID=arn:aws:ivs:...
-IVS_PLAYBACK_PRIVATE_KEY="-----BEGIN EC PRIVATE KEY-----\n..."
-```
-
-### Step 2: Get Ingest Credentials
-
-```bash
-curl -X POST http://localhost:3000/api/streams/children/test-child-id/ingest \
-  -H "Authorization: Bearer test-user-id" \
-  -H "Content-Type: application/json"
-```
-
-Response:
-```json
-{
-  "channelArn": "arn:aws:ivs:us-east-1:...",
-  "ingest": {
-    "protocol": "rtmps",
-    "endpoint": "rtmps://xxx.global-contribute.live-video.net:443/app/",
-    "streamKey": "sk_us-east-1_..."
-  },
-  "recommendedEncoderConfig": {...}
-}
-```
-
-### Step 3: Create Session
-
-```bash
-curl -X POST http://localhost:3000/api/streams/children/test-child-id/sessions \
-  -H "Authorization: Bearer test-user-id" \
-  -H "Content-Type: application/json"
-```
-
-### Step 4: Stream with OBS or FFmpeg
-
-**OBS:**
-1. Settings → Stream
-2. Service: Custom
-3. Server: `rtmps://xxx.global-contribute.live-video.net:443/app/`
-4. Stream Key: `sk_us-east-1_...` (from step 2)
-5. Start Streaming
-
-**FFmpeg:**
-```bash
-ENDPOINT="rtmps://xxx.global-contribute.live-video.net:443/app/"
-KEY="sk_us-east-1_..."
-
-ffmpeg -f lavfi -i testsrc=size=1280x720:rate=30 \
-       -f lavfi -i sine=frequency=1000:sample_rate=44100 \
-       -c:v libx264 -preset veryfast -b:v 3500k \
-       -g 60 -keyint_min 60 \
-       -c:a aac -b:a 128k \
-       -f flv "${ENDPOINT}${KEY}"
-```
-
-### Step 5: Get Playback URL
-
-```bash
-curl http://localhost:3000/api/streams/children/test-child-id/playback \
-  -H "Authorization: Bearer test-parent-user-id"
-```
-
-### Step 6: Watch Stream
-
-Use the returned `playback.url` and `playback.token` with an IVS player:
-
-```html
-<script src="https://player.live-video.net/1.12.0/amazon-ivs-player.min.js"></script>
-<video id="video-player" playsinline controls></video>
-<script>
-  const player = IVSPlayer.create();
-  player.attachHTMLVideoElement(document.getElementById('video-player'));
-  player.load('PLAYBACK_URL?token=TOKEN');
-  player.play();
-</script>
-```
-
-### Step 7: End Session
-
-```bash
-curl -X DELETE http://localhost:3000/api/streams/sessions/SESSION_ID \
-  -H "Authorization: Bearer test-user-id"
-```
-
----
-
-## Level 3: Unity Integration Demo
-
-### Prerequisites
-- All Level 2 prerequisites
-- Unity 2023+
-- (Optional) Native FFmpeg library built
-
-### Step 1: Open Unity Project
-
-```
-Open: UnityProject/
-```
-
-### Step 2: Configure IVSStreamControl
-
-1. Find/add GameObject with `IVSStreamControl`
-2. In Inspector:
-   - **Backend URL**: `http://localhost:3000`
-   - **Child ID**: `test-child-id`
-   - **Auth Token**: `test-user-id`
-
-### Step 3: Run
-
-1. Press Play in Unity
-2. Press `U` key to start streaming
-3. Check Console for:
-
-**With Stub (no native library):**
-```
-[IVS] Got ingest config: arn:aws:ivs:...
-[RTMP STUB] Would connect to: rtmps://xxx.../app/sk_...
-[IVS] Status: LIVE (stub mode)
-```
-
-**With Native Library:**
-```
-[IVS] Got ingest config: arn:aws:ivs:...
-[IVS] RTMP connected
-[IVS] Streaming at 1280x720@30fps
-```
-
----
-
-## Quick Demo Script
-
-For a quick demo without setup, run this in the browser console on the backend home page:
-
-```javascript
-// Demo API calls (backend must be running)
-const BASE = 'http://localhost:3000';
-
-// 1. Health check
-fetch(`${BASE}/api/health`).then(r => r.json()).then(console.log);
-
-// 2. Attempt ingest (will show AWS not configured)
-fetch(`${BASE}/api/streams/children/test-child-id/ingest`, {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer test-user-id',
-    'Content-Type': 'application/json'
-  }
-}).then(r => r.json()).then(console.log);
-```
-
----
-
-## What to Tell Stakeholders
-
-### "Does IVS work?"
-
-> "Yes, the IVS streaming backend is fully implemented. API routes for ingest credentials, session management, playback authorization, and VOD listing are all functional. To demo actual streaming, we need AWS IVS credentials configured. The Unity integration is ready and falls back to a stub when the native FFmpeg library isn't available."
-
-### "When should we use IVS vs WebRTC?"
-
-> "Use IVS when automatic recording and reliability matter more than latency (2-5 second delay). Use WebRTC when you need sub-second latency for real-time interaction. Both are available in different branches."
-
-### "What's left to do?"
-
-> 1. Configure AWS credentials (Jesse has these)
-> 2. Build native FFmpeg library for production (optional - can demo with OBS)
-> 3. Integration testing with real Unity builds
+All streams have thumbnails and recording URLs pointing to real YouTube gaming videos for a polished demo experience.

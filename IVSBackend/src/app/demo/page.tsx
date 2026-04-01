@@ -175,7 +175,7 @@ export default function DemoPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer demo-token' },
         body: JSON.stringify({
-          childId: 'demo-child-001', orgId: 'org-livewave-demo',
+          childId: 'demo-child-001', orgId: 'org-substream-demo',
           streamerName: 'Demo Player', title: 'Live Breakout Session',
         }),
       });
@@ -242,9 +242,9 @@ export default function DemoPage() {
       {/* Nav */}
       <nav className="flex items-center justify-between px-6 py-4 border-b border-white/10">
         <Link href="/" className="text-lg font-bold tracking-tight">
-          <span className="text-brand-400">live</span>wave
+          <span className="text-brand-400">sub</span>stream
         </Link>
-        <Link href="/login" className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium hover:bg-brand-500 transition-colors">
+        <Link href="/api/auth/demo-auto" className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium hover:bg-brand-500 transition-colors">
           Open Dashboard
         </Link>
       </nav>

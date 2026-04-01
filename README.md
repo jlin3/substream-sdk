@@ -1,137 +1,75 @@
-# Substream SDK - Production VR Streaming
+# Substream SDK
 
-**Production-ready Unity streaming for VR applications** with automatic recording, notifications, and enterprise-grade infrastructure.
+**Add live streaming to any game with 5 lines of code.**
 
-Stream high-quality VR gameplay (1080p @ 30fps) from Quest headsets to web browsers.
-
----
-
-## Who Is This For?
-
-### Game Developers (SDK Users)
-
-**Want to add streaming to your Unity game?** You're in the right place!
-
-```
-You integrate the SDK → Your users stream → Parents watch on web
-```
-
-**Start here:** [SDK_STREAMING_GUIDE.md](SDK_STREAMING_GUIDE.md)
-
-You do NOT need to:
-- Set up any backend servers
-- Configure AWS or databases
-- Run the `IVSBackend/` or `WebappBackend/` code
-
-Just import the SDK, configure your API credentials, and start streaming!
+Stream gameplay from web canvas or Unity games via WebRTC with sub-second latency. Automatic cloud recording, AI-generated highlights, and a full analytics dashboard.
 
 ---
 
-### Service Operators (k-ID/Bezi)
+## Live Demo
 
-**Hosting the streaming infrastructure?** See the backend setup guides.
+Try it right now — no setup required:
 
-| Backend | Guide | Description |
-|---------|-------|-------------|
-| **IVS** (Recommended) | [IVS_BACKEND_SETUP.md](IVS_BACKEND_SETUP.md) | AWS IVS + automatic recording |
-| **WebRTC** | [DEVELOPER_SETUP.md](DEVELOPER_SETUP.md) | WebRTC signaling server |
-
-The `IVSBackend/` and `WebappBackend/` directories contain server code that SDK users do NOT run.
-
----
-
-## Try It Now (Demo)
-
-Test streaming immediately with our live demo:
-
-| Setting | Value |
-|---------|-------|
-| **Live API** | `https://substream-sdk-production.up.railway.app` |
-| **Child ID** | `demo-child-001` |
-| **Auth Token** | `demo-token` |
-
-**[Full Demo Guide →](SDK_STREAMING_GUIDE.md#quick-demo-try-it-now)**
+| | |
+|---|---|
+| **Landing Page** | [substream-sdk-production.up.railway.app](https://substream-sdk-production.up.railway.app) |
+| **Interactive Demo** | [/demo](https://substream-sdk-production.up.railway.app/demo) — play Breakout and stream it live |
+| **Dashboard** | [/api/auth/demo-auto](https://substream-sdk-production.up.railway.app/api/auth/demo-auto) — auto-login to explore streams, recordings, and AI highlights |
 
 ---
 
-## Quick Start: Web Games (HTML5 Canvas)
+## Quick Start: Web Games
 
-Add two script tags to your page and call one function. No npm, no build step.
+```js
+import Substream from '@substream/web-sdk';
 
-```html
-<script src="https://web-broadcast.live-video.net/1.32.0/amazon-ivs-web-broadcast.js"></script>
-<script src="substream.js"></script>
-<script>
-  const session = await Substream.startStream({
-    canvas: document.getElementById('game-canvas'),
-    backendUrl: 'https://substream-sdk-production.up.railway.app',
-    childId: 'demo-child-001',
-    authToken: 'demo-token',
-  });
-  console.log('Viewer URL:', session.viewerUrl);
-</script>
+const session = await Substream.startStream({
+  canvasElement: document.querySelector('canvas'),
+  backendUrl: 'https://your-api.com',
+  authToken: 'your-token',
+});
+
+console.log('Live! Viewer URL:', session.viewerUrl);
 ```
 
-Copy `substream.js` from [examples/web-game-demo/](examples/web-game-demo/).
-Works with Phaser, Three.js, PixiJS, Unity WebGL, Cocos, Construct, and any `<canvas>` game.
+Works with **Phaser, Three.js, PixiJS, Unity WebGL, Cocos, Construct**, and any `<canvas>` game.
 
-**Full guide with complete integration examples:** [examples/web-game-demo/README.md](examples/web-game-demo/README.md)
+For a zero-build-step version using script tags, see [examples/web-game-demo/](examples/web-game-demo/).
 
 ---
 
-## Quick Start: Unity Native
+## Quick Start: Unity
 
-### 1. Import the SDK
-
-Copy to your Unity project:
+1. Copy SDK scripts to your project:
 ```
 UnityProject/Assets/Scripts/  →  YourProject/Assets/Scripts/
-UnityProject/Plugins/         →  YourProject/Plugins/
 ```
 
-### 2. Add Streaming Component
-
-1. Add `IVSStreamControl` component to a GameObject
-2. Configure:
-   - **Backend URL**: Your k-ID API endpoint
-   - **Child ID**: User ID from your auth system
+2. Add `IVSRealTimeStreamControl` to a GameObject and configure:
+   - **Backend URL**: Your Substream API endpoint
+   - **Streamer ID**: User ID from your auth system
    - **Auth Token**: Auth token from your auth system
 
-### 3. Start Streaming
-
+3. Start streaming:
 ```csharp
-// Start streaming
-streamControl.StartStreaming();
-
-// Stop streaming
-streamControl.StopStreaming();
-
-// Or use keyboard shortcut: Press 'U' to toggle
+streamControl.StartStreaming();  // or press 'U' to toggle
 ```
 
-### 4. Watch the Stream
-
-Open the web viewer: `examples/web-viewer/index.html`
-
-**Full Unity guide:** [SDK_STREAMING_GUIDE.md](SDK_STREAMING_GUIDE.md)
+Full guide: [SDK_STREAMING_GUIDE.md](SDK_STREAMING_GUIDE.md)
 
 ---
 
-## Streaming Approaches
+## What You Get
 
-This SDK supports **two streaming approaches**:
-
-| Feature | IVS (Recommended) | WebRTC |
-|---------|-------------------|--------|
-| **Latency** | 2-5 seconds | < 500ms |
-| **Recording** | Automatic to S3 | Client-side |
-| **Scaling** | AWS-managed | Self-managed TURN |
-| **Cost** | Pay-per-use | TURN servers expensive |
-| **Best For** | VOD, reliability | Real-time interaction |
-
-**Choose IVS** if you need automatic recording and enterprise reliability.
-
-**Choose WebRTC** if you need sub-second latency for interactive features.
+| Feature | Description |
+|---------|-------------|
+| **Canvas Streaming** | Capture any HTML5 canvas or Unity game and stream via WebRTC |
+| **Sub-Second Latency** | IVS Real-Time stages deliver < 500ms glass-to-glass |
+| **Cloud Recording** | Every stream automatically recorded to S3 |
+| **AI Highlights** | Analyze recordings and generate highlight reels with best moments |
+| **Dashboard** | Browse streams, watch live, view recordings, manage highlights |
+| **Webhooks** | Get notified on stream.started, stream.stopped, viewer.joined events |
+| **Multi-Platform** | Web canvas, Unity (Windows, macOS, Quest), and more |
 
 ---
 
@@ -139,135 +77,65 @@ This SDK supports **two streaming approaches**:
 
 ```
 substream-sdk/
-├── SDK_STREAMING_GUIDE.md    # ← START HERE (Game Developers)
+├── packages/web-sdk/           # @substream/web-sdk — TypeScript SDK
 ├── examples/
-│   ├── web-viewer/           # Stream viewer page (parents)
-│   └── web-game-demo/        # HTML5 canvas game streaming demo
-│
-├── packages/
-│   └── web-sdk/              # TypeScript SDK for web game streaming
-│
-├── UnityProject/             # Unity SDK components
-│   ├── Assets/Scripts/
-│   │   ├── IVSStreamControl.cs    # IVS streaming (recommended)
-│   │   └── RenderStreamControl.cs # WebRTC streaming
-│   └── Plugins/              # Native libraries
-│
-├── IVSBackend/               # [OPERATORS ONLY] IVS backend server
-│   ├── src/app/api/streams/  # API routes (incl. web-publish, webhooks)
-│   ├── src/lib/streaming/    # IVS service layer
-│   └── prisma/               # Database schema
-│
-├── WebappBackend/            # [OPERATORS ONLY] WebRTC backend server
-│   ├── src/                  # Server code
-│   ├── client/               # Web receiver
-│   └── database/             # SQL schema
-│
-└── docs/                     # Additional documentation
+│   ├── web-game-demo/          # Standalone web game streaming demo
+│   └── web-viewer/             # Stream viewer page
+├── UnityProject/               # Unity SDK components
+│   └── Assets/Scripts/         # IVSRealTimeStreamControl, WhipStreamControl, etc.
+├── IVSBackend/                 # Next.js API server + dashboard
+│   ├── src/app/api/            # Streaming, auth, webhook APIs
+│   ├── src/app/dashboard/      # Analytics dashboard
+│   └── prisma/                 # Database schema
+├── highlight-service/          # AI highlight generation (Python/FastAPI)
+└── SDK_STREAMING_GUIDE.md      # Full integration guide
 ```
 
 ---
 
-## Documentation
+## For SDK Users (Game Developers)
 
-### For Game Developers
+You do **not** need to run any backend code. Just integrate the SDK and point it at a hosted Substream API.
 
-| Guide | Description |
-|-------|-------------|
-| **[SDK_STREAMING_GUIDE.md](SDK_STREAMING_GUIDE.md)** | Complete SDK integration guide |
-| **[examples/web-viewer/](examples/web-viewer/)** | Ready-to-use stream viewer |
+- [SDK_STREAMING_GUIDE.md](SDK_STREAMING_GUIDE.md) — Complete integration guide
+- [examples/web-game-demo/](examples/web-game-demo/) — Working web demo with source
+- [examples/web-viewer/](examples/web-viewer/) — Viewer page for watching streams
 
-### For Service Operators
+## For Operators (Hosting the Infrastructure)
 
-| Guide | Description |
-|-------|-------------|
-| **[IVS_BACKEND_SETUP.md](IVS_BACKEND_SETUP.md)** | AWS IVS backend setup |
-| **[IVS_MIGRATION.md](IVS_MIGRATION.md)** | Migrating from WebRTC to IVS |
-| **[DEVELOPER_SETUP.md](DEVELOPER_SETUP.md)** | WebRTC backend setup |
-| **[docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md)** | Production deployment |
+- [IVS_BACKEND_SETUP.md](IVS_BACKEND_SETUP.md) — Deploy the IVS backend
+- [DEMO_GUIDE.md](DEMO_GUIDE.md) — Run the full demo end-to-end
 
 ---
 
-## Features
+## Demo Credentials
 
-- **High-Quality Streaming** - 1080p @ 30fps with adaptive bitrate
-- **Automatic Recording** - Streams recorded to S3 (IVS) or client-side (WebRTC)
-- **Parent Notifications** - Email alerts when streaming starts/ends
-- **Multi-Viewer** - Concurrent viewers per stream
-- **Secure** - JWT authentication for all connections
-- **Quest VR Ready** - Optimized for Meta Quest headsets
+For quick testing against the hosted API:
 
----
-
-## Architecture
-
-```
-┌─────────────────┐                      ┌─────────────────┐
-│   Unity Game    │    ← SDK Users       │  Web Viewer     │
-│  (Your App)     │    integrate this    │  (Parents)      │
-└────────┬────────┘                      └────────┬────────┘
-         │                                        │
-         │ RTMPS                           HLS    │
-         │                                        │
-         v                                        v
-┌─────────────────────────────────────────────────────────┐
-│                   k-ID Hosted Service                   │
-│                                                         │
-│   ┌─────────────┐    ┌─────────────┐    ┌───────────┐  │
-│   │  API Server │    │  AWS IVS    │    │    S3     │  │
-│   │  (Backend)  │───>│  (Stream)   │───>│  (VODs)   │  │
-│   └─────────────┘    └─────────────┘    └───────────┘  │
-│                                                         │
-│   ← Service Operators manage this                       │
-└─────────────────────────────────────────────────────────┘
-```
+| Setting | Value |
+|---------|-------|
+| **API** | `https://substream-sdk-production.up.railway.app` |
+| **Child ID** | `demo-child-001` |
+| **Auth Token** | `demo-token` |
+| **Viewer Token** | `demo-viewer-token` |
 
 ---
 
 ## Platform Support
 
-### Unity Native (IVSStreamControl / IVSRealTimeStreamControl)
-
-| Platform | Status | Notes |
-|----------|--------|-------|
-| Windows (Editor) | ✅ | Full streaming |
-| macOS (Editor) | ✅ | Full streaming |
-| Quest 2/3/Pro | ✅ | Android ARM64 |
-| iOS | 🔄 | Coming soon |
-| Unity WebGL | ❌ | No native plugins (use Web SDK below) |
-
-### Web Games (canvas.captureStream + IVS Web Broadcast SDK)
-
-| Platform | Status | Notes |
-|----------|--------|-------|
-| HTML5 Canvas games | ✅ | Phaser, Three.js, PixiJS, Cocos, Construct |
-| Unity WebGL builds | ✅ | Canvas streaming via Web SDK |
-| Any `<canvas>` app | ✅ | Works with any engine that renders to canvas |
-
-See [examples/web-game-demo/](examples/web-game-demo/) for a working demo.
+| Platform | SDK | Status |
+|----------|-----|--------|
+| Web (any canvas) | `@substream/web-sdk` | Production |
+| Unity Windows/macOS | `IVSRealTimeStreamControl` | Production |
+| Unity Quest 2/3/Pro | `IVSRealTimeStreamControl` | Production |
+| Unity WebGL | `@substream/web-sdk` | Production |
+| Unity iOS | Coming soon | In progress |
 
 ---
 
-## Getting Help
+## Built With
 
-1. **Game Developers**: Check [SDK_STREAMING_GUIDE.md](SDK_STREAMING_GUIDE.md)
-2. **Service Operators**: Check [IVS_BACKEND_SETUP.md](IVS_BACKEND_SETUP.md)
-3. Review Unity Console logs (filter by `[IVS]`)
-4. Contact k-ID support
-
----
-
-## License
-
-[Your License Here]
-
----
-
-## Credits
-
-Built with:
-- Unity Render Streaming
-- AWS IVS
-- Next.js / Express
-- Prisma / Supabase
-- FFmpeg
+- [Amazon IVS](https://aws.amazon.com/ivs/) — Real-time streaming infrastructure
+- [Next.js](https://nextjs.org) — API server and dashboard
+- [Prisma](https://prisma.io) — Database ORM
+- [Google Cloud Video Intelligence](https://cloud.google.com/video-intelligence) — Highlight analysis
