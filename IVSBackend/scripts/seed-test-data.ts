@@ -166,17 +166,17 @@ async function seed() {
   console.log('✅ Linked test parent to test child\n');
 
   // =========================================================================
-  // ORGANIZATION DATA - For livewave.ai demo
+  // ORGANIZATION DATA
   // =========================================================================
   console.log('🏢 Creating demo organization...\n');
 
   const demoOrg = await prisma.organization.upsert({
-    where: { slug: 'livewave-demo' },
-    update: {},
+    where: { slug: 'substream-demo' },
+    update: { name: 'Substream Demo' },
     create: {
-      id: 'org-livewave-demo',
-      name: 'Livewave Demo',
-      slug: 'livewave-demo',
+      id: 'org-substream-demo',
+      name: 'Substream Demo',
+      slug: 'substream-demo',
     },
   });
   console.log('✅ Demo organization:', demoOrg.slug);
@@ -360,11 +360,11 @@ async function seed() {
   console.log('');
   console.log('═══════════════════════════════════════════════════════════════');
   console.log('');
-  console.log('  🏢 LIVEWAVE DEMO ORG');
+  console.log('  🏢 SUBSTREAM DEMO ORG');
   console.log('');
-  console.log('    Org Slug:    livewave-demo');
+  console.log('    Org Slug:    substream-demo');
   console.log('    Demo Code:   Set DEMO_ORG_CODE in .env');
-  console.log('    Login at:    https://livewave.ai/login');
+  console.log('    Login at:    /login or /api/auth/demo-auto');
   console.log('');
   console.log('═══════════════════════════════════════════════════════════════');
   console.log('');

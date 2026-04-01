@@ -20,14 +20,14 @@ export async function createSessionToken(payload: SessionPayload): Promise<strin
     .setProtectedHeader({ alg: ALG })
     .setIssuedAt()
     .setExpirationTime('7d')
-    .setIssuer('livewave')
+    .setIssuer('substream')
     .sign(getSessionSecret());
 }
 
 export async function verifySessionToken(token: string): Promise<SessionPayload | null> {
   try {
     const { payload } = await jose.jwtVerify(token, getSessionSecret(), {
-      issuer: 'livewave',
+      issuer: 'substream',
     });
     return payload as unknown as SessionPayload;
   } catch {

@@ -1,6 +1,6 @@
 # IVS Backend Setup Guide
 
-> **⚠️ FOR SERVICE OPERATORS ONLY (k-ID/Bezi)**
+> **⚠️ FOR SERVICE OPERATORS ONLY**
 >
 > This guide is for operators who need to set up and host the IVS streaming infrastructure.
 >
