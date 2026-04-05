@@ -1,5 +1,11 @@
-# Ignore WebappBackend - we're only deploying IVSBackend
-WebappBackend/
+# Only deploying IVSBackend
+_archive/
+docs-site/
+UnityProject/
+examples/
+packages/
+.specstory/
+.cursor/
 
 # Standard ignores
 node_modules/
