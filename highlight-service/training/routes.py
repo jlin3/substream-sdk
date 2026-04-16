@@ -73,7 +73,10 @@ async def upload_training_example(
     ext = ext[:10].replace("/", "").replace("\\", "").replace("..", "")
     filename = f"{example_id}.{ext}"
 
+    max_upload_bytes = 500 * 1024 * 1024  # 500 MB
     contents = await file.read()
+    if len(contents) > max_upload_bytes:
+        raise HTTPException(status_code=413, detail=f"File too large ({len(contents)} bytes). Max is {max_upload_bytes} bytes.")
 
     from services.gcs_client import _get_client
     client = _get_client()

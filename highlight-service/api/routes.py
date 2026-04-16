@@ -270,7 +270,8 @@ async def _run_job(
         logger.info("Job %s completed successfully", job_id)
 
         if callback_url:
-            await _send_webhook(callback_url, job_id, "completed", result)
+            ok = await _send_webhook(callback_url, job_id, "completed", result)
+            store.update(job_id, {"webhook_delivered": ok})
 
     except Exception as exc:
         logger.exception("Job %s failed", job_id)
@@ -280,11 +281,12 @@ async def _run_job(
         })
 
         if callback_url:
-            await _send_webhook(callback_url, job_id, "failed", {"error": str(exc)})
+            ok = await _send_webhook(callback_url, job_id, "failed", {"error": str(exc)})
+            store.update(job_id, {"webhook_delivered": ok})
 
 
-async def _send_webhook(callback_url: str, job_id: str, status: str, data: dict):
-    """POST job results to the callback URL."""
+async def _send_webhook(callback_url: str, job_id: str, status: str, data: dict) -> bool:
+    """POST job results to the callback URL. Returns True if delivered successfully."""
     import config as cfg
 
     payload = {
@@ -297,5 +299,7 @@ async def _send_webhook(callback_url: str, job_id: str, status: str, data: dict)
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(callback_url, json=payload)
             logger.info("Webhook sent to %s: status=%d", callback_url, response.status_code)
+            return 200 <= response.status_code < 300
     except Exception:
         logger.warning("Webhook delivery failed for %s", callback_url, exc_info=True)
+        return False
