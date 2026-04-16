@@ -78,7 +78,7 @@ jobs:
           DIFF=$(cat /tmp/pr_trimmed.diff)
           PROMPT=$(cat /tmp/prompt.txt)
 
-          PAYLOAD=$(jq -n \
+          jq -n \
             --arg model "claude-sonnet-4-20250514" \
             --arg system "$PROMPT" \
             --arg diff "$DIFF" \
@@ -92,13 +92,13 @@ jobs:
                 role: "user",
                 content: ("PR Title: " + $title + "\n\nPR Description:\n" + $body + "\n\nDiff:\n```diff\n" + $diff + "\n```")
               }]
-            }')
+            }' > /tmp/payload.json
 
           RESPONSE=$(curl -s -w "\n%{http_code}" https://api.anthropic.com/v1/messages \
             -H "x-api-key: $ANTHROPIC_API_KEY" \
             -H "anthropic-version: 2023-06-01" \
             -H "content-type: application/json" \
-            -d "$PAYLOAD")
+            -d @/tmp/payload.json)
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | sed '$d')
