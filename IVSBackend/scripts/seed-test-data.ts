@@ -1,174 +1,20 @@
 /**
  * Seed test data for demo purposes
- * 
- * Creates two sets of credentials:
- * 1. Demo credentials (for SDK users to test immediately)
- * 2. Test credentials (for internal testing)
- * 
+ *
+ * Creates demo organization, sample streams, and highlights.
+ *
  * Run: pnpm db:seed
  */
 
 import { prisma } from '../src/lib/prisma';
 
 async function seed() {
-  console.log('🌱 Seeding database...\n');
+  console.log('Seeding database...\n');
 
   // =========================================================================
-  // DEMO CREDENTIALS - For SDK users to test immediately
+  // ORGANIZATION
   // =========================================================================
-  console.log('📦 Creating demo credentials for SDK users...\n');
-
-  // Demo child user (the streamer)
-  const demoChildUser = await prisma.user.upsert({
-    where: { email: 'demo@substream.dev' },
-    update: {},
-    create: {
-      id: 'demo-user-001',
-      email: 'demo@substream.dev',
-      role: 'CHILD',
-      displayName: 'Demo Streamer',
-      kidVerified: true,
-    },
-  });
-  console.log('✅ Demo child user:', demoChildUser.id);
-
-  // Demo child profile
-  const demoChildProfile = await prisma.childProfile.upsert({
-    where: { userId: demoChildUser.id },
-    update: {},
-    create: {
-      id: 'demo-child-001',
-      userId: demoChildUser.id,
-      streamingEnabled: true,
-      maxStreamDuration: 60, // 1 hour max for demo
-    },
-  });
-  console.log('✅ Demo child profile:', demoChildProfile.id);
-
-  // Demo parent user (the viewer)
-  const demoParentUser = await prisma.user.upsert({
-    where: { email: 'demo-viewer@substream.dev' },
-    update: {},
-    create: {
-      id: 'demo-viewer-001',
-      email: 'demo-viewer@substream.dev',
-      role: 'PARENT',
-      displayName: 'Demo Viewer',
-    },
-  });
-  console.log('✅ Demo parent user:', demoParentUser.id);
-
-  // Demo parent profile
-  const demoParentProfile = await prisma.parentProfile.upsert({
-    where: { userId: demoParentUser.id },
-    update: {},
-    create: {
-      id: 'demo-parent-001',
-      userId: demoParentUser.id,
-      notificationsEnabled: false,
-    },
-  });
-  console.log('✅ Demo parent profile:', demoParentProfile.id);
-
-  // Link demo parent to demo child
-  await prisma.parentChildRelation.upsert({
-    where: {
-      parentId_childId: {
-        parentId: demoParentProfile.id,
-        childId: demoChildProfile.id,
-      },
-    },
-    update: {},
-    create: {
-      id: 'demo-relation-001',
-      parentId: demoParentProfile.id,
-      childId: demoChildProfile.id,
-      canWatch: true,
-      canViewVods: true,
-    },
-  });
-  console.log('✅ Linked demo parent to demo child\n');
-
-  // =========================================================================
-  // TEST CREDENTIALS - For internal testing
-  // =========================================================================
-  console.log('🧪 Creating test credentials for internal use...\n');
-
-  // Test child user
-  const testChildUser = await prisma.user.upsert({
-    where: { email: 'test-child@example.com' },
-    update: {},
-    create: {
-      id: 'test-user-id',
-      email: 'test-child@example.com',
-      role: 'CHILD',
-      displayName: 'Test Child',
-      kidVerified: true,
-    },
-  });
-  console.log('✅ Test child user:', testChildUser.id);
-
-  // Test child profile
-  const testChildProfile = await prisma.childProfile.upsert({
-    where: { userId: testChildUser.id },
-    update: {},
-    create: {
-      id: 'test-child-id',
-      userId: testChildUser.id,
-      streamingEnabled: true,
-      maxStreamDuration: 120,
-    },
-  });
-  console.log('✅ Test child profile:', testChildProfile.id);
-
-  // Test parent user
-  const testParentUser = await prisma.user.upsert({
-    where: { email: 'test-parent@example.com' },
-    update: {},
-    create: {
-      id: 'test-parent-user-id',
-      email: 'test-parent@example.com',
-      role: 'PARENT',
-      displayName: 'Test Parent',
-    },
-  });
-  console.log('✅ Test parent user:', testParentUser.id);
-
-  // Test parent profile
-  const testParentProfile = await prisma.parentProfile.upsert({
-    where: { userId: testParentUser.id },
-    update: {},
-    create: {
-      id: 'test-parent-id',
-      userId: testParentUser.id,
-      notificationsEnabled: true,
-    },
-  });
-  console.log('✅ Test parent profile:', testParentProfile.id);
-
-  // Link test parent to test child
-  await prisma.parentChildRelation.upsert({
-    where: {
-      parentId_childId: {
-        parentId: testParentProfile.id,
-        childId: testChildProfile.id,
-      },
-    },
-    update: {},
-    create: {
-      id: 'test-relation-id',
-      parentId: testParentProfile.id,
-      childId: testChildProfile.id,
-      canWatch: true,
-      canViewVods: true,
-    },
-  });
-  console.log('✅ Linked test parent to test child\n');
-
-  // =========================================================================
-  // ORGANIZATION DATA
-  // =========================================================================
-  console.log('🏢 Creating demo organization...\n');
+  console.log('Creating demo organization...\n');
 
   const demoOrg = await prisma.organization.upsert({
     where: { slug: 'substream-demo' },
@@ -179,32 +25,33 @@ async function seed() {
       slug: 'substream-demo',
     },
   });
-  console.log('✅ Demo organization:', demoOrg.slug);
+  console.log('  Organization:', demoOrg.slug);
 
+  // =========================================================================
+  // SAMPLE STREAMS
+  // =========================================================================
   const ytUrl = (id: string) => `youtube:${id}`;
   const ytThumb = (id: string) => `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
 
   const DAY = 86400_000;
   const HOUR = 3600_000;
 
-  // YouTube video IDs mapped to each game/stream
   const YT = {
-    haloCtf:      'w3xnLMctoKc', // HCS Top 10 Clips: Best of 2024
-    breakout:     'KHtEAzyniHI', // Closest Slayer Matchup in Halo Infinite
-    fnArena:      'cq_2vB0aHk8', // The BEST Clutches in Fortnite History
-    rlTourney:    'ruJP73lSqTU', // Rocket League Best of 2024
-    valComp:      'JbNNZ_vOCCU', // PRX f0rsakeN 1v5 ACE Clutch VCT Masters
-    mcBuild:      'hZQC-dblHU8', // Shinju Castle — Minecraft Timelapse
-    haloSlayer:   'ioNVJK-3sNs', // Royal 2 Greatest Hits — Halo Infinite LAN
-    fnCreative:   'E2Em3XKkzMo', // Top 10 Solo Clutches in Competitive Fortnite
-    apexRanked:   '5wjf0BTLORc', // iiTzTimmy Best Clutch of his Career
-    valUnrated:   '9Rwv6z9CxlU', // DRX MaKo Insane Ace Clutch
-    // Highlight-specific clips
-    haloPower:    'Wh1tHg1Ytcs', // Power Weapon Plays Community Montage
-    fnClutch:     'NuYXzNZlBfQ', // Insane 1v8 clutch in reload
-    rlGoals:      'W75FYBkT6lI', // Best RLCS 2024 Goals
-    valAce:       'ZjLEB-QDlgU', // PRX f0rsaken 1v5 ACE Clutch vs EDG
-    apexSquad:    'AbOHTw8z1Wo', // INSANE Ranked Clutch 1v6 OFF DROP
+    haloCtf:      'w3xnLMctoKc',
+    breakout:     'KHtEAzyniHI',
+    fnArena:      'cq_2vB0aHk8',
+    rlTourney:    'ruJP73lSqTU',
+    valComp:      'JbNNZ_vOCCU',
+    mcBuild:      'hZQC-dblHU8',
+    haloSlayer:   'ioNVJK-3sNs',
+    fnCreative:   'E2Em3XKkzMo',
+    apexRanked:   '5wjf0BTLORc',
+    valUnrated:   '9Rwv6z9CxlU',
+    haloPower:    'Wh1tHg1Ytcs',
+    fnClutch:     'NuYXzNZlBfQ',
+    rlGoals:      'W75FYBkT6lI',
+    valAce:       'ZjLEB-QDlgU',
+    apexSquad:    'AbOHTw8z1Wo',
   };
 
   const sampleStreams = [
@@ -227,10 +74,13 @@ async function seed() {
       update: { recordingUrl: data.recordingUrl, thumbnailUrl: data.thumbnailUrl, status: data.status },
       create: { id, orgId: demoOrg.id, ...data },
     });
-    console.log(`✅ Stream: ${data.title}`);
+    console.log(`  Stream: ${data.title}`);
   }
 
-  // Halo highlight — real pipeline output
+  // =========================================================================
+  // HIGHLIGHTS
+  // =========================================================================
+
   const haloPipelineData = {
     source_duration: 480,
     highlight_duration: 75,
@@ -254,11 +104,6 @@ async function seed() {
       { start: 340.0, end: 345.7, duration: 5.7, score: 59, label: 'Ambushing enemies near a Warthog', selected: true },
       { start: 370.0, end: 412.7, duration: 42.7, score: 50, label: 'Kills and a destroyed vehicle', selected: true },
       { start: 426.0, end: 436.8, duration: 10.8, score: 56, label: 'Active Camo stealth attack on enemy vehicle', selected: true },
-      { start: 15.0, end: 30.0, duration: 15.0, score: 22, label: 'Initial spawn and traversal', selected: false },
-      { start: 45.0, end: 60.0, duration: 15.0, score: 18, label: 'Walking toward objective', selected: false },
-      { start: 60.0, end: 75.0, duration: 15.0, score: 31, label: 'Minor firefight, no kills', selected: false },
-      { start: 135.0, end: 150.0, duration: 15.0, score: 28, label: 'Vehicle boarding', selected: false },
-      { start: 225.0, end: 240.0, duration: 15.0, score: 15, label: 'Respawn and traversal', selected: false },
     ],
   };
 
@@ -283,9 +128,6 @@ async function seed() {
       { start: 2205.0, end: 2214.0, duration: 9.0, score: 78, label: 'Clutch revive under fire + Wingman triple kill', selected: true },
       { start: 3600.0, end: 3606.0, duration: 6.0, score: 71, label: 'No-scope Kraber elimination on zip-line', selected: true },
       { start: 4800.0, end: 4804.5, duration: 4.5, score: 68, label: 'Final ring sprint + Mastiff wipe for the win', selected: true },
-      { start: 120.0, end: 135.0, duration: 15.0, score: 25, label: 'Looting and rotating to ring', selected: false },
-      { start: 900.0, end: 915.0, duration: 15.0, score: 32, label: 'Poking at range with no knocks', selected: false },
-      { start: 2700.0, end: 2715.0, duration: 15.0, score: 19, label: 'Healing and repositioning', selected: false },
     ],
   };
 
@@ -304,7 +146,7 @@ async function seed() {
       pipelineData: haloPipelineData,
     },
   });
-  console.log('✅ Halo highlight (COMPLETED with pipeline data)');
+  console.log('  Halo highlight (COMPLETED with pipeline data)');
 
   await prisma.highlight.upsert({
     where: { id: 'highlight-processing' },
@@ -320,7 +162,7 @@ async function seed() {
       status: 'COMPLETED',
     },
   });
-  console.log('✅ Breakout highlight (COMPLETED)');
+  console.log('  Breakout highlight (COMPLETED)');
 
   const extraHighlights = [
     { id: 'highlight-fn-clutch', streamId: 'stream-fn-arena', title: 'Fortnite — Insane 1v4 Clutch', duration: 45, status: 'COMPLETED' as const, videoUrl: ytUrl(YT.fnClutch), thumbnailUrl: ytThumb(YT.fnClutch) },
@@ -336,52 +178,27 @@ async function seed() {
       update: { videoUrl: data.videoUrl, thumbnailUrl: data.thumbnailUrl, status: data.status },
       create: { id, orgId: demoOrg.id, ...data },
     });
-    console.log(`✅ Highlight: ${data.title}`);
+    console.log(`  Highlight: ${data.title}`);
   }
-
-  console.log('');
 
   // =========================================================================
   // SUMMARY
   // =========================================================================
-  console.log('═══════════════════════════════════════════════════════════════');
-  console.log('');
-  console.log('  🎮 DEMO CREDENTIALS (for SDK users)');
-  console.log('');
-  console.log('  Use these in your Unity project to test streaming:');
-  console.log('');
-  console.log('    Child ID:    demo-child-001');
-  console.log('    Auth Token:  demo-token');
-  console.log('');
-  console.log('  Viewer credentials:');
-  console.log('');
-  console.log('    Parent ID:   demo-viewer-001');
-  console.log('    Auth Token:  demo-viewer-token');
-  console.log('');
-  console.log('═══════════════════════════════════════════════════════════════');
-  console.log('');
-  console.log('  🏢 SUBSTREAM DEMO ORG');
-  console.log('');
-  console.log('    Org Slug:    substream-demo');
-  console.log('    Demo Code:   Set DEMO_ORG_CODE in .env');
-  console.log('    Login at:    /login or /api/auth/demo-auto');
-  console.log('');
-  console.log('═══════════════════════════════════════════════════════════════');
-  console.log('');
-  console.log('  🧪 TEST CREDENTIALS (for internal testing)');
-  console.log('');
-  console.log('    Child ID:    test-child-id');
-  console.log('    User ID:     test-user-id');
-  console.log('    Parent ID:   test-parent-user-id');
-  console.log('');
-  console.log('═══════════════════════════════════════════════════════════════');
-  console.log('');
-  console.log('🎉 Seed complete!');
+  console.log('\n' + '='.concat('='.repeat(62)));
+  console.log('\n  DEMO CREDENTIALS\n');
+  console.log('  Streamer ID:    demo-child-001');
+  console.log('  Auth Token:     demo-token');
+  console.log('  Viewer Token:   demo-viewer-token');
+  console.log('\n  DEMO ORG\n');
+  console.log('  Org Slug:       substream-demo');
+  console.log('  Login:          /login or /api/auth/demo-auto');
+  console.log('\n' + '='.concat('='.repeat(62)));
+  console.log('\nSeed complete!');
 }
 
 seed()
   .catch((e) => {
-    console.error('❌ Seed failed:', e);
+    console.error('Seed failed:', e);
     process.exit(1);
   })
   .finally(() => {

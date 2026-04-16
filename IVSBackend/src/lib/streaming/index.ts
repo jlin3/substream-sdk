@@ -1,6 +1,5 @@
 /**
  * Streaming Module Exports
- * IVS-based "Private Twitch" streaming infrastructure
  */
 
 // Types
@@ -19,19 +18,6 @@ export {
   createRecordingConfiguration,
   getRecordingConfiguration,
 } from './ivs-client';
-
-// Stream Service
-export {
-  ensureChannelForChild,
-  getIngestProvisioning,
-  getPlaybackForParent,
-  createStreamSession,
-  endStreamSession,
-  getSessionInfo,
-  getVODsForChild,
-  forceStopStream,
-  resetChannel,
-} from './stream-service';
 
 // Playback Auth
 export {
