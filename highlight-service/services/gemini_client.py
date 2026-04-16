@@ -10,9 +10,6 @@ from __future__ import annotations
 import json
 import logging
 
-import vertexai
-from vertexai.generative_models import GenerativeModel, GenerationConfig, Image, Part
-
 import config
 
 logger = logging.getLogger(__name__)
@@ -33,15 +30,17 @@ SCORE_RESPONSE_SCHEMA = {
 def _ensure_init():
     global _initialized
     if not _initialized:
+        import vertexai
         location = "global" if "preview" in config.GEMINI_MODEL else config.GCP_REGION
         vertexai.init(project=config.GCP_PROJECT, location=location)
         _initialized = True
 
 
-def _get_model() -> GenerativeModel:
+def _get_model():
     global _model
     _ensure_init()
     if _model is None:
+        from vertexai.generative_models import GenerativeModel
         _model = GenerativeModel(config.GEMINI_MODEL)
     return _model
 
@@ -65,6 +64,8 @@ def score_segment(
     Returns:
         (score, label) where score is 0-100 and label is a short description.
     """
+    from vertexai.generative_models import GenerationConfig, Image, Part
+
     model = _get_model()
 
     parts: list[Part] = []

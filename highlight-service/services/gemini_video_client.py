@@ -13,9 +13,6 @@ import os
 import subprocess
 from dataclasses import dataclass, field
 
-import vertexai
-from vertexai.generative_models import GenerativeModel, GenerationConfig, Part
-
 import config
 
 logger = logging.getLogger(__name__)
@@ -92,15 +89,17 @@ class VideoDiscoveryResult:
 def _ensure_init():
     global _initialized
     if not _initialized:
+        import vertexai
         location = "global" if "preview" in config.GEMINI_DISCOVERY_MODEL else config.GCP_REGION
         vertexai.init(project=config.GCP_PROJECT, location=location)
         _initialized = True
 
 
-def _get_discovery_model() -> GenerativeModel:
+def _get_discovery_model():
     global _discovery_model
     _ensure_init()
     if _discovery_model is None:
+        from vertexai.generative_models import GenerativeModel
         system_prompt = load_prompt("system_base")
         _discovery_model = GenerativeModel(
             config.GEMINI_DISCOVERY_MODEL,
@@ -109,11 +108,12 @@ def _get_discovery_model() -> GenerativeModel:
     return _discovery_model
 
 
-def _get_verify_model() -> GenerativeModel:
+def _get_verify_model():
     global _verify_model
     _ensure_init()
-    model_name = config.GEMINI_TUNED_MODEL or config.GEMINI_SCORING_MODEL
     if _verify_model is None:
+        from vertexai.generative_models import GenerativeModel
+        model_name = config.GEMINI_TUNED_MODEL or config.GEMINI_SCORING_MODEL
         _verify_model = GenerativeModel(model_name)
     return _verify_model
 
@@ -152,6 +152,8 @@ def discover_highlights(
     This is the core of Phase 1a — native whole-video understanding replaces
     the old per-segment frame-sampling approach.
     """
+    from vertexai.generative_models import GenerationConfig, Part
+
     model = _get_discovery_model()
     video_part = Part.from_uri(uri=gcs_uri, mime_type=_guess_mime_type(gcs_uri))
 
@@ -258,6 +260,8 @@ def verify_segment(
     except subprocess.CalledProcessError:
         logger.warning("Failed to cut verification clip at %.1f-%.1f", start_seconds, end_seconds)
         return 50.0, "cut_failed", "intense"
+
+    from vertexai.generative_models import GenerationConfig, Part
 
     model = _get_verify_model()
     genre_instructions = get_genre_prompt(genre or "generic")

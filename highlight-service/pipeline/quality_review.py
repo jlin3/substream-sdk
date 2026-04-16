@@ -11,9 +11,6 @@ import json
 import logging
 import os
 
-import vertexai
-from vertexai.generative_models import GenerativeModel, GenerationConfig, Part
-
 import config
 
 logger = logging.getLogger(__name__)
@@ -41,15 +38,17 @@ REVIEW_SCHEMA = {
 def _ensure_init():
     global _initialized
     if not _initialized:
+        import vertexai
         location = "global" if "preview" in config.GEMINI_REVIEW_MODEL else config.GCP_REGION
         vertexai.init(project=config.GCP_PROJECT, location=location)
         _initialized = True
 
 
-def _get_model() -> GenerativeModel:
+def _get_model():
     global _review_model
     _ensure_init()
     if _review_model is None:
+        from vertexai.generative_models import GenerativeModel
         _review_model = GenerativeModel(config.GEMINI_REVIEW_MODEL)
     return _review_model
 
@@ -67,6 +66,8 @@ def review_highlight_reel(output_path: str) -> tuple[int, str]:
     if file_size > 100 * 1024 * 1024:
         logger.warning("Highlight reel too large for review (%d bytes), skipping", file_size)
         return 70, "skipped: file too large for inline review"
+
+    from vertexai.generative_models import GenerationConfig, Part
 
     model = _get_model()
 
