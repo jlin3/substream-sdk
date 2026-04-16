@@ -18,13 +18,11 @@ jobs:
         id: check
         env:
           HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
-        run: |
-          echo "has_key=$HAS_KEY" >> "$GITHUB_OUTPUT"
+        run: echo "has_key=$HAS_KEY" >> "$GITHUB_OUTPUT"
 
       - name: Skip if no API key
         if: steps.check.outputs.has_key != 'true'
-        run: |
-          echo "::notice::ANTHROPIC_API_KEY not configured — skipping Claude review. Add it in Settings → Secrets → Actions."
+        run: echo "::notice::ANTHROPIC_API_KEY not configured — skipping Claude review."
 
       - uses: actions/checkout@v4
         if: steps.check.outputs.has_key == 'true'
@@ -41,18 +39,10 @@ jobs:
           head -c 120000 /tmp/pr.diff > /tmp/pr_trimmed.diff
           echo "lines=$(wc -l < /tmp/pr_trimmed.diff)" >> "$GITHUB_OUTPUT"
 
-      - name: Review with Claude
+      - name: Write review prompt
         if: steps.check.outputs.has_key == 'true' && steps.diff.outputs.lines > 0
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_BODY: ${{ github.event.pull_request.body }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          DIFF=$(cat /tmp/pr_trimmed.diff)
-
-          read -r -d '' PROMPT << 'PROMPT_END'
+          cat > /tmp/prompt.txt << 'PROMPT_END'
           You are a senior engineer reviewing a pull request. Analyze the diff and provide a concise, actionable review.
 
           Focus on:
@@ -75,6 +65,18 @@ jobs:
 
           End with a one-line **Verdict**: APPROVE, REQUEST_CHANGES, or COMMENT.
           PROMPT_END
+
+      - name: Review with Claude
+        if: steps.check.outputs.has_key == 'true' && steps.diff.outputs.lines > 0
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          DIFF=$(cat /tmp/pr_trimmed.diff)
+          PROMPT=$(cat /tmp/prompt.txt)
 
           PAYLOAD=$(jq -n \
             --arg model "claude-sonnet-4-20250514" \
@@ -103,7 +105,7 @@ jobs:
 
           if [ "$HTTP_CODE" != "200" ]; then
             ERROR=$(echo "$BODY" | jq -r '.error.message // "Unknown error"')
-            echo "::warning::Claude API returned $HTTP_CODE: $ERROR"
+            echo "::warning::Claude API returned HTTP $HTTP_CODE: $ERROR"
             exit 0
           fi
 
@@ -114,10 +116,6 @@ jobs:
             exit 0
           fi
 
-          # Post as PR comment
-          gh pr comment "$PR_NUMBER" --body "## Claude Code Review
+          COMMENT=$(printf '## Claude Code Review\n\n%s\n\n---\n*Automated review by Claude Sonnet 4. Not a substitute for human review.*' "$REVIEW")
 
-          $REVIEW
-
-          ---
-          *Automated review by Claude Sonnet 4. Not a substitute for human review.*"
+          gh pr comment "$PR_NUMBER" --body "$COMMENT"
