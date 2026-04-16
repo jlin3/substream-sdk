@@ -295,25 +295,125 @@ Docusaurus 3 site deployed to GitHub Pages at `docs.livewave.ai`.
 
 ---
 
-## Repo Separation Plan
+## Relationship to `substream-platform`
 
-The monorepo is designed for an eventual split:
+The platform repo ([github.com/jlin3/substream-platform](https://github.com/jlin3/substream-platform)) is a separate Next.js 15 app that extends the SDK backend with multi-tenant, engagement, and analytics features. Both repos can serve as a `backendUrl` for the SDK -- the browser/Unity client doesn't care which backend it talks to.
+
+### How They Connect
+
+```
+Browser / Unity Game
+       │
+       │  SubstreamSDK.startStream({ backendUrl: '...' })
+       │
+       ▼
+┌──────────────────────┐          ┌────────────────────────────┐
+│ substream-sdk        │          │ substream-platform         │
+│ (IVSBackend)         │          │                            │
+│                      │          │                            │
+│ /api/streams/*       │◄── OR ──►│ /api/streams/*             │
+│ /api/health          │          │ /api/orgs/[orgId]/apps     │
+│ /api/keys            │          │ /api/orgs/[orgId]/keys     │
+│ /api/webhooks        │          │ /api/orgs/[orgId]/analytics│
+│                      │          │ /api/streams/[id]/chat     │
+│ Demo dashboard       │          │ /api/streams/[id]/reactions│
+│ Highlight service    │          │ /api/streams/[id]/events   │
+│ AI pipeline          │          │ /api/apps/[appId]/tokens   │
+│                      │          │ /api/metrics (Prometheus)  │
+│ Railway (production) │          │ Embeddable viewer widget   │
+└──────────────────────┘          └────────────────────────────┘
+       │                                    │
+       ▼                                    ▼
+  Same IVS stages                    Same IVS stages
+  Same AWS credentials               Same AWS credentials
+  Separate Postgres DB               Separate Postgres DB
+```
+
+The SDK client connects to whichever `backendUrl` it's configured with. Both backends implement the same core streaming contract (`/api/streams/web-publish`, `/api/streams/whip`, `/api/streams/[streamId]/viewer`), so the SDK works identically against either.
+
+### What Each Repo Owns
+
+| Capability | SDK Repo (this repo) | Platform Repo |
+|-----------|---------------------|---------------|
+| **Core streaming** (publish, view, stop) | Yes | Yes (same API contract) |
+| **Auth** (JWT, API keys, demo tokens) | Yes | Yes (same pattern, duplicated code) |
+| **Organization model** | Simple (name, slug) | Extended (plan tier, limits, members) |
+| **API keys** | Org-scoped, `sk_live_*` | Org-scoped + rate limits, expiry |
+| **Streams** | Org-scoped | App-scoped (App belongs to Org) |
+| **Highlights / AI pipeline** | Yes (highlight-service) | No |
+| **Chat & reactions** | No | Yes (IVS Chat + HTTP routes) |
+| **Analytics dashboard** | No | Yes (org analytics API + UI) |
+| **Embeddable viewer widget** | No | Yes (`public/embed.js`) |
+| **Webhooks** | In-memory | Persisted (DB + BullMQ) |
+| **Multi-tenancy** | Single org | Full (Org → App → Stream hierarchy) |
+| **Dashboard** | Full (browse, watch, streams, VODs, highlights, billing, keys) | Minimal (analytics viewer) |
+| **Demo / landing page** | Yes (Breakout game, marketing page) | API docs landing |
+| **Docs site** | Yes (Docusaurus at docs.livewave.ai) | No |
+| **npm package** | Yes (`@substream/web-sdk`) | No |
+| **Unity SDK** | Yes | No |
+| **Redis / BullMQ** | No | Yes |
+| **Prometheus metrics** | No | Yes |
+| **Legacy family/child models** | Removed (archived) | Still present in schema |
+
+### Schema Comparison
+
+Both repos use Prisma + PostgreSQL with **separate databases**.
+
+| Model | SDK Schema | Platform Schema |
+|-------|-----------|----------------|
+| `Organization` | `id`, `name`, `slug`, `logoUrl` | Same + `plan`, `maxApps`, `maxStreamsPerApp`, `maxViewersPerStream` |
+| `ApiKey` | `hashedKey`, `prefix`, `scopes[]`, `revokedAt` | `keyHash`, `prefix`, `scopes[]`, `isActive`, `expiresAt`, `rateLimit` |
+| `Stream` | `orgId`, `streamerId`, `status`, highlights relation | `appId`, `streamerId`, `status`, VOD fields, viewer metrics, no highlights |
+| `Highlight` | Full model with pipeline data | Not present |
+| `App` | Not present | `orgId`, `name`, `platform`, token management |
+| `OrgMember` | Not present | `orgId`, `userId`, `role` (OWNER/ADMIN/MEMBER) |
+| `ChatRoom` | Not present | `streamId`, IVS chat ARN |
+| `WebhookEndpoint/Delivery` | Not present (in-memory only) | Full persisted models |
+
+### Shared Code (Duplicated, Not Shared)
+
+The following modules exist in both repos with the same logic but separate implementations:
+
+- `src/lib/auth/middleware.ts` — Bearer token resolution (demo → API key → JWT)
+- `src/lib/auth/jwt.ts` — HS256 JWT signing/verification, issuer `substream`
+- `src/lib/auth/api-keys.ts` — `sk_live_` format, SHA-256 hashing
+- `src/lib/streaming/stage-pool.ts` — IVS Real-Time stage allocation
+- `src/lib/prisma.ts` — PrismaClient singleton with pg adapter
+
+If both backends share the same `JWT_SECRET`, tokens issued by one are valid on the other.
+
+### Current Deployment State
+
+| Repo | Deployed | URL |
+|------|----------|-----|
+| `substream-sdk` (IVSBackend) | Railway | `substream-sdk-production.up.railway.app` |
+| `substream-platform` | Not deployed (4 commits, development stage) | — |
+
+The SDK repo's IVSBackend is the live production backend. The platform repo is a young, development-stage codebase (initial feature commit + hardening PR) that is not yet deployed.
+
+---
+
+## Future Repo Separation
+
+When the platform matures, the plan is:
 
 **Stays in `substream-sdk`:**
 - `packages/web-sdk/` — npm package
 - `examples/` — standalone demos
 - `UnityProject/` — Unity SDK
 - `docs-site/` — documentation
-- Minimal demo backend for `/demo` page
+- Minimal demo backend for the `/demo` page
 - SDK guides (`SDK_STREAMING_GUIDE.md`, `README.md`)
 
-**Moves to `substream-platform`:**
-- Dashboard UI (`/dashboard/*`)
-- Org/user management + Prisma schema
-- Auth system (beyond demo tokens)
-- Billing/monetization
-- `highlight-service/`
-- Operator deployment guides
+**Moves to / already in `substream-platform`:**
+- Full dashboard UI with analytics
+- Multi-tenant org/app management
+- Chat, reactions, engagement features
+- Embeddable viewer widget
+- Persistent webhooks (DB + BullMQ)
+- Redis scaling layer
+- Prometheus metrics
+- Highlight service integration (currently only in SDK repo)
 
 ---
 
