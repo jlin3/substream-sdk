@@ -13,6 +13,8 @@ def _make_segment(start: float, end: float, gemini: float = 70, vi: float = 60, 
         video_intel_score=vi,
         audio_score=audio,
         label=label,
+        reason="test",
+        pacing="intense",
     )
 
 

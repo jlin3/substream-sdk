@@ -35,23 +35,45 @@ export async function GET(
       const hlRes = await fetch(`${highlightServiceUrl}/api/v1/highlights/${highlight.jobId}`);
       if (hlRes.ok) {
         const hlData = await hlRes.json();
-        if (hlData.status === 'completed' && hlData.result?.highlight_url) {
+
+        // highlight-service returns flat response: { status, highlight_url, segments, metadata, pipeline_data }
+        if (hlData.status === 'completed' && hlData.highlight_url) {
+          const duration = hlData.metadata?.highlight_duration
+            ? Math.round(hlData.metadata.highlight_duration)
+            : null;
+
+          const pipelineData = hlData.pipeline_data
+            ? {
+                ...hlData.pipeline_data,
+                segments: hlData.segments?.map((s: { start_time: number; end_time: number; score: number; label: string }) => ({
+                  start: s.start_time,
+                  end: s.end_time,
+                  score: s.score,
+                  label: s.label,
+                })),
+                model: hlData.metadata?.model_used || null,
+                game_detected: hlData.metadata?.game_detected || null,
+                genre_detected: hlData.metadata?.genre_detected || null,
+              }
+            : null;
+
           await prisma.highlight.update({
             where: { id: highlight.id },
             data: {
               status: 'COMPLETED',
-              videoUrl: hlData.result.highlight_url,
-              thumbnailUrl: hlData.result.thumbnail_url || null,
-              duration: hlData.result.duration_seconds || null,
+              videoUrl: hlData.highlight_url,
+              thumbnailUrl: null,
+              duration,
+              pipelineData: pipelineData ?? undefined,
             },
           });
           return NextResponse.json({
             highlight: {
               ...highlight,
               status: 'COMPLETED',
-              videoUrl: hlData.result.highlight_url,
-              thumbnailUrl: hlData.result.thumbnail_url || null,
-              duration: hlData.result.duration_seconds || null,
+              videoUrl: hlData.highlight_url,
+              duration,
+              pipelineData,
             },
           });
         } else if (hlData.status === 'failed') {

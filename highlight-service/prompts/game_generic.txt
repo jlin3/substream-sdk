@@ -1,0 +1,31 @@
+Generic game highlight criteria (for games that don't fit specific genres):
+
+HIGH VALUE (80-100):
+- Major achievements or milestones
+- Boss defeats or difficult challenge completions
+- Rare item drops or discoveries
+- Dramatic story moments with strong emotional impact
+- Impressive mechanical skill demonstrations
+- Unexpected or humorous events
+- Close calls with dramatic escapes
+
+MEDIUM VALUE (50-79):
+- Satisfying gameplay sequences
+- Puzzle solutions or clever strategies
+- Exploration discoveries (new areas, hidden secrets)
+- Character progression moments (level ups, unlocks)
+- Good combat sequences with varied action
+
+LOW VALUE (20-49):
+- Routine gameplay loops
+- Inventory management
+- Standard navigation between areas
+- Dialogue sequences (unless dramatic)
+
+IGNORE (0-19):
+- Loading screens and menus
+- Settings adjustment
+- Idle moments
+- Repetitive grinding without variety
+
+Audio cues: achievement sounds, dramatic music shifts, character voice lines with emotional emphasis, environmental audio spikes (explosions, crashes), player reactions.

@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 import config
 from api.routes import router
+from training.routes import router as training_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,8 +18,8 @@ os.makedirs(config.TEMP_DIR, exist_ok=True)
 
 app = FastAPI(
     title="Substream Highlight Service",
-    description="Automatic gameplay highlight reel generator powered by Google Cloud AI",
-    version="0.1.0",
+    description="Automatic gameplay highlight reel generator powered by Google Cloud AI (Gemini 3.1 Pro)",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -30,11 +31,20 @@ app.add_middleware(
 )
 
 app.include_router(router, prefix="/api/v1")
+app.include_router(training_router, prefix="/api/v1")
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "version": "2.0.0",
+        "models": {
+            "discovery": config.GEMINI_DISCOVERY_MODEL,
+            "scoring": config.GEMINI_TUNED_MODEL or config.GEMINI_SCORING_MODEL,
+            "review": config.GEMINI_REVIEW_MODEL,
+        },
+    }
 
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")

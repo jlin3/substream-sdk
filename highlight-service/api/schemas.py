@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -11,6 +11,12 @@ class JobStatus(str, Enum):
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+class OutputPreset(str, Enum):
+    SOCIAL = "social"
+    STANDARD = "standard"
+    EXTENDED = "extended"
 
 
 class HighlightRequest(BaseModel):
@@ -31,6 +37,14 @@ class HighlightRequest(BaseModel):
     game_title: Optional[str] = Field(
         default=None,
         description="Optional game title for context-aware scoring",
+    )
+    output_preset: OutputPreset = Field(
+        default=OutputPreset.STANDARD,
+        description="Output format preset: social (9:16, 60s), standard (16:9, 90s), extended (16:9, 3min)",
+    )
+    callback_url: Optional[str] = Field(
+        default=None,
+        description="Optional webhook URL to POST results when job completes",
     )
 
     @field_validator("video_uri")
@@ -55,6 +69,10 @@ class JobMetadata(BaseModel):
     segments_analyzed: int
     segments_selected: int
     processing_time_seconds: float
+    model_used: Optional[str] = None
+    game_detected: Optional[str] = None
+    genre_detected: Optional[str] = None
+    review_score: Optional[int] = None
 
 
 class HighlightResponse(BaseModel):
@@ -63,9 +81,53 @@ class HighlightResponse(BaseModel):
     highlight_url: Optional[str] = None
     segments: Optional[list[HighlightSegment]] = None
     metadata: Optional[JobMetadata] = None
+    pipeline_data: Optional[dict[str, Any]] = None
     error: Optional[str] = None
 
 
 class HighlightCreateResponse(BaseModel):
     job_id: str
     status: JobStatus
+
+
+class FeedbackRating(str, Enum):
+    GOOD = "good"
+    BAD = "bad"
+
+
+class FeedbackRequest(BaseModel):
+    rating: FeedbackRating
+    notes: Optional[str] = Field(default=None, description="Optional feedback notes")
+    segment_index: Optional[int] = Field(
+        default=None,
+        description="If set, feedback applies to a specific segment (0-indexed)",
+    )
+
+
+class FeedbackResponse(BaseModel):
+    job_id: str
+    rating: FeedbackRating
+    recorded: bool = True
+
+
+class TrainingExampleUpload(BaseModel):
+    game_title: str = Field(..., description="Game title for this training example")
+    genre: str = Field(default="other", description="Game genre")
+    source_video_uri: Optional[str] = Field(
+        default=None,
+        description="GCS URI of the full gameplay recording (if available)",
+    )
+    highlight_segments: Optional[list[dict[str, Any]]] = Field(
+        default=None,
+        description="Labeled highlight segments [{start, end, score, label}]",
+    )
+
+
+class TrainingExampleResponse(BaseModel):
+    id: str
+    game_title: str
+    genre: str
+    source_video_gcs_uri: Optional[str] = None
+    highlight_video_gcs_uri: Optional[str] = None
+    highlight_segments: Optional[list[dict[str, Any]]] = None
+    created_at: str

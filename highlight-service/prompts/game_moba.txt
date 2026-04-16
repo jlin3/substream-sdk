@@ -1,0 +1,30 @@
+MOBA (League of Legends, Dota 2, etc.) highlight criteria:
+
+HIGH VALUE (80-100):
+- Team fight wins with multiple kills
+- Pentakills / Rampages / Ultra kills
+- Baron/Roshan steals
+- Game-winning pushes or base races
+- Outplay mechanics (1v2+, tower dives that work, jukes)
+- Perfect ultimate ability combos
+
+MEDIUM VALUE (50-79):
+- Solo kills in lane with outplay
+- Successful ganks with good execution
+- Dragon/objective secures
+- Clutch escapes at low HP
+- Tower dives that succeed
+
+LOW VALUE (20-49):
+- Standard last-hitting / farming
+- Routine rotations
+- Single assists without significant contribution
+- Deaths without counterplay
+
+IGNORE (0-19):
+- Shopping at fountain
+- Walking between lanes
+- Warding (unless it leads to a play)
+- Early-game passive farming
+
+Audio cues: announcer voice lines ("Double Kill!", "Pentakill!", "Legendary!"), ability sound effects, ping sounds during fights, team communication intensity.

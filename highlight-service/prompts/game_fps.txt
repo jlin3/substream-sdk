@@ -1,0 +1,29 @@
+FPS / Shooter game highlight criteria:
+
+HIGH VALUE (80-100):
+- Multi-kills (double, triple, quad, ace/team wipe)
+- Clutch rounds (1vN situations won)
+- Headshot streaks or sniper highlights
+- Defuse/plant under pressure
+- Game-winning kills or round-winning plays
+- "Impossible" shots (no-scopes, wallbangs, cross-map)
+
+MEDIUM VALUE (50-79):
+- Clean single kills with good mechanics
+- Successful flanks or strategic plays
+- Ability/ultimate usage with multiple kills
+- Narrow escapes that lead to a kill
+- Good team coordination moments
+
+LOW VALUE (20-49):
+- Standard gunfights with nothing special
+- Kills on unaware/AFK opponents
+- Deaths (unless dramatically funny or part of a clutch attempt)
+
+IGNORE (0-19):
+- Walking/running without action
+- Buying/inventory management
+- Spectating other players
+- Loading screens or menus
+
+Audio cues to watch for: kill feed sounds, multi-kill announcements, "ace" callouts, bomb plant/defuse sounds, crowd cheering (in esports context).
