@@ -7,7 +7,6 @@ from fastapi.staticfiles import StaticFiles
 
 import config
 from api.routes import router
-from training.routes import router as training_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,7 +30,12 @@ app.add_middleware(
 )
 
 app.include_router(router, prefix="/api/v1")
-app.include_router(training_router, prefix="/api/v1")
+
+try:
+    from training.routes import router as training_router
+    app.include_router(training_router, prefix="/api/v1")
+except Exception as _exc:
+    logging.getLogger(__name__).warning("Training routes disabled: %s", _exc)
 
 
 @app.get("/health")
