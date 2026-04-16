@@ -6,8 +6,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { isApiKeyFormat } from './api-keys';
+import { isApiKeyFormat, hashApiKey } from './api-keys';
 import { verifyJwt, type JwtPayload } from './jwt';
+import { prisma } from '@/lib/prisma';
 
 // ============================================
 // AUTH CONTEXT
@@ -75,14 +76,26 @@ export async function authenticate(request: NextRequest): Promise<AuthContext | 
     return DEMO_TOKENS[token];
   }
 
-  // 2. API Key format — accept as authenticated identity
-  //    Full DB-backed validation happens in the platform repo.
+  // 2. API Key — validate against the database
   if (isApiKeyFormat(token)) {
+    const hashed = hashApiKey(token);
+    const apiKey = await prisma.apiKey.findUnique({
+      where: { hashedKey: hashed },
+      select: { id: true, orgId: true, scopes: true, revokedAt: true },
+    });
+
+    if (!apiKey || apiKey.revokedAt) return null;
+
+    prisma.apiKey.update({
+      where: { id: apiKey.id },
+      data: { lastUsedAt: new Date() },
+    }).catch(() => {});
+
     return {
-      orgId: 'sdk',
+      orgId: apiKey.orgId,
       appId: null,
       userId: `apikey:${token.substring(0, 16)}`,
-      scopes: ['streams:write', 'streams:read'],
+      scopes: apiKey.scopes,
       method: 'api_key',
     };
   }

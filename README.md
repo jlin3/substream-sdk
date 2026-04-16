@@ -1,5 +1,9 @@
 # Substream SDK
 
+[![npm version](https://img.shields.io/npm/v/@substream/web-sdk.svg)](https://www.npmjs.com/package/@substream/web-sdk)
+[![CI](https://github.com/jlin3/substream-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/jlin3/substream-sdk/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 **Add live streaming to any game with 5 lines of code.**
 
 Stream gameplay from web canvas or Unity games via WebRTC with sub-second latency. Automatic cloud recording, AI-generated highlights, and a full analytics dashboard.
@@ -19,6 +23,10 @@ Try it right now — no setup required:
 ---
 
 ## Quick Start: Web Games
+
+```bash
+npm install @substream/web-sdk amazon-ivs-web-broadcast
+```
 
 ```js
 import Substream from '@substream/web-sdk';

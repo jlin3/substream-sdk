@@ -147,28 +147,15 @@ export default async function BillingPage() {
         </section>
       </div>
 
-      {/* API Keys */}
-      <section className="rounded-xl border border-white/10 bg-surface-100 overflow-hidden">
-        <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
-          <div>
-            <h2 className="font-semibold">API Keys</h2>
-            <p className="text-xs text-white/40 mt-0.5">Use these to authenticate SDK requests</p>
-          </div>
+      {/* API Keys link */}
+      <section className="rounded-xl border border-white/10 bg-surface-100 p-5 flex items-center justify-between">
+        <div>
+          <h2 className="font-semibold">API Keys</h2>
+          <p className="text-xs text-white/40 mt-0.5">Create and manage keys for SDK authentication</p>
         </div>
-        <div className="divide-y divide-white/5">
-          <ApiKeyRow
-            name="Production"
-            keyValue={`sk_live_${session.orgId.slice(0, 8)}...${session.orgId.slice(-4)}`}
-            status="active"
-            created="Created on setup"
-          />
-          <ApiKeyRow
-            name="Demo / Testing"
-            keyValue="demo-token"
-            status="active"
-            created="Built-in demo key"
-          />
-        </div>
+        <a href="/dashboard/keys" className="rounded-lg bg-brand-600/20 text-brand-400 px-4 py-2 text-sm font-semibold hover:bg-brand-600/30 transition-colors">
+          Manage Keys &rarr;
+        </a>
       </section>
 
       {/* Pricing tiers */}
@@ -226,29 +213,6 @@ function CostLine({ label, quantity, rate, total }: {
         <p className="text-xs text-white/30">{quantity} × {rate}</p>
       </div>
       <span className="font-medium">${total.toFixed(2)}</span>
-    </div>
-  );
-}
-
-function ApiKeyRow({ name, keyValue, status, created }: {
-  name: string; keyValue: string; status: string; created: string;
-}) {
-  return (
-    <div className="px-5 py-4 flex items-center justify-between">
-      <div className="space-y-0.5">
-        <p className="text-sm font-medium">{name}</p>
-        <p className="text-xs text-white/30">{created}</p>
-      </div>
-      <div className="flex items-center gap-3">
-        <code className="text-xs bg-surface-300 px-2.5 py-1 rounded font-mono text-white/60">
-          {keyValue}
-        </code>
-        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-          status === 'active' ? 'bg-success/20 text-success' : 'bg-white/10 text-white/40'
-        }`}>
-          {status}
-        </span>
-      </div>
     </div>
   );
 }
