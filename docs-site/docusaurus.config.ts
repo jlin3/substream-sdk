@@ -6,7 +6,7 @@ const config: Config = {
   title: 'Substream SDK',
   tagline: 'Add live streaming to any game with 5 lines of code',
   favicon: 'img/favicon.ico',
-  url: 'https://docs.substream.dev',
+  url: 'https://docs.livewave.ai',
   baseUrl: '/',
   organizationName: 'jlin3',
   projectName: 'substream-sdk',
