@@ -1,11 +1,17 @@
-"""Vertex AI Gemini client for multimodal video segment scoring."""
+"""Vertex AI Gemini client for per-segment scoring with structured output.
+
+This is the legacy per-frame scoring client, upgraded to use structured output
+(response_schema) instead of fragile JSON parsing. Used as fallback when
+whole-video discovery is not available.
+"""
 
 from __future__ import annotations
 
+import json
 import logging
 
 import vertexai
-from vertexai.generative_models import GenerativeModel, Image, Part
+from vertexai.generative_models import GenerativeModel, GenerationConfig, Image, Part
 
 import config
 
@@ -13,6 +19,15 @@ logger = logging.getLogger(__name__)
 
 _model: GenerativeModel | None = None
 _initialized = False
+
+SCORE_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "score": {"type": "integer", "minimum": 0, "maximum": 100},
+        "label": {"type": "string"},
+    },
+    "required": ["score", "label"],
+}
 
 
 def _ensure_init():
@@ -38,6 +53,8 @@ def score_segment(
     game_title: str | None = None,
 ) -> tuple[float, str]:
     """Score a gameplay segment for highlight-worthiness using Gemini.
+
+    Uses structured output for guaranteed valid JSON responses.
 
     Args:
         frame_paths: Paths to representative frames (JPEG images) from the segment.
@@ -66,8 +83,6 @@ def score_segment(
         f"- Visual excitement (explosions, fast movement, impressive plays)\n"
         f"- Social shareability (would someone want to clip this?)\n"
         f"- Key game events (victories, defeats, clutch moments, kills)\n"
-        f"\n"
-        f"Respond with ONLY a JSON object: {{\"score\": <0-100>, \"label\": \"<short description>\"}}"
     )
 
     parts.append(Part.from_text(prompt))
@@ -75,29 +90,23 @@ def score_segment(
     for path in frame_paths:
         parts.append(Part.from_image(Image.load_from_file(path)))
 
-    response = model.generate_content(parts)
+    try:
+        response = model.generate_content(
+            parts,
+            generation_config=GenerationConfig(
+                response_mime_type="application/json",
+                response_schema=SCORE_RESPONSE_SCHEMA,
+            ),
+        )
+    except Exception:
+        logger.exception("Gemini scoring call failed")
+        return 50.0, "error"
 
     if not response.candidates:
         logger.warning("Gemini returned no candidates (response may have been blocked)")
         return 50.0, "blocked"
 
-    return _parse_response(response.text)
-
-
-def _parse_response(text: str) -> tuple[float, str]:
-    """Parse Gemini's JSON response into (score, label)."""
-    import json
-
-    cleaned = text.strip()
-    if cleaned.startswith("```"):
-        lines = cleaned.split("\n")
-        cleaned = "\n".join(lines[1:-1])
-
-    try:
-        data = json.loads(cleaned)
-        score = float(data.get("score", 50))
-        label = str(data.get("label", "gameplay"))
-        return min(max(score, 0), 100), label
-    except (json.JSONDecodeError, ValueError, KeyError):
-        logger.warning("Failed to parse Gemini response: %s", text[:200])
-        return 50.0, "unscored"
+    data = json.loads(response.text)
+    score = float(data.get("score", 50))
+    label = str(data.get("label", "gameplay"))
+    return min(max(score, 0), 100), label

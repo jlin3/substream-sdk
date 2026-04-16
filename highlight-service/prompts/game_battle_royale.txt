@@ -1,0 +1,33 @@
+Battle Royale (Fortnite, Apex, Warzone, PUBG, etc.) highlight criteria:
+
+HIGH VALUE (80-100):
+- Victory Royale / Champion squad moment
+- Final circle clutch plays
+- Squad wipes (eliminating full enemy team)
+- Insane sniper shots or long-range eliminations
+- Creative building plays (Fortnite) or movement tech (Apex)
+- Winning gunfights while extremely low HP
+- Hot drop success (multiple early kills in contested areas)
+
+MEDIUM VALUE (50-79):
+- Clean 1v1 gunfight wins
+- Successful third-party plays
+- Good rotations under fire
+- Vehicle plays (explosions, dramatic chases)
+- Reviving teammates under pressure
+- Finding legendary/mythic loot (brief moment)
+
+LOW VALUE (20-49):
+- Standard looting
+- Running across open terrain
+- Single eliminations on unaware players
+- Routine circle rotations
+
+IGNORE (0-19):
+- Inventory management
+- Long looting sequences
+- Waiting in bushes/buildings with no action
+- Loading/lobby screens
+- Dropping from the bus/plane (unless immediately into action)
+
+Audio cues: elimination sounds, shield break/crack sounds, storm/circle warnings, victory music, announcer callouts ("You are the champion"), gunfire intensity spikes.

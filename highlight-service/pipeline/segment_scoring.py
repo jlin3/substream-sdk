@@ -28,6 +28,8 @@ class ScoredSegment:
     video_intel_score: float
     audio_score: float
     label: str
+    reason: str = ""
+    pacing: str = "intense"
 
 
 def _extract_frames(

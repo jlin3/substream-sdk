@@ -3,8 +3,10 @@ uvicorn[standard]
 google-cloud-storage
 google-cloud-videointelligence
 google-cloud-aiplatform
+google-cloud-firestore
 pydub
 numpy
 pydantic
 python-multipart
 boto3
+httpx

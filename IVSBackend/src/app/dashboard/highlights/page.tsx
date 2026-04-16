@@ -20,7 +20,23 @@ export default async function HighlightsPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Highlights</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Highlights</h1>
+        <div className="flex gap-2">
+          <Link
+            href="/dashboard/highlights/training"
+            className="rounded-lg border border-white/10 px-3 py-1.5 text-xs hover:bg-surface-200 transition-colors text-white/60 hover:text-white"
+          >
+            Training Data
+          </Link>
+          <Link
+            href="/dashboard/highlights/compare"
+            className="rounded-lg border border-white/10 px-3 py-1.5 text-xs hover:bg-surface-200 transition-colors text-white/60 hover:text-white"
+          >
+            Compare
+          </Link>
+        </div>
+      </div>
 
       {highlights.length === 0 ? (
         <div className="rounded-xl border border-white/10 bg-surface-100 px-5 py-16 text-center space-y-2">

@@ -1,0 +1,32 @@
+Sports game (FIFA, NBA 2K, Madden, Rocket League, etc.) highlight criteria:
+
+HIGH VALUE (80-100):
+- Goals / Touchdowns / Baskets in clutch moments (final minutes, overtime)
+- Game-winning plays
+- Incredible skill moves or fakes
+- Long-range shots or half-court buzzer beaters
+- Aerial goals in Rocket League
+- Perfect team plays (passing sequences, fast breaks)
+- Comeback moments
+
+MEDIUM VALUE (50-79):
+- Standard goals/scores with good execution
+- Good defensive plays (saves, blocks, interceptions)
+- Skillful dribbling or ball control
+- Breakaway plays
+- Near-misses that hit the post/bar (dramatic)
+
+LOW VALUE (20-49):
+- Routine passes
+- Standard defensive positioning
+- Free kicks/penalties without drama
+- Substitutions or tactical changes
+
+IGNORE (0-19):
+- Menu navigation
+- Team management screens
+- Replays of already-captured moments (avoid duplication)
+- Cutscenes between plays
+- Half-time screens
+
+Audio cues: crowd cheering spikes, commentator excitement, goal horns/celebrations, whistle sounds, music changes on important plays.
