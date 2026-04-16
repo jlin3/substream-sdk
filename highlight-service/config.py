@@ -50,6 +50,9 @@ GCS_TRAINING_PREFIX = os.environ.get("GCS_TRAINING_PREFIX", "training-data")
 # Assembly presets
 DEFAULT_OUTPUT_PRESET = os.environ.get("DEFAULT_OUTPUT_PRESET", "standard")
 
+# Webhook delivery
+WEBHOOK_TIMEOUT_SECONDS = int(os.environ.get("WEBHOOK_TIMEOUT_SECONDS", "30"))
+
 # AWS S3 configuration (for recordings from IVS)
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 S3_RECORDING_BUCKET = os.environ.get("S3_RECORDING_BUCKET", "")

@@ -183,8 +183,11 @@ def discover_highlights(
                 response_schema=HIGHLIGHT_DISCOVERY_SCHEMA,
             ),
         )
+    except (ValueError, TypeError) as exc:
+        # Config/auth errors should fail fast — don't mask them
+        raise RuntimeError(f"Gemini discovery failed (likely config/auth issue): {exc}") from exc
     except Exception:
-        logger.exception("Gemini discovery call failed")
+        logger.exception("Gemini discovery call failed (retryable)")
         return VideoDiscoveryResult()
 
     if not response.candidates:

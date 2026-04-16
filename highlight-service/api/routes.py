@@ -285,13 +285,16 @@ async def _run_job(
 
 async def _send_webhook(callback_url: str, job_id: str, status: str, data: dict):
     """POST job results to the callback URL."""
+    import config as cfg
+
     payload = {
         "job_id": job_id,
         "status": status,
         **data,
     }
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        timeout = httpx.Timeout(connect=5.0, read=cfg.WEBHOOK_TIMEOUT_SECONDS, write=5.0, pool=5.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(callback_url, json=payload)
             logger.info("Webhook sent to %s: status=%d", callback_url, response.status_code)
     except Exception:
