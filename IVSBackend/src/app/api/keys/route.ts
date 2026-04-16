@@ -36,20 +36,22 @@ export async function POST(request: NextRequest) {
 
   const { plaintext, hash, prefix } = generateApiKeyPair();
 
-  const key = await prisma.apiKey.create({
-    data: {
-      orgId: session.orgId,
-      name,
-      hashedKey: hash,
-      prefix,
-    },
-    select: {
-      id: true,
-      name: true,
-      prefix: true,
-      scopes: true,
-      createdAt: true,
-    },
+  const key = await prisma.$transaction(async (tx) => {
+    return tx.apiKey.create({
+      data: {
+        orgId: session.orgId,
+        name,
+        hashedKey: hash,
+        prefix,
+      },
+      select: {
+        id: true,
+        name: true,
+        prefix: true,
+        scopes: true,
+        createdAt: true,
+      },
+    });
   });
 
   return NextResponse.json({ key, plaintext }, { status: 201 });
@@ -61,8 +63,8 @@ export async function DELETE(request: NextRequest) {
 
   const url = new URL(request.url);
   const keyId = url.searchParams.get('id');
-  if (!keyId) {
-    return NextResponse.json({ error: 'Key id is required' }, { status: 400 });
+  if (!keyId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(keyId)) {
+    return NextResponse.json({ error: 'Valid key id is required' }, { status: 400 });
   }
 
   const existing = await prisma.apiKey.findFirst({
