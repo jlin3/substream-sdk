@@ -82,7 +82,8 @@ class FirestoreJobStore:
                 try:
                     data["status"] = JobStatus(data["status"])
                 except ValueError:
-                    pass
+                    logger.warning("Unknown job status '%s' for job %s, defaulting to FAILED", data["status"], job_id)
+                    data["status"] = JobStatus.FAILED
             return data
         return None
 
@@ -129,7 +130,7 @@ class FirestoreJobStore:
                 try:
                     data["status"] = JobStatus(data["status"])
                 except ValueError:
-                    pass
+                    data["status"] = JobStatus.FAILED
             results.append((doc.id, data))
         return results
 

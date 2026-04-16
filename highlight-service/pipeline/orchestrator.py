@@ -62,7 +62,10 @@ async def run_pipeline(
             output_preset, work_dir, start_time,
         )
     finally:
-        shutil.rmtree(work_dir, ignore_errors=True)
+        try:
+            shutil.rmtree(work_dir)
+        except Exception as cleanup_err:
+            logger.warning("[%s] Work dir cleanup failed: %s", job_id, cleanup_err)
 
 
 async def _execute(

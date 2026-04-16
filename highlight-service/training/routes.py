@@ -67,7 +67,12 @@ async def upload_training_example(
     Optionally provide the source video URI and labeled segments.
     """
     example_id = str(uuid.uuid4())
-    filename = file.filename or f"{example_id}.mp4"
+
+    raw_name = file.filename or "video.mp4"
+    ext = raw_name.rsplit(".", 1)[-1] if "." in raw_name else "mp4"
+    ext = ext[:10].replace("/", "").replace("\\", "").replace("..", "")
+    filename = f"{example_id}.{ext}"
+
     contents = await file.read()
 
     from services.gcs_client import _get_client
@@ -91,6 +96,15 @@ async def upload_training_example(
             segments = json.loads(highlight_segments_json)
         except json.JSONDecodeError:
             raise HTTPException(status_code=400, detail="Invalid JSON in highlight_segments_json")
+        if not isinstance(segments, list):
+            raise HTTPException(status_code=400, detail="highlight_segments_json must be a JSON array")
+        for i, seg in enumerate(segments):
+            if not isinstance(seg, dict):
+                raise HTTPException(status_code=400, detail=f"Segment {i} must be a JSON object")
+            if "start" not in seg and "start_seconds" not in seg:
+                raise HTTPException(status_code=400, detail=f"Segment {i} must have 'start' or 'start_seconds'")
+            if "end" not in seg and "end_seconds" not in seg:
+                raise HTTPException(status_code=400, detail=f"Segment {i} must have 'end' or 'end_seconds'")
 
     example = TrainingExample(
         id=example_id,
