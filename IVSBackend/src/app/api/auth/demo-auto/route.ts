@@ -5,7 +5,9 @@ import { createSessionToken, COOKIE_NAME } from '@/lib/auth/session';
 const DEMO_SLUG = 'substream-demo';
 
 export async function GET(request: NextRequest) {
-  const origin = request.nextUrl.origin;
+  const host = request.headers.get('host') || request.nextUrl.host;
+  const proto = request.headers.get('x-forwarded-proto') || (request.nextUrl.protocol === 'https:' ? 'https' : 'http');
+  const origin = `${proto}://${host}`;
 
   try {
     const org = await prisma.organization.findUnique({
