@@ -1,0 +1,52 @@
+name: SubstreamDemo
+options:
+  bundleIdPrefix: dev.substream.demo
+  deploymentTarget:
+    iOS: "14.0"
+
+packages:
+  SubstreamSDK:
+    path: ..
+
+targets:
+  SubstreamDemo:
+    type: application
+    platform: iOS
+    sources:
+      - SubstreamDemo
+    dependencies:
+      - package: SubstreamSDK
+      - target: SubstreamBroadcast
+        embed: true
+    info:
+      path: SubstreamDemo/Info.plist
+      properties:
+        CFBundleDisplayName: Substream Demo
+        UILaunchScreen: {}
+        NSMicrophoneUsageDescription: "Substream Demo streams your voice alongside gameplay."
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SceneDelegate
+    settings:
+      CODE_SIGN_ENTITLEMENTS: SubstreamDemo/SubstreamDemo.entitlements
+
+  SubstreamBroadcast:
+    type: app-extension
+    platform: iOS
+    sources:
+      - SubstreamBroadcast
+    dependencies:
+      - package: SubstreamSDK
+    info:
+      path: SubstreamBroadcast/Info.plist
+      properties:
+        CFBundleDisplayName: Substream Broadcast
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.broadcast-services-upload
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).SampleHandler
+          RPBroadcastProcessMode: RPBroadcastProcessModeSampleBuffer
+    settings:
+      CODE_SIGN_ENTITLEMENTS: SubstreamBroadcast/SubstreamBroadcast.entitlements

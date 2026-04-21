@@ -41,6 +41,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Platform segmentation: "web" | "ios" | "android" | "unity" | "unity-quest" | null
+    // SDKs send this via the `platform` body field and/or the `X-Substream-SDK`
+    // header (e.g. "ios/1.0.0"). Unknown/missing values are treated as "web".
+    const sdkHeader = request.headers.get('x-substream-sdk') || '';
+    const [headerPlatform, headerVersion] = sdkHeader.includes('/')
+      ? sdkHeader.split('/', 2)
+      : [sdkHeader, ''];
+    const platform: string =
+      (typeof body.platform === 'string' && body.platform.trim()) ||
+      headerPlatform ||
+      'web';
+    const sdkVersion: string | null =
+      (typeof body.sdkVersion === 'string' && body.sdkVersion.trim()) ||
+      headerVersion ||
+      null;
+
     const streamId = uuidv4();
     const allocation = await allocateStage(streamId, auth.userId, streamerId);
 
@@ -68,6 +84,8 @@ export async function POST(request: NextRequest) {
             status: 'LIVE',
             ivsStageArn: allocation.stageArn,
             startedAt: new Date(),
+            platform,
+            sdkVersion,
           },
         });
       }
@@ -81,6 +99,8 @@ export async function POST(request: NextRequest) {
       stageArn: allocation.stageArn,
       viewerUrl,
       orgId,
+      platform,
+      sdkVersion,
     });
 
     return NextResponse.json(

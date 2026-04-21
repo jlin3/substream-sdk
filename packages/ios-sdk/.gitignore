@@ -1,0 +1,11 @@
+.DS_Store
+*.xcodeproj/xcuserdata
+*.xcworkspace/xcuserdata
+.build/
+.swiftpm/
+DerivedData/
+Pods/
+build/
+*.xcframework
+*.xcframework.zip
+Package.resolved
