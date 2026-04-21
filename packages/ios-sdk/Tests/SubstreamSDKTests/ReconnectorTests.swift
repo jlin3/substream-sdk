@@ -16,8 +16,8 @@ final class ReconnectorTests: XCTestCase {
         XCTAssertEqual(r.delay(forAttempt: 2), 2.0, accuracy: 0.01)
         XCTAssertEqual(r.delay(forAttempt: 3), 4.0, accuracy: 0.01)
         XCTAssertEqual(r.delay(forAttempt: 4), 8.0, accuracy: 0.01)
-        XCTAssertEqual(r.delay(forAttempt: 5), 10.0, accuracy: 0.01) // capped
-        XCTAssertEqual(r.delay(forAttempt: 20), 10.0, accuracy: 0.01) // capped
+        XCTAssertEqual(r.delay(forAttempt: 5), 10.0, accuracy: 0.01)  // capped
+        XCTAssertEqual(r.delay(forAttempt: 20), 10.0, accuracy: 0.01)  // capped
     }
 
     func testStopsAfterMaxAttempts() async {

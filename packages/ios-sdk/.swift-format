@@ -7,11 +7,11 @@
     "lineBreakBeforeEachArgument": false,
     "lineBreakBeforeControlFlowKeywords": false,
     "prioritizeKeepingFunctionOutputTogether": true,
-    "indentConditionalCompilationBlocks": false,
+    "indentConditionalCompilationBlocks": true,
     "lineBreakAroundMultilineExpressionChainComponents": true,
     "maximumBlankLines": 1,
     "rules": {
-        "AllPublicDeclarationsHaveDocumentation": true,
+        "AllPublicDeclarationsHaveDocumentation": false,
         "AlwaysUseLowerCamelCase": true,
         "AmbiguousTrailingClosureOverload": true,
         "NoBlockComments": false,

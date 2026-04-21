@@ -56,7 +56,8 @@
             defer { CVPixelBufferUnlockBaseAddress(dst, []) }
 
             guard let base = CVPixelBufferGetBaseAddress(dst) else { return }
-            let bitmapInfo = CGBitmapInfo.byteOrder32Little.rawValue
+            let bitmapInfo =
+                CGBitmapInfo.byteOrder32Little.rawValue
                 | CGImageAlphaInfo.premultipliedFirst.rawValue
             guard
                 let ctx = CGContext(

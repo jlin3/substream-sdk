@@ -31,13 +31,14 @@ final class PublishAPITests: XCTestCase {
         FakeURLProtocol.nextResponse = (
             status: 201,
             body: #"""
-                {
-                  "streamId": "abc-123",
-                  "stageArn": "arn:aws:ivs:us-east-1:1:stage/xxx",
-                  "publishToken": "tok-xyz",
-                  "viewerUrl": "https://api.example.com/viewer/abc-123"
-                }
-                """#.data(using: .utf8)!
+            {
+              "streamId": "abc-123",
+              "stageArn": "arn:aws:ivs:us-east-1:1:stage/xxx",
+              "publishToken": "tok-xyz",
+              "viewerUrl": "https://api.example.com/viewer/abc-123"
+            }
+            """#
+            .data(using: .utf8)!
         )
 
         let api = makeAPI()

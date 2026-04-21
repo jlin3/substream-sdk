@@ -60,28 +60,26 @@
 
             // Use a synchronous bootstrap — extensions don't run an async runtime
             // alongside the host, so we spin a small blocking wait with a timeout.
+            // The shared error box is used to cross the concurrency boundary from
+            // the Task back to this synchronous method.
+            let errorBox = ErrorBox()
             let sema = DispatchSemaphore(value: 0)
-            var startError: Error?
 
             Task { [weak self] in
                 guard let self else { sema.signal(); return }
                 do {
-                    self.session = try await Substream.startStream(substreamConfig)
-                    // Swap in the ReplayKit source references so sample buffers can flow.
-                    // We tap the client's image source via a KVC-free backdoor: our
-                    // factory returned a ReplayKitInAppSource, and the SDK holds it.
-                    // Here we piggy-back on the `NotificationCenter`-less contract by
-                    // exposing a small singleton handoff in `SubstreamBroadcastBridge`.
-                    SubstreamBroadcastBridge.shared.session = self.session
+                    let session = try await Substream.startStream(substreamConfig)
+                    self.session = session
+                    SubstreamBroadcastBridge.shared.session = session
                 } catch {
-                    startError = error
+                    errorBox.set(error)
                 }
                 sema.signal()
             }
 
             _ = sema.wait(timeout: .now() + 10)
 
-            if let e = startError {
+            if let e = errorBox.value {
                 failBroadcast(reason: "Substream start failed: \(e.localizedDescription)")
             }
         }

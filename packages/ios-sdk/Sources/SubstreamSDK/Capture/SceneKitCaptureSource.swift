@@ -63,7 +63,8 @@
                 let cg = image.cgImage
             else { return }
 
-            let bitmapInfo = CGBitmapInfo.byteOrder32Little.rawValue
+            let bitmapInfo =
+                CGBitmapInfo.byteOrder32Little.rawValue
                 | CGImageAlphaInfo.premultipliedFirst.rawValue
 
             guard

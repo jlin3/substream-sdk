@@ -236,14 +236,15 @@ final class SubstreamClient: @unchecked Sendable {
             }
 
             session?.setLive(true)
-            session?.eventChannel.emit(
-                .live(
-                    info: .init(
-                        streamId: self.currentSession?.streamId ?? "",
-                        viewerUrl: self.currentSession?.viewerUrl ?? config.backendUrl
+            session?.eventChannel
+                .emit(
+                    .live(
+                        info: .init(
+                            streamId: self.currentSession?.streamId ?? "",
+                            viewerUrl: self.currentSession?.viewerUrl ?? config.backendUrl
+                        )
                     )
                 )
-            )
         #else
             // Without the IVS dependency, we still start capture for simulators/tests.
             source.attach(sink: StubImageSink(stats: frameStats))
@@ -255,17 +256,19 @@ final class SubstreamClient: @unchecked Sendable {
             try source.start()
             try audioSource?.start()
             session?.setLive(true)
-            session?.eventChannel.emit(
-                .live(
-                    info: .init(
-                        streamId: self.currentSession?.streamId ?? "",
-                        viewerUrl: self.currentSession?.viewerUrl ?? config.backendUrl
+            session?.eventChannel
+                .emit(
+                    .live(
+                        info: .init(
+                            streamId: self.currentSession?.streamId ?? "",
+                            viewerUrl: self.currentSession?.viewerUrl ?? config.backendUrl
+                        )
                     )
                 )
-            )
-            session?.eventChannel.emit(
-                .warning("AmazonIVSBroadcast not linked; frames are captured but not published.")
-            )
+            session?.eventChannel
+                .emit(
+                    .warning("AmazonIVSBroadcast not linked; frames are captured but not published.")
+                )
         #endif
     }
 
@@ -302,7 +305,7 @@ final class SubstreamClient: @unchecked Sendable {
         heartbeatTask?.cancel()
         heartbeatTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 30_000_000_000) // 30s
+                try? await Task.sleep(nanoseconds: 30_000_000_000)  // 30s
                 guard let self, !Task.isCancelled else { return }
                 let bitrate = config.videoBitrateKbps
                 await self.publishAPI.heartbeat(
@@ -349,7 +352,7 @@ final class SubstreamClient: @unchecked Sendable {
         return .init(
             bitrateKbps: adaptive.current.bitrateKbps,
             fps: fps,
-            rttMs: 0, // IVS basic SDK doesn't surface RTT; filled in when stats delegate lands.
+            rttMs: 0,  // IVS basic SDK doesn't surface RTT; filled in when stats delegate lands.
             droppedFrames: dropped,
             health: health
         )
@@ -360,11 +363,12 @@ final class SubstreamClient: @unchecked Sendable {
         if adaptive.tick() {
             let target = adaptive.current
             imageSource?.targetFps = target.fps
-            session?.eventChannel.emit(
-                .warning(
-                    "Adaptive quality: fps=\(target.fps) bitrate=\(target.bitrateKbps)kbps (\(target.reason))"
+            session?.eventChannel
+                .emit(
+                    .warning(
+                        "Adaptive quality: fps=\(target.fps) bitrate=\(target.bitrateKbps)kbps (\(target.reason))"
+                    )
                 )
-            )
             #if canImport(AmazonIVSBroadcast)
                 // IVS simulcast layer selection could go here in a future pass.
             #endif

@@ -49,7 +49,7 @@
             recorder.isMicrophoneEnabled = includeMicrophone
 
             let sema = DispatchSemaphore(value: 0)
-            var startError: Error?
+            let errorBox = ErrorBox()
             recorder.startCapture(
                 handler: { [weak self] sampleBuffer, bufferType, error in
                     if let error {
@@ -59,13 +59,13 @@
                     self?.handle(sampleBuffer: sampleBuffer, bufferType: bufferType)
                 },
                 completionHandler: { error in
-                    startError = error
+                    errorBox.set(error)
                     sema.signal()
                 }
             )
             _ = sema.wait(timeout: .now() + 5)
 
-            if let e = startError {
+            if let e = errorBox.value {
                 throw SubstreamError.captureUnavailable(
                     "ReplayKit.startCapture failed: \(e.localizedDescription)"
                 )

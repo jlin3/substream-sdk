@@ -48,11 +48,13 @@
                 formatDescription: format,
                 sampleCount: frames,
                 sampleTimingEntryCount: 1,
-                sampleTimingArray: [CMSampleTimingInfo(
-                    duration: CMTime(value: 1, timescale: CMTimeScale(asbdVar.mSampleRate)),
-                    presentationTimeStamp: pts,
-                    decodeTimeStamp: .invalid
-                )],
+                sampleTimingArray: [
+                    CMSampleTimingInfo(
+                        duration: CMTime(value: 1, timescale: CMTimeScale(asbdVar.mSampleRate)),
+                        presentationTimeStamp: pts,
+                        decodeTimeStamp: .invalid
+                    )
+                ],
                 sampleSizeEntryCount: 0,
                 sampleSizeArray: nil,
                 sampleBufferOut: &sampleBuffer

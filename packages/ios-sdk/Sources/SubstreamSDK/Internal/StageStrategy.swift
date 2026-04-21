@@ -21,7 +21,9 @@ import Foundation
             self.audioDevice = audioDevice
         }
 
-        func stage(_ stage: IVSStage, streamsToPublishForParticipant participant: IVSParticipantInfo)
+        func stage(
+            _ stage: IVSStage, streamsToPublishForParticipant participant: IVSParticipantInfo
+        )
             -> [IVSLocalStageStream]
         {
             var streams: [IVSLocalStageStream] = [IVSLocalStageStream(device: videoDevice)]
