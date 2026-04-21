@@ -46,6 +46,37 @@ For a zero-build-step version using script tags, see [examples/web-game-demo/](e
 
 ---
 
+## Quick Start: iOS
+
+Install via Swift Package Manager:
+
+```
+https://github.com/jlin3/substream-sdk
+```
+
+Select the `SubstreamSDK` product, then:
+
+```swift
+import SubstreamSDK
+
+let session = try await Substream.startStream(
+    .init(
+        backendUrl: URL(string: "https://your-api.com")!,
+        authToken: "sk_live_…",
+        streamerId: "player-456",
+        capture: .metalView(self.gameView)   // or .spriteKit, .sceneKit, .replayKit, .broadcastExtension
+    )
+)
+
+print("Live!", session.viewerUrl)
+```
+
+Works with **Metal, MTKView, SpriteKit, SceneKit, UIKit**, in-app **ReplayKit**, and system-wide capture via a **Broadcast Upload Extension**.
+
+Full guide: [`packages/ios-sdk/README.md`](packages/ios-sdk/README.md) · Example app: [`packages/ios-sdk/Example/`](packages/ios-sdk/Example/)
+
+---
+
 ## Quick Start: Unity
 
 1. Copy SDK scripts to your project:
@@ -86,6 +117,10 @@ Full guide: [SDK_STREAMING_GUIDE.md](SDK_STREAMING_GUIDE.md)
 ```
 substream-sdk/
 ├── packages/web-sdk/           # @substream/web-sdk — TypeScript SDK
+├── packages/ios-sdk/           # SubstreamSDK — native iOS SDK (Swift, SwiftPM + CocoaPods)
+│   ├── Sources/SubstreamSDK/   # Core SDK + capture sources (Metal/SpriteKit/SceneKit/ReplayKit)
+│   ├── Tests/                  # Unit tests
+│   └── Example/                # SubstreamDemo app + Broadcast Upload Extension
 ├── examples/
 │   ├── web-game-demo/          # Standalone web game streaming demo
 │   └── web-viewer/             # Stream viewer page
@@ -134,10 +169,12 @@ For quick testing against the hosted API:
 | Platform | SDK | Status |
 |----------|-----|--------|
 | Web (any canvas) | `@substream/web-sdk` | Production |
+| iOS Native (Metal/SpriteKit/SceneKit/UIKit/ReplayKit) | `SubstreamSDK` (SwiftPM / CocoaPods) | Production |
 | Unity Windows/macOS | `IVSRealTimeStreamControl` | Production |
 | Unity Quest 2/3/Pro | `IVSRealTimeStreamControl` | Production |
 | Unity WebGL | `@substream/web-sdk` | Production |
-| Unity iOS | Coming soon | In progress |
+| Unity iOS | `IVSRealTimeStreamControl` via `SubstreamSDK` native plugin | On roadmap |
+| Android Native | `SubstreamSDK-Android` | On roadmap |
 
 ---
 

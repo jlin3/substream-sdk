@@ -1,0 +1,98 @@
+name: iOS SDK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/ios-sdk/**'
+      - '.github/workflows/ios.yml'
+  pull_request:
+    paths:
+      - 'packages/ios-sdk/**'
+      - '.github/workflows/ios.yml'
+  release:
+    types: [published]
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & Test (macOS)
+    runs-on: macos-14
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: packages/ios-sdk
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-spm-${{ hashFiles('packages/ios-sdk/Package.swift', 'packages/ios-sdk/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Resolve dependencies
+        run: swift package resolve
+
+      - name: Build (iOS Simulator)
+        run: |
+          xcodebuild build \
+            -scheme SubstreamSDK \
+            -destination 'generic/platform=iOS Simulator' \
+            -skipPackagePluginValidation \
+            -quiet
+
+      - name: Test
+        run: |
+          xcodebuild test \
+            -scheme SubstreamSDK \
+            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+            -skipPackagePluginValidation
+
+  lint:
+    name: swift-format
+    runs-on: macos-14
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run swift-format lint
+        run: |
+          # Ship with Xcode 15.4+; fall back to brew if missing.
+          if ! command -v swift-format >/dev/null 2>&1; then
+            brew install swift-format
+          fi
+          swift-format lint --recursive --strict packages/ios-sdk/Sources packages/ios-sdk/Tests
+
+  xcframework:
+    name: Build xcframework
+    runs-on: macos-14
+    if: github.event_name == 'release'
+    needs: [build-and-test, lint]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+      - name: Build xcframework
+        run: bash packages/ios-sdk/Scripts/build_xcframework.sh
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            packages/ios-sdk/build/SubstreamSDK.xcframework.zip
+            packages/ios-sdk/build/SubstreamSDK.xcframework.zip.sha256

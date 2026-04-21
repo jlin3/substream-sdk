@@ -20,11 +20,18 @@ This monorepo contains both the SDK (for game developers) and the platform backe
 │  │              │  │ Prisma/Postgres  │  │ FFmpeg          │  │ livewave  │ │
 │  │              │  │ IVS integration  │  │                │  │ .ai       │ │
 │  └──────────────┘  └──────────────────┘  └────────────────┘  └───────────┘ │
-│  ┌──────────────┐  ┌──────────────────┐                                     │
-│  │ UnityProject/│  │ examples/        │                                     │
-│  │ Unity 6 SDK  │  │ web-game-demo/   │                                     │
-│  │ scripts      │  │ web-viewer/      │                                     │
-│  └──────────────┘  └──────────────────┘                                     │
+│  ┌──────────────┐  ┌──────────────────┐  ┌────────────────────────────┐   │
+│  │ packages/    │  │ UnityProject/    │  │ examples/                  │   │
+│  │ ios-sdk/     │  │ Unity 6 SDK      │  │ web-game-demo/             │   │
+│  │              │  │ scripts          │  │ web-viewer/                │   │
+│  │ SubstreamSDK │  └──────────────────┘  └────────────────────────────┘   │
+│  │ (Swift,      │                                                         │
+│  │  SwiftPM +   │                                                         │
+│  │  CocoaPods)  │                                                         │
+│  │ + Example    │                                                         │
+│  │ + Broadcast  │                                                         │
+│  │   Extension  │                                                         │
+│  └──────────────┘                                                         │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -37,18 +44,21 @@ Game Client                      Platform Backend                    Viewers
 ┌──────────────┐                 ┌─────────────────────┐           ┌──────────┐
 │ @substream/  │  POST /api/     │ IVSBackend          │           │ Browser  │
 │ web-sdk      │──streams/──────>│  ├ Auth (JWT/API key)│           │ /viewer/ │
-│   or         │  web-publish    │  ├ Prisma → Postgres │           │ [id]     │
-│ Unity SDK    │                 │  ├ IVS Stage Pool    │──WebRTC──>│          │
-│              │──WebRTC────────>│  ├ S3 Recording      │           └──────────┘
-│ canvas +     │  via IVS Stage  │  ├ Webhooks          │
-│ audio        │                 │  └ Stream/Highlight DB│
-└──────────────┘                 │                      │
-                                 │  highlight-service   │
-                                 │  ├ Video Intelligence│
-                                 │  ├ Gemini scoring    │
-                                 │  └ FFmpeg assembly   │
+│ SubstreamSDK │  web-publish    │  ├ Prisma → Postgres │           │ [id]     │
+│ (iOS native) │  (+ platform)   │  ├ IVS Stage Pool    │──WebRTC──>│          │
+│ Unity SDK    │                 │  ├ S3 Recording      │           └──────────┘
+│              │──WebRTC────────>│  ├ Webhooks          │
+│ canvas /     │  via IVS Stage  │  ├ Stream/Highlight DB│
+│ MTKView /    │  (AmazonIVS-    │  └ platform/sdkVersion│
+│ SpriteKit /  │   Broadcast)    │                       │
+│ ReplayKit    │                 │  highlight-service    │
+│ + audio      │                 │  ├ Video Intelligence │
+└──────────────┘                 │  ├ Gemini scoring     │
+                                 │  └ FFmpeg assembly    │
                                  └─────────────────────┘
 ```
+
+Every client SDK (web, iOS native, Unity) calls the same `POST /api/streams/web-publish` endpoint, sends `platform` + `sdkVersion` so the dashboard can segment by client, and receives the same IVS participant token.
 
 **Streaming lifecycle:**
 1. SDK calls `POST /api/streams/web-publish` with a Bearer token (API key or demo token)

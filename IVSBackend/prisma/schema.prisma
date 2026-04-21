@@ -67,6 +67,11 @@ model Stream {
   endedAt       DateTime?
   durationSecs  Int?
 
+  // Platform that produced the stream — "web", "ios", "unity", "android".
+  // Nullable for back-compat; older streams predate this field.
+  platform      String?
+  sdkVersion    String?
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -76,6 +81,7 @@ model Stream {
   @@index([status])
   @@index([streamerId])
   @@index([startedAt])
+  @@index([platform])
 }
 
 enum StreamStatus {
