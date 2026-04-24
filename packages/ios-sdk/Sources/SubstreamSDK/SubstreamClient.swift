@@ -491,7 +491,13 @@ final class StubImageSink: SubstreamImageSink {
             self.stats = stats
         }
         func consume(pixelBuffer: CVPixelBuffer, presentationTime: CMTime) {
-            device.onSampleBuffer(SubstreamSampleBufferBuilder.make(pixelBuffer: pixelBuffer, pts: presentationTime))
+            guard
+                let sb = SubstreamSampleBufferBuilder.make(pixelBuffer: pixelBuffer, pts: presentationTime)
+            else {
+                stats.markDropped()
+                return
+            }
+            device.onSampleBuffer(sb)
             stats.markDelivered()
         }
     }
