@@ -41,21 +41,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Platform segmentation: "web" | "ios" | "android" | "unity" | "unity-quest" | null
-    // SDKs send this via the `platform` body field and/or the `X-Substream-SDK`
-    // header (e.g. "ios/1.0.0"). Unknown/missing values are treated as "web".
+    // Platform segmentation: client SDKs announce themselves via the
+    // `platform` body field and/or the `X-Substream-SDK: <platform>/<version>`
+    // header. We whitelist the value so the dashboard's segmentation stays
+    // clean and untrusted input can't land an arbitrary string in the DB.
+    const ALLOWED_PLATFORMS = ['web', 'ios', 'android', 'unity', 'unity-quest'] as const;
+    type Platform = (typeof ALLOWED_PLATFORMS)[number];
+    const isAllowedPlatform = (p: string): p is Platform =>
+      (ALLOWED_PLATFORMS as readonly string[]).includes(p);
+
     const sdkHeader = request.headers.get('x-substream-sdk') || '';
-    const [headerPlatform, headerVersion] = sdkHeader.includes('/')
+    const [rawHeaderPlatform = '', rawHeaderVersion = ''] = sdkHeader.includes('/')
       ? sdkHeader.split('/', 2)
       : [sdkHeader, ''];
-    const platform: string =
-      (typeof body.platform === 'string' && body.platform.trim()) ||
-      headerPlatform ||
-      'web';
-    const sdkVersion: string | null =
+    const rawBodyPlatform =
+      typeof body.platform === 'string' ? body.platform.trim().toLowerCase() : '';
+    const rawHeaderPlatformLower = rawHeaderPlatform.trim().toLowerCase();
+
+    const platform: Platform = isAllowedPlatform(rawBodyPlatform)
+      ? rawBodyPlatform
+      : isAllowedPlatform(rawHeaderPlatformLower)
+        ? rawHeaderPlatformLower
+        : 'web';
+
+    // Version is advisory; clamp length so we don't accept novels as a SemVer string.
+    const rawVersion =
       (typeof body.sdkVersion === 'string' && body.sdkVersion.trim()) ||
-      headerVersion ||
-      null;
+      rawHeaderVersion.trim() ||
+      '';
+    const sdkVersion: string | null =
+      rawVersion && /^[A-Za-z0-9._+\-]{1,32}$/.test(rawVersion) ? rawVersion : null;
 
     const streamId = uuidv4();
     const allocation = await allocateStage(streamId, auth.userId, streamerId);
