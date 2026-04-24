@@ -82,6 +82,22 @@ const DEFAULT_CONFIG: StagePoolConfig = {
 const WHIP_GLOBAL_ENDPOINT = 'https://global.whip.live-video.net';
 
 // ============================================
+// ERROR CLASSIFIERS
+// ============================================
+
+/**
+ * Detect errors from AWS SDK that indicate the stage ARN no longer exists.
+ * Covers both the typed `ResourceNotFoundException` name and the string
+ * form ("Resource: arn:... not found") some code paths surface.
+ */
+function isStageGoneError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  if (error.name === 'ResourceNotFoundException') return true;
+  const msg = error.message || '';
+  return /Resource:.*not found/i.test(msg) || /no resource found/i.test(msg);
+}
+
+// ============================================
 // STAGE POOL CLASS
 // ============================================
 
@@ -310,7 +326,17 @@ class StagePoolAllocator {
 
   /**
    * Allocate a stage for a new stream
-   * Returns WHIP connection info and publish token
+   * Returns WHIP connection info and publish token.
+   *
+   * Stages may be stale — AWS garbage-collects idle stages, and previous
+   * process instances may have registered ARNs that no longer exist. When
+   * `createParticipantToken` returns `ResourceNotFoundException` we:
+   *   1. Evict the stale entry from the local pool (it's gone from AWS).
+   *   2. Retry with the next available stage.
+   *   3. If we exhaust the pool, create a fresh stage on-demand.
+   *
+   * `maxStaleAttempts` bounds the retry loop so a pool full of stale entries
+   * eventually falls back to creating a brand-new stage instead of spinning.
    */
   async allocate(
     streamId: string,
@@ -322,65 +348,73 @@ class StagePoolAllocator {
       await this.initialize();
     }
 
-    // Find available stage
-    let stage: PooledStage | null = null;
-    
-    for (const s of this.pool.values()) {
-      if (!s.inUse) {
-        stage = s;
-        break;
+    const maxStaleAttempts = 6;
+    let staleSeen = 0;
+
+    while (true) {
+      // Find an available stage, or create one on-demand
+      let stage = this.findAvailableStage();
+      if (!stage) {
+        console.log('[StagePool] No available stages, creating on-demand');
+        stage = await this.createPoolStage();
+      }
+
+      // Mark as in use
+      stage.inUse = true;
+      stage.streamId = streamId;
+      stage.allocatedAt = new Date();
+
+      // Try to mint a publish token. If AWS reports the stage is gone,
+      // evict and retry; otherwise rollback and rethrow.
+      try {
+        const tokenResponse = await createParticipantToken({
+          stageArn: stage.arn,
+          userId,
+          capabilities: ['PUBLISH'],
+          duration: 60,
+          attributes: { role: 'publisher', childId, streamId },
+        });
+
+        console.log(`[StagePool] Allocated stage ${stage.name} for stream ${streamId}`);
+        return {
+          stageArn: stage.arn,
+          stageName: stage.name,
+          publishToken: tokenResponse.token,
+          participantId: tokenResponse.participantId,
+          expiresAt: tokenResponse.expirationTime,
+          whipUrl: WHIP_GLOBAL_ENDPOINT,
+          region: this.config.region,
+        };
+      } catch (error) {
+        if (isStageGoneError(error) && staleSeen < maxStaleAttempts) {
+          staleSeen++;
+          console.warn(
+            `[StagePool] Stage ${stage.name} is gone from AWS, evicting and retrying (${staleSeen}/${maxStaleAttempts})`,
+          );
+          this.pool.delete(stage.arn);
+          // Replenish in the background so the pool heals faster.
+          this.replenish().catch(err => console.error('[StagePool] Replenish after eviction failed:', err));
+          continue;
+        }
+
+        // Non-recoverable — rollback the allocation and rethrow.
+        console.error(`[StagePool] Token creation failed, rolling back stage ${stage.name}:`, error);
+        stage.inUse = false;
+        stage.streamId = undefined;
+        stage.allocatedAt = undefined;
+        throw error;
       }
     }
+  }
 
-    // If no available stage, create one on-demand (slower)
-    if (!stage) {
-      console.log('[StagePool] No available stages, creating on-demand');
-      stage = await this.createPoolStage();
+  /**
+   * Find the first available stage in the pool, or `null` if none.
+   */
+  private findAvailableStage(): PooledStage | null {
+    for (const s of this.pool.values()) {
+      if (!s.inUse) return s;
     }
-
-    // Mark as in use
-    stage.inUse = true;
-    stage.streamId = streamId;
-    stage.allocatedAt = new Date();
-
-    // Create publish token for this stage
-    // Wrapped in try/catch to rollback stage allocation on failure
-    let tokenResponse;
-    try {
-      tokenResponse = await createParticipantToken({
-        stageArn: stage.arn,
-        userId,
-        capabilities: ['PUBLISH'],
-        duration: 60, // 1 hour for WHIP sessions
-        attributes: {
-          role: 'publisher',
-          childId,
-          streamId,
-        },
-      });
-    } catch (error) {
-      // Rollback: release the stage so it's not permanently stuck as in-use
-      console.error(`[StagePool] Token creation failed, rolling back stage ${stage.name}:`, error);
-      stage.inUse = false;
-      stage.streamId = undefined;
-      stage.allocatedAt = undefined;
-      throw error;
-    }
-
-    // Use the global WHIP endpoint. The JWT contains a stage-specific base URL
-    // but it's missing the path component that the 307 redirect provides.
-    // The global endpoint with auto-redirect is the correct approach per AWS docs.
-    console.log(`[StagePool] Allocated stage ${stage.name} for stream ${streamId}`);
-
-    return {
-      stageArn: stage.arn,
-      stageName: stage.name,
-      publishToken: tokenResponse.token,
-      participantId: tokenResponse.participantId,
-      expiresAt: tokenResponse.expirationTime,
-      whipUrl: WHIP_GLOBAL_ENDPOINT,
-      region: this.config.region,
-    };
+    return null;
   }
 
   /**
@@ -413,11 +447,14 @@ class StagePoolAllocator {
 
   /**
    * Release a stage back to the pool (after stream ends)
-   * AWS recommends deleting stages after use to avoid quota issues
+   * AWS recommends deleting stages after use to avoid quota issues.
+   *
+   * If AWS reports the stage is already gone, treat that as success —
+   * we just need to drop it from the local pool.
    */
   async release(stageArn: string): Promise<void> {
     const stage = this.pool.get(stageArn);
-    
+
     if (!stage) {
       console.warn(`[StagePool] Attempted to release unknown stage: ${stageArn}`);
       return;
@@ -425,21 +462,58 @@ class StagePoolAllocator {
 
     console.log(`[StagePool] Releasing stage ${stage.name}`);
 
-    // Delete the stage (AWS recommendation for cleanup)
     try {
       await deleteStage(stageArn);
       this.pool.delete(stageArn);
       console.log(`[StagePool] Deleted stage ${stage.name}`);
     } catch (error) {
-      console.error(`[StagePool] Error deleting stage ${stageArn}:`, error);
-      // Mark as not in use so it can be reused or cleaned up later
-      stage.inUse = false;
-      stage.streamId = undefined;
-      stage.allocatedAt = undefined;
+      if (isStageGoneError(error)) {
+        console.warn(`[StagePool] Stage ${stage.name} already gone on AWS; dropping from pool`);
+        this.pool.delete(stageArn);
+      } else {
+        console.error(`[StagePool] Error deleting stage ${stageArn}:`, error);
+        // Mark as not in use so it can be reused or cleaned up later
+        stage.inUse = false;
+        stage.streamId = undefined;
+        stage.allocatedAt = undefined;
+      }
     }
 
     // Trigger async replenish to maintain pool size
     this.replenish().catch(console.error);
+  }
+
+  /**
+   * Drop any stages from the local pool that don't actually exist on AWS.
+   * Called once at init and can be called periodically as a safety net.
+   */
+  async pruneStaleStages(): Promise<number> {
+    let pruned = 0;
+    for (const [arn, stage] of [...this.pool.entries()]) {
+      // Skip stages that are currently in use — we don't want to pull the
+      // rug out from under a live stream. Stale in-use stages will be
+      // detected the next time someone tries to allocate.
+      if (stage.inUse) continue;
+
+      try {
+        const token = await createParticipantToken({
+          stageArn: arn,
+          userId: '__healthcheck',
+          capabilities: ['SUBSCRIBE'],
+          duration: 1,
+          attributes: { role: 'healthcheck' },
+        });
+        // Token minted fine; the stage exists. Nothing to do.
+        void token;
+      } catch (error) {
+        if (isStageGoneError(error)) {
+          this.pool.delete(arn);
+          pruned++;
+          console.warn(`[StagePool] Pruned stale stage ${stage.name}`);
+        }
+      }
+    }
+    return pruned;
   }
 
   /**
