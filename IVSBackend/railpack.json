@@ -1,0 +1,19 @@
+{
+    "$schema": "https://schema.railpack.com",
+    "provider": "node",
+    "packages": {
+        "node": "20"
+    },
+    "steps": {
+        "build": {
+            "commands": [
+                "...",
+                "pnpm db:generate",
+                "pnpm build"
+            ]
+        }
+    },
+    "deploy": {
+        "startCommand": "npx prisma db push --accept-data-loss || echo 'prisma push failed, continuing...' ; pnpm start"
+    }
+}
