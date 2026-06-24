@@ -83,18 +83,11 @@ print("Live!", session.viewerUrl)`,
 
 const ENGINES = ['Unity', 'Unreal', 'WebGL', 'Phaser', 'Three.js', 'PixiJS', 'Cocos', 'Godot', 'Construct'];
 
-const VIDEOS = [
-  {
-    id: 'd2cacf2112a947d1a6805991359c05ff',
-    title: 'Introducing Substream',
-    label: 'The platform in 2 minutes',
-  },
-  {
-    id: 'e4798d41d35046468db7ef4d035f7087',
-    title: 'Unity SDK, live',
-    label: 'Stream Unity gameplay live',
-  },
-];
+const VIDEO = {
+  id: 'e4798d41d35046468db7ef4d035f7087',
+  title: 'Stream your gameplay live',
+  label: 'Watch a Unity game go live with the Substream SDK',
+};
 
 const FEATURES = [
   { icon: 'plug', title: 'Plugs into any game', body: '5 lines. Web, Unity, or iOS.' },
@@ -270,12 +263,12 @@ export default function ProductDemoPage() {
               White-label streaming for games
             </p>
             <h1 className="text-balance text-4xl sm:text-5xl lg:text-6xl font-medium tracking-tighter leading-[1.05]">
-              Any game.
+              Your own private Twitch
               <br />
-              <span className="text-[#2B7FFF]">Live on your site.</span>
+              <span className="text-[#2B7FFF]">for your community.</span>
             </h1>
             <p className="max-w-md mx-auto lg:mx-0 text-base md:text-lg text-white/55 leading-relaxed">
-              One SDK to stream gameplay, own the content and data, monetize it, and auto-generate AI highlights.
+              One SDK to stream gameplay to your own site, own the content and data, monetize it, and auto-generate AI highlights.
             </p>
             <div className="flex gap-3 justify-center lg:justify-start flex-wrap">
               <Link href="/demo" className={BTN_PRIMARY}>Try the live demo</Link>
@@ -341,35 +334,25 @@ export default function ProductDemoPage() {
 
       {/* Video proof */}
       <section id="watch" className="py-20 px-6 border-b border-white/10 bg-white/[0.015] scroll-mt-16">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <Reveal className="text-center mb-12">
             <p className="text-sm font-medium text-[#2B7FFF] uppercase tracking-widest mb-2">See it in action</p>
-            <h2 className="text-3xl md:text-4xl font-medium tracking-tighter">Watch Substream work</h2>
+            <h2 className="text-3xl md:text-4xl font-medium tracking-tighter">{VIDEO.title}</h2>
+            <p className="text-white/50 mt-3">{VIDEO.label}</p>
           </Reveal>
-          <div className="grid md:grid-cols-2 gap-6">
-            {VIDEOS.map((v, i) => (
-              <Reveal key={v.id} delay={i * 120}>
-                <div className="group rounded-2xl border border-white/10 bg-[#0e0e10] overflow-hidden shadow-xl shadow-black/40 transition-all duration-500 hover:border-[#2B7FFF]/40 hover:shadow-[0_24px_60px_rgba(43,127,255,0.15)]">
-                  <div className="relative aspect-video">
-                    <iframe
-                      src={`https://www.loom.com/embed/${v.id}?hide_owner=true&hide_share=true&hideEmbedTopBar=true`}
-                      title={v.title}
-                      allow="fullscreen; picture-in-picture"
-                      allowFullScreen
-                      className="absolute inset-0 h-full w-full"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between px-5 py-4">
-                    <div>
-                      <div className="font-semibold">{v.title}</div>
-                      <div className="text-sm text-white/45">{v.label}</div>
-                    </div>
-                    <span className="text-[#2B7FFF] text-sm opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all">▶</span>
-                  </div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
+          <Reveal delay={120}>
+            <div className="group rounded-2xl border border-white/10 bg-[#0e0e10] overflow-hidden shadow-2xl shadow-black/50 transition-all duration-500 hover:border-[#2B7FFF]/40 hover:shadow-[0_32px_80px_rgba(43,127,255,0.2)]">
+              <div className="relative aspect-video">
+                <iframe
+                  src={`https://www.loom.com/embed/${VIDEO.id}?hide_owner=true&hide_share=true&hideEmbedTopBar=true`}
+                  title={VIDEO.title}
+                  allow="fullscreen; picture-in-picture"
+                  allowFullScreen
+                  className="absolute inset-0 h-full w-full"
+                />
+              </div>
+            </div>
+          </Reveal>
         </div>
       </section>
 
