@@ -16,6 +16,7 @@ Try it right now — no setup required:
 
 | | |
 |---|---|
+| **Product Walkthrough** | [/product-demo](https://substream-sdk-production.up.railway.app/product-demo) — the full story: integrate, stream to your site, own the data, monetize, and tune AI highlights |
 | **Landing Page** | [substream-sdk-production.up.railway.app](https://substream-sdk-production.up.railway.app) |
 | **Interactive Demo** | [/demo](https://substream-sdk-production.up.railway.app/demo) — play Breakout and stream it live |
 | **Dashboard** | [/api/auth/demo-auto](https://substream-sdk-production.up.railway.app/api/auth/demo-auto) — auto-login to explore streams, recordings, and AI highlights |
@@ -104,11 +105,15 @@ Full guide: [SDK_STREAMING_GUIDE.md](SDK_STREAMING_GUIDE.md)
 |---------|-------------|
 | **Canvas Streaming** | Capture any HTML5 canvas or Unity game and stream via WebRTC |
 | **Sub-Second Latency** | IVS Real-Time stages deliver < 500ms glass-to-glass |
+| **Stream to Your Site** | Every stream returns a `viewerUrl` you embed on your own domain — link it or iframe it |
 | **Cloud Recording** | Every stream automatically recorded to S3 |
+| **Owned Data & Content** | Streams, recordings, viewers, and events live in your dashboard and API — your content, your data |
 | **AI Highlights** | Analyze recordings and generate highlight reels with best moments |
+| **Custom Highlight Models** | Fine-tune the highlight model on your own clips so "exciting" matches your game |
+| **Monetization** | Usage-based billing plus revenue models: player subscriptions, watch parties, clip sales |
 | **Dashboard** | Browse streams, watch live, view recordings, manage highlights |
 | **Webhooks** | Get notified on stream.started, stream.stopped, viewer.joined events |
-| **Multi-Platform** | Web canvas, Unity (Windows, macOS, Quest), and more |
+| **Multi-Platform** | Web canvas, Unity (Windows, macOS, Quest), iOS native, and more |
 
 ---
 

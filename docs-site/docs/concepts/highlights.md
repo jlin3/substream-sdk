@@ -42,3 +42,29 @@ Content-Type: application/json
 ## Pipeline Visualization
 
 The dashboard shows a detailed pipeline visualization for each highlight, including processing steps, segment scores, and which segments were selected vs skipped.
+
+## Custom Models (Per-Game Tuning)
+
+The base scoring model is game-agnostic and works out of the box. For your title,
+you can fine-tune a model so "exciting" means what it means in your game — a
+headshot in an FPS, a comeback in a racer, a boss kill in an RPG.
+
+### How tuning works
+
+1. **Collect examples** — Upload labelled segments that represent great moments
+   from your game. Positive feedback on generated highlights is also captured
+   automatically to grow the training set.
+2. **Export & tune** — The highlight service exports the examples as JSONL and
+   fine-tunes a Gemini model via the training API (`/api/v1/training/*`).
+3. **Activate** — Set the `GEMINI_TUNED_MODEL` environment variable on the
+   highlight service. When set, segment scoring uses your tuned model instead of
+   the base model.
+
+### Comparing models
+
+The dashboard's **Highlights → Compare** view runs the base model and your tuned
+model against the same recording so you can see, segment by segment, how much the
+custom model improves selection before you roll it out.
+
+The **Highlights → Training** view is where you upload examples and kick off a
+tuning job.
