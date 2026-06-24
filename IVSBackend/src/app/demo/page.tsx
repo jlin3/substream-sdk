@@ -43,7 +43,7 @@ export default function DemoPage() {
   const [sdkLoaded, setSdkLoaded] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [streamInfo, setStreamInfo] = useState<{ streamId: string; dashboardUrl: string } | null>(null);
+  const [streamInfo, setStreamInfo] = useState<{ streamId: string; dashboardUrl: string; viewerUrl: string } | null>(null);
   const [status, setStatus] = useState<{ text: string; type: 'info' | 'live' | 'error' }>({
     text: 'Load complete. Click "Start Streaming" to go live.', type: 'info',
   });
@@ -206,7 +206,7 @@ export default function DemoPage() {
       log('Publishing to IVS Real-Time', 'ok');
 
       sessionRef.current = { streamId: info.streamId, viewerUrl: info.viewerUrl, stage, canvasStream: stream, isLive: true };
-      setStreamInfo({ streamId: info.streamId, dashboardUrl: `/dashboard/streams/${info.streamId}` });
+      setStreamInfo({ streamId: info.streamId, dashboardUrl: `/dashboard/streams/${info.streamId}`, viewerUrl: info.viewerUrl });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       log(`ERROR: ${msg}`, 'err');
@@ -229,6 +229,7 @@ export default function DemoPage() {
       log('Stream stopped, backend notified', 'ok');
     } catch { log('Backend stop notification failed (non-critical)', 'warn'); }
     sessionRef.current = null;
+    setStreamInfo(null);
     setStreaming(false); setConnecting(false);
     setStatus({ text: 'Stream stopped. Start again anytime.', type: 'info' });
   }
@@ -296,13 +297,33 @@ export default function DemoPage() {
               {status.text}
             </div>
 
-            {/* Dashboard link */}
+            {/* Live links: company website viewer + dashboard */}
             {streamInfo && (
-              <div className="rounded-lg border border-brand-500/30 bg-brand-600/10 px-4 py-3 text-sm space-y-1">
-                <p className="text-brand-400 font-medium">Stream is live on the dashboard</p>
-                <Link href={streamInfo.dashboardUrl} className="text-brand-300 hover:underline text-xs">
-                  {window.location.origin}{streamInfo.dashboardUrl}
-                </Link>
+              <div className="space-y-3">
+                <div className="rounded-lg border border-brand-500/30 bg-brand-600/10 px-4 py-3 text-sm space-y-2">
+                  <p className="text-brand-400 font-medium">Watch on a website</p>
+                  <p className="text-white/50 text-xs leading-relaxed">
+                    The SDK returns this viewer URL. It&apos;s what your company embeds on its own
+                    site &mdash; players watch on your domain, no third-party app.
+                  </p>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <a
+                      href={streamInfo.viewerUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-semibold hover:bg-brand-500 transition-colors"
+                    >
+                      Open the website viewer
+                    </a>
+                    <code className="text-brand-300 text-xs break-all">{streamInfo.viewerUrl}</code>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-surface-100 px-4 py-3 text-sm space-y-1">
+                  <p className="text-white/70 font-medium">Track it on the dashboard</p>
+                  <Link href={streamInfo.dashboardUrl} className="text-brand-300 hover:underline text-xs">
+                    {window.location.origin}{streamInfo.dashboardUrl}
+                  </Link>
+                </div>
               </div>
             )}
           </div>

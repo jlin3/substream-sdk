@@ -13,6 +13,7 @@ const sidebars: SidebarsConfig = {
       label: 'Concepts',
       items: [
         'concepts/streams',
+        'concepts/viewer-embed',
         'concepts/recordings',
         'concepts/highlights',
         'concepts/webhooks',

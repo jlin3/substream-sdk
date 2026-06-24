@@ -10,6 +10,12 @@ export default function LandingPage() {
         </span>
         <div className="flex items-center gap-3">
           <Link
+            href="/product-demo"
+            className="text-sm text-white/60 hover:text-white transition-colors"
+          >
+            Product
+          </Link>
+          <Link
             href="/docs"
             className="text-sm text-white/60 hover:text-white transition-colors"
           >

@@ -215,110 +215,74 @@ By default, pressing `U` toggles streaming on/off. You can disable this by remov
 
 ---
 
-## Viewing the Stream
+## Streaming to Your Website
 
-Once streaming starts, viewers can watch via:
+Every stream produces a **viewer URL** that renders the live IVS Real-Time
+player. This is how gameplay reaches your company's own site — players watch on
+your domain, not a third-party platform, with sub-second latency.
 
-### Option A: Substream Dashboard
+You get the viewer URL two ways:
 
-1. Log into the Substream dashboard
-2. Navigate to **Live Streams**
-3. Click **Watch** on the active stream
+- **Web/iOS SDK** — `session.viewerUrl` is returned from `startStream()`.
+- **Unity** — `streamControl.GetViewerUrl()` after the stream starts.
 
-### Option B: Embed in Your Web App
+It always points at `{backendUrl}/viewer/{streamId}`.
 
-Add the IVS player to any web page:
+### Option A: Embed on your site (recommended)
+
+Drop the viewer straight into any page with an iframe — no player SDK required:
 
 ```html
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Stream Viewer</title>
-    <script src="https://player.live-video.net/1.24.0/amazon-ivs-player.min.js"></script>
-    <style>
-        #video-player {
-            width: 100%;
-            max-width: 1280px;
-            aspect-ratio: 16/9;
-            background: #000;
-        }
-        .status {
-            padding: 10px;
-            font-family: sans-serif;
-        }
-        .live { color: #e53935; font-weight: bold; }
-        .offline { color: #666; }
-    </style>
-</head>
-<body>
-    <div class="status" id="status">Checking stream...</div>
-    <video id="video-player" playsinline controls></video>
-    
-    <script>
-        // Replace with your API endpoint and child ID
-        const API_ENDPOINT = 'https://api.kid.com';
-        const CHILD_ID = 'your-child-id';
-        const AUTH_TOKEN = 'your-auth-token';
-        
-        async function loadStream() {
-            const statusEl = document.getElementById('status');
-            
-            try {
-                // Get playback URL from API
-                const response = await fetch(
-                    `${API_ENDPOINT}/api/streams/children/${CHILD_ID}/playback`,
-                    { headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` } }
-                );
-                
-                const data = await response.json();
-                
-                if (!data.status?.isLive) {
-                    statusEl.textContent = 'Stream is offline';
-                    statusEl.className = 'status offline';
-                    return;
-                }
-                
-                statusEl.innerHTML = '🔴 LIVE';
-                statusEl.className = 'status live';
-                
-                // Initialize IVS player
-                if (IVSPlayer.isPlayerSupported) {
-                    const player = IVSPlayer.create();
-                    player.attachHTMLVideoElement(document.getElementById('video-player'));
-                    
-                    // Load with auth token if private channel
-                    player.load(data.playback.url);
-                    if (data.playback.token) {
-                        player.setPlaybackToken(data.playback.token);
-                    }
-                    
-                    player.play();
-                } else {
-                    statusEl.textContent = 'Browser not supported';
-                }
-            } catch (error) {
-                statusEl.textContent = `Error: ${error.message}`;
-                console.error('Failed to load stream:', error);
-            }
-        }
-        
-        loadStream();
-        // Refresh status every 10 seconds
-        setInterval(loadStream, 10000);
-    </script>
-</body>
-</html>
+<!-- viewerUrl looks like https://your-api.com/viewer/STREAM_ID -->
+<iframe
+  src="https://your-api.com/viewer/STREAM_ID"
+  allow="autoplay; fullscreen"
+  style="width:100%; aspect-ratio:16/9; border:0; border-radius:12px"
+></iframe>
 ```
 
-### Option C: Use the Example Viewer
+For private streams, pass the viewer's auth token as a query param so the page
+can request a scoped subscribe token:
 
-We provide a ready-to-use viewer in `examples/web-viewer/`:
-
-```bash
-cd examples/web-viewer
-# Open index.html in your browser
-# Enter your stream URL and watch!
 ```
+https://your-api.com/viewer/STREAM_ID?auth=VIEWER_AUTH_TOKEN
+```
+
+### Option B: Link to the hosted viewer
+
+Open or share the viewer URL directly:
+
+```js
+const session = await Substream.startStream({ /* ... */ });
+window.open(session.viewerUrl, '_blank');
+```
+
+### Option C: Build your own player
+
+If you need full control over the UI, request a subscribe token and render the
+stream with the IVS Web Broadcast SDK yourself:
+
+```js
+const res = await fetch(`${API_ENDPOINT}/api/streams/${streamId}/viewer`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${VIEWER_AUTH_TOKEN}`,
+  },
+  body: JSON.stringify({ parentUserId: 'viewer-123' }),
+});
+const { subscribeToken, stageArn, participantId } = await res.json();
+// Join the IVS Real-Time stage as a subscriber with subscribeToken.
+```
+
+The hosted `/viewer/{streamId}` page (see
+`IVSBackend/src/components/IvsRealTimeViewer.tsx`) is a working reference for
+this flow.
+
+### Option D: Substream Dashboard
+
+For internal monitoring, log into the dashboard, open **Live Streams**, and
+click **Watch** on any active stream.
 
 ---
 
