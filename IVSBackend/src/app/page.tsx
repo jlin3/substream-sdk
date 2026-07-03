@@ -28,10 +28,10 @@ export default function LandingPage() {
             Dashboard
           </Link>
           <Link
-            href="/demo"
+            href="/try"
             className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium hover:bg-brand-500 transition-colors"
           >
-            Live Demo
+            Demo It Yourself
           </Link>
         </div>
       </nav>
@@ -73,18 +73,21 @@ const session = await Substream.startStream({
 
           <div className="flex gap-4 justify-center pt-4 flex-wrap">
             <Link
-              href="/demo"
+              href="/try"
               className="rounded-lg bg-brand-600 px-6 py-3 text-sm font-semibold hover:bg-brand-500 transition-colors"
             >
-              Try the Live Demo
+              Demo It Yourself — See Your Own Platform
             </Link>
             <Link
-              href="/api/auth/demo-auto"
+              href="/demo"
               className="rounded-lg border border-white/20 px-6 py-3 text-sm font-semibold hover:bg-white/5 transition-colors"
             >
-              Explore the Dashboard
+              Try the SDK Demo
             </Link>
           </div>
+          <p className="text-sm text-white/40">
+            Enter your website — we&apos;ll generate a fully branded streaming experience for your games in under a minute.
+          </p>
         </div>
       </main>
 

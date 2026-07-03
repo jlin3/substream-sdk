@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/vods', label: 'Recordings', icon: VodIcon },
   { href: '/dashboard/highlights', label: 'Highlights', icon: HighlightIcon },
   { href: '/dashboard/billing', label: 'Usage & Billing', icon: BillingIcon },
+  { href: '/dashboard/leads', label: 'Leads', icon: LeadsIcon },
   { href: '/dashboard/keys', label: 'API Keys', icon: KeyIcon },
 ];
 
@@ -147,6 +148,16 @@ function BillingIcon({ active }: { active: boolean }) {
       <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
       <path d="M1.5 6h13" stroke="currentColor" strokeWidth="1" opacity="0.4" />
       <path d="M4.5 9h3M4.5 11h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function LeadsIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? 'text-brand-400' : 'text-white/40'}>
+      <circle cx="6" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M1.5 13.5c0-2.2 2-4 4.5-4s4.5 1.8 4.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M11 6.5l1.5 1.5L15 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
