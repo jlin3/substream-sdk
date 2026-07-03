@@ -20,7 +20,7 @@ const createSchema = z.object({
     .string()
     .regex(/^#[0-9a-fA-F]{3,8}$/)
     .optional(),
-  template: z.enum(['DESTINATION', 'FEED']).default('DESTINATION'),
+  template: z.enum(['DESTINATION', 'FEED', 'EVENT']).default('DESTINATION'),
   genre: z.string().max(40).default('shooter'),
   survey: z.record(z.string(), z.unknown()).optional(),
 });

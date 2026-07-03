@@ -4,7 +4,14 @@ import Script from 'next/script';
 import Link from 'next/link';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Geist } from 'next/font/google';
-import { embedUrl, hashString, type SimContent, type SimClip } from '@/lib/demo-gen/content';
+import {
+  embedUrl,
+  hashString,
+  TERMS,
+  type SimContent,
+  type SimChannel,
+  type SimClip,
+} from '@/lib/demo-gen/content';
 import GoLivePanel, { type GoLiveSession } from './go-live';
 
 const geist = Geist({ subsets: ['latin'] });
@@ -14,7 +21,7 @@ export interface DemoSiteProps {
   brandName: string;
   logoUrl: string | null;
   accentColor: string;
-  template: 'DESTINATION' | 'FEED';
+  template: 'DESTINATION' | 'FEED' | 'EVENT';
   genre: string;
 }
 
@@ -42,39 +49,41 @@ export default function BrandedDemo({ site, content }: { site: DemoSiteProps; co
   const handleLive = useCallback((s: GoLiveSession) => setLiveSession(s), []);
   const handleStopped = useCallback(() => setLiveSession(null), []);
 
+  const templateProps: TemplateProps = {
+    site,
+    content,
+    sdkLoaded,
+    liveSession,
+    goLiveOpen,
+    setGoLiveOpen,
+    onLive: handleLive,
+    onStopped: handleStopped,
+  };
+
   return (
     <div className={`${geist.className} min-h-screen bg-[#0e0e10] text-[#FAFAFA] tracking-tight flex flex-col`}>
       <Script src="https://web-broadcast.live-video.net/1.32.0/amazon-ivs-web-broadcast.js" onLoad={() => setSdkLoaded(true)} />
 
       <PreviewBanner brandName={site.brandName} accent={site.accentColor} />
 
-      {site.template === 'DESTINATION' ? (
-        <DestinationTemplate
-          site={site}
-          content={content}
-          sdkLoaded={sdkLoaded}
-          liveSession={liveSession}
-          goLiveOpen={goLiveOpen}
-          setGoLiveOpen={setGoLiveOpen}
-          onLive={handleLive}
-          onStopped={handleStopped}
-        />
-      ) : (
-        <FeedTemplate
-          site={site}
-          content={content}
-          sdkLoaded={sdkLoaded}
-          liveSession={liveSession}
-          goLiveOpen={goLiveOpen}
-          setGoLiveOpen={setGoLiveOpen}
-          onLive={handleLive}
-          onStopped={handleStopped}
-        />
-      )}
+      {site.template === 'DESTINATION' && <DestinationTemplate {...templateProps} />}
+      {site.template === 'EVENT' && <EventTemplate {...templateProps} />}
+      {site.template === 'FEED' && <FeedTemplate {...templateProps} />}
 
       <FooterCta brandName={site.brandName} accent={site.accentColor} />
     </div>
   );
+}
+
+interface TemplateProps {
+  site: DemoSiteProps;
+  content: SimContent;
+  sdkLoaded: boolean;
+  liveSession: GoLiveSession | null;
+  goLiveOpen: boolean;
+  setGoLiveOpen: (open: boolean) => void;
+  onLive: (s: GoLiveSession) => void;
+  onStopped: () => void;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -145,7 +154,7 @@ function FooterCta({ brandName, accent }: { brandName: string; accent: string })
         </Link>
       </div>
       <p className="text-xs text-white/25 pt-2">
-        Powered by <Link href="/" className="underline hover:text-white/50">Substream</Link> — live streaming infrastructure for games
+        Powered by <Link href="/" className="underline hover:text-white/50">Substream</Link> — live streaming infrastructure for games, music, and sports
       </p>
     </footer>
   );
@@ -169,7 +178,7 @@ function useSimChat(content: SimContent, liveNow: boolean) {
     const tick = () => {
       const user = content.chatUsers[Math.floor(Math.random() * content.chatUsers.length)];
       const pool = liveNow
-        ? [...content.chatLines, 'yo someone just went LIVE', 'new streamer just dropped', 'welcome to the stream!', 'sub-second latency btw', 'this is running on WebRTC??']
+        ? [...content.chatLines, 'yo someone just went LIVE', 'a new broadcast just dropped', 'welcome to the stream!', 'sub-second latency btw', 'this is running on WebRTC??']
         : content.chatLines;
       push(user, pool[Math.floor(Math.random() * pool.length)]);
       timeout = setTimeout(tick, 1200 + Math.random() * 2200);
@@ -238,7 +247,7 @@ function ChatPanel({
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Viewer count that drifts like a live stream
+// Live-feel helpers
 // ─────────────────────────────────────────────────────────────────
 
 function useDriftingCount(base: number) {
@@ -257,52 +266,375 @@ function fmtViewers(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
 }
 
+function Avatar({ name, hue, accent, isYou }: { name: string; hue: number; accent: string; isYou?: boolean }) {
+  return (
+    <span
+      className="flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+      style={{ background: isYou ? accent : `hsl(${hue},55%,45%)` }}
+    >
+      {name.charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
+function LiveBadge() {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-bold text-white bg-red-600">
+      LIVE
+    </span>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────
-// Template 1: Twitch-style destination
+// Browse building blocks (hero carousel, categories, stream grid)
 // ─────────────────────────────────────────────────────────────────
 
-interface TemplateProps {
+function HeroCarousel({
+  channels,
+  accent,
+  personNoun,
+  onWatch,
+}: {
+  channels: SimChannel[];
+  accent: string;
+  personNoun: string;
+  onWatch: (index: number) => void;
+}) {
+  const [featured, setFeatured] = useState(0);
+  const channel = channels[featured];
+  const viewers = useDriftingCount(channel.viewers);
+
+  useEffect(() => {
+    const t = setInterval(() => setFeatured((f) => (f + 1) % channels.length), 12000);
+    return () => clearInterval(t);
+  }, [channels.length]);
+
+  return (
+    <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black">
+      <div className="relative aspect-[21/9] min-h-[260px]">
+        <iframe
+          key={channel.videoId}
+          src={embedUrl(channel.videoId)}
+          title={channel.title}
+          allow="autoplay; encrypted-media"
+          className="absolute inset-0 h-full w-full pointer-events-none scale-[1.35]"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+        <div className="absolute top-3 left-3 flex items-center gap-2">
+          <LiveBadge />
+          <span className="rounded bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-white/90">{fmtViewers(viewers)} watching</span>
+        </div>
+        <div className="absolute bottom-0 inset-x-0 p-5 flex items-end gap-4 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs uppercase tracking-widest text-white/50 mb-1">Featured {personNoun.toLowerCase()}</p>
+            <p className="text-xl font-semibold truncate">{channel.streamer}</p>
+            <p className="text-sm text-white/60 truncate">{channel.title}</p>
+          </div>
+          <button
+            onClick={() => onWatch(featured)}
+            className="inline-flex h-10 items-center rounded-full px-6 text-sm font-semibold text-white transition-opacity hover:opacity-85 active:scale-95"
+            style={{ background: accent }}
+          >
+            Watch now
+          </button>
+        </div>
+      </div>
+      <div className="absolute bottom-3 right-4 flex items-center gap-1.5">
+        {channels.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setFeatured(i)}
+            className="h-1.5 rounded-full transition-all"
+            style={{ width: i === featured ? 20 : 8, background: i === featured ? accent : 'rgba(255,255,255,0.3)' }}
+            aria-label={`Featured ${i + 1}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CategoryTiles({ content, accent }: { content: SimContent; accent: string }) {
+  return (
+    <div>
+      <h2 className="text-base font-semibold mb-3">Top live categories</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+        {content.categories.map((cat, i) => (
+          <div key={`${cat.label}-${i}`} className="group cursor-pointer">
+            <div className="relative rounded-xl overflow-hidden border border-white/10 aspect-[3/4]">
+              <img src={ytThumb(cat.videoId)} alt={cat.label} className="absolute inset-0 h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent" />
+              <div className="absolute bottom-0 inset-x-0 p-3">
+                <p className="text-sm font-semibold leading-tight">{cat.label}</p>
+                <p className="text-[11px] text-white/60 mt-0.5">
+                  <span className="inline-block size-1.5 rounded-full bg-red-500 mr-1" />
+                  {cat.watching} watching
+                </p>
+              </div>
+              <span className="absolute top-0 left-0 h-0.5 w-full opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: accent }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StreamGrid({
+  channels,
+  accent,
+  heading,
+  onWatch,
+}: {
+  channels: SimChannel[];
+  accent: string;
+  heading: string;
+  onWatch: (index: number) => void;
+}) {
+  return (
+    <div>
+      <h2 className="text-base font-semibold mb-3">{heading}</h2>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {channels.map((c, i) => (
+          <button key={`${c.streamer}-${i}`} onClick={() => onWatch(i)} className="text-left group">
+            <div className="relative rounded-xl overflow-hidden border border-white/10">
+              <img src={ytThumb(c.videoId)} alt={c.title} className="w-full aspect-video object-cover group-hover:scale-105 transition-transform duration-300" />
+              <span className="absolute top-2 left-2"><LiveBadge /></span>
+              <span className="absolute bottom-2 left-2 rounded bg-black/80 px-1.5 py-0.5 text-[11px] font-semibold">{fmtViewers(c.viewers)} watching</span>
+            </div>
+            <div className="flex items-center gap-2.5 mt-2.5">
+              <Avatar name={c.streamer} hue={c.avatarHue} accent={accent} />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold truncate">{c.streamer}</p>
+                <p className="text-xs text-white/45 truncate">{c.title}</p>
+                <p className="text-[11px] text-white/30 mt-0.5">{c.category}</p>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Watch view (shared by destination + event templates)
+// ─────────────────────────────────────────────────────────────────
+
+function WatchView({
+  site,
+  content,
+  channel,
+  sdkLoaded,
+  liveSession,
+  goLiveOpen,
+  goLiveMode,
+  clipsHeading,
+  onLive,
+  onStopped,
+  onBack,
+}: {
   site: DemoSiteProps;
   content: SimContent;
+  channel: SimChannel;
   sdkLoaded: boolean;
   liveSession: GoLiveSession | null;
   goLiveOpen: boolean;
-  setGoLiveOpen: (open: boolean) => void;
+  goLiveMode: 'game' | 'screen';
+  clipsHeading: string;
   onLive: (s: GoLiveSession) => void;
   onStopped: () => void;
-}
-
-function DestinationTemplate({ site, content, sdkLoaded, liveSession, goLiveOpen, setGoLiveOpen, onLive, onStopped }: TemplateProps) {
+  onBack: () => void;
+}) {
   const accent = site.accentColor;
-  const [selected, setSelected] = useState(0);
   const [clipModal, setClipModal] = useState<SimClip | null>(null);
-  const channel = content.channels[selected];
   const viewers = useDriftingCount(channel.viewers);
   const watchingYou = useDriftingCount(12);
-
   const showingRealStream = liveSession !== null;
+
+  return (
+    <div className="flex flex-1 min-h-0">
+      <main className="flex-1 min-w-0 flex flex-col">
+        <button onClick={onBack} className="flex items-center gap-2 px-5 py-2.5 text-sm text-white/50 hover:text-white transition-colors text-left">
+          ← Back to browse
+        </button>
+
+        {/* Player */}
+        <div className="relative bg-black aspect-video max-h-[62vh] w-full">
+          {showingRealStream ? (
+            <iframe
+              key={liveSession.streamId}
+              src={`/viewer/${liveSession.streamId}?auth=demo-viewer-token`}
+              title="Your live stream"
+              allow="autoplay; fullscreen"
+              className="absolute inset-0 h-full w-full"
+            />
+          ) : (
+            <iframe
+              key={channel.videoId}
+              src={embedUrl(channel.videoId)}
+              title={channel.title}
+              allow="autoplay; encrypted-media"
+              className="absolute inset-0 h-full w-full pointer-events-none"
+            />
+          )}
+          <span className="absolute top-3 left-3"><LiveBadge /></span>
+          <span className="absolute top-3 right-3 rounded bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-white/90">
+            {showingRealStream ? fmtViewers(watchingYou) : fmtViewers(viewers)} watching
+          </span>
+        </div>
+
+        {/* Stream meta */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-white/10">
+          <Avatar name={showingRealStream ? 'You' : channel.streamer} hue={showingRealStream ? 0 : channel.avatarHue} accent={accent} isYou={showingRealStream} />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold truncate">{showingRealStream ? 'You' : channel.streamer}</p>
+            <p className="text-sm text-white/50 truncate">
+              {showingRealStream ? `Broadcasting live on ${site.brandName} — real WebRTC, sub-second latency` : channel.title}
+            </p>
+          </div>
+          <button className="rounded-full px-4 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-85" style={{ background: accent }}>
+            Follow
+          </button>
+        </div>
+
+        {/* Broadcast panel */}
+        {goLiveOpen && (
+          <div className="px-5 py-4 border-b border-white/10 bg-white/[0.02]">
+            <p className="text-xs font-semibold uppercase tracking-wide text-white/50 mb-3">
+              Your broadcast — publishing into the player above
+            </p>
+            <GoLivePanel
+              accent={accent}
+              brandName={site.brandName}
+              playerName="You"
+              sdkLoaded={sdkLoaded}
+              mode={goLiveMode}
+              onLive={onLive}
+              onStopped={onStopped}
+            />
+          </div>
+        )}
+
+        {/* Clips rail */}
+        <div className="px-5 py-4">
+          <div className="flex items-center gap-2 mb-3">
+            <p className="text-sm font-semibold">{clipsHeading}</p>
+            <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-white/50 uppercase tracking-wide">
+              auto-generated by AI
+            </span>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {content.clips.map((clip) => (
+              <button key={clip.title} onClick={() => setClipModal(clip)} className="w-48 shrink-0 text-left group">
+                <div className="relative rounded-lg overflow-hidden border border-white/10">
+                  <img src={ytThumb(clip.videoId)} alt={clip.title} className="w-full aspect-video object-cover group-hover:scale-105 transition-transform duration-300" />
+                  <span className="absolute bottom-1.5 right-1.5 rounded bg-black/80 px-1.5 py-0.5 text-[10px] font-semibold">{clip.duration}</span>
+                  <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="flex size-9 items-center justify-center rounded-full text-white" style={{ background: accent }}>▶</span>
+                  </span>
+                </div>
+                <p className="mt-1.5 text-xs font-medium leading-snug line-clamp-2">{clip.title}</p>
+                <p className="text-[11px] text-white/40">{clip.streamer} · {clip.views} views</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      </main>
+
+      {/* Chat */}
+      <aside className="hidden md:flex w-72 xl:w-80 shrink-0 flex-col border-l border-white/10 bg-[#18181B]/60">
+        <ChatPanel content={content} accent={accent} brandName={site.brandName} liveNow={showingRealStream} />
+      </aside>
+
+      {clipModal && <ClipModal clip={clipModal} accent={accent} onClose={() => setClipModal(null)} />}
+    </div>
+  );
+}
+
+function ClipModal({ clip, accent, onClose }: { clip: SimClip; accent: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
+      <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-[#18181B] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="relative aspect-video bg-black">
+          <iframe src={embedUrl(clip.videoId, false)} title={clip.title} allow="autoplay; encrypted-media" className="absolute inset-0 h-full w-full" />
+        </div>
+        <div className="px-5 py-4 flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold truncate">{clip.title}</p>
+            <p className="text-xs text-white/40 mt-0.5">
+              {clip.streamer} · {clip.views} views · clipped automatically by
+              <span className="font-medium" style={{ color: accent }}> Substream AI Highlights</span>
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded-full border border-white/15 px-4 py-1.5 text-sm text-white/70 hover:bg-white/5">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Template 1: Twitch-style destination (browse home + watch)
+// ─────────────────────────────────────────────────────────────────
+
+function DestinationTemplate(props: TemplateProps) {
+  const { site, content, liveSession, goLiveOpen, setGoLiveOpen } = props;
+  const accent = site.accentColor;
+  const terms = TERMS[content.vertical];
+  const [view, setView] = useState<'home' | 'watch'>('home');
+  const [selected, setSelected] = useState(0);
+  const watchingYou = useDriftingCount(12);
+  const showingRealStream = liveSession !== null;
+
+  const openWatch = (index: number) => {
+    setSelected(index);
+    setView('watch');
+  };
+
+  const openGoLive = () => {
+    const next = !goLiveOpen;
+    setGoLiveOpen(next);
+    if (next) setView('watch');
+  };
 
   return (
     <>
       {/* Site nav */}
       <nav className="flex items-center gap-4 px-5 py-3 border-b border-white/10 bg-[#18181B]">
         <BrandMark site={site} />
+        <div className="hidden sm:flex items-center gap-1 ml-2">
+          <button
+            onClick={() => setView('home')}
+            className={`rounded-full px-3.5 py-1.5 text-sm transition-colors ${view === 'home' ? 'text-white bg-white/10' : 'text-white/50 hover:text-white'}`}
+          >
+            Home
+          </button>
+          <button
+            onClick={() => setView('watch')}
+            className={`rounded-full px-3.5 py-1.5 text-sm transition-colors ${view === 'watch' ? 'text-white bg-white/10' : 'text-white/50 hover:text-white'}`}
+          >
+            Watching
+          </button>
+        </div>
         <div className="hidden md:flex flex-1 max-w-sm mx-4">
-          <div className="w-full rounded-full border border-white/10 bg-white/[0.04] px-4 py-1.5 text-sm text-white/30">Search streams…</div>
+          <div className="w-full rounded-full border border-white/10 bg-white/[0.04] px-4 py-1.5 text-sm text-white/30">Search…</div>
         </div>
         <button
-          onClick={() => setGoLiveOpen(!goLiveOpen)}
+          onClick={openGoLive}
           className="ml-auto inline-flex h-9 items-center gap-2 rounded-full px-4 text-sm font-semibold text-white transition-opacity hover:opacity-85 active:scale-95"
           style={{ background: goLiveOpen ? '#3f3f46' : accent }}
         >
-          {goLiveOpen ? 'Close broadcast panel' : '⦿ Go live yourself'}
+          {goLiveOpen ? 'Close broadcast panel' : `⦿ ${terms.goLive}`}
         </button>
       </nav>
 
       <div className="flex flex-1 min-h-0">
-        {/* Channel sidebar */}
+        {/* Channel sidebar (persistent, like Twitch/Kick) */}
         <aside className="hidden lg:flex w-60 shrink-0 flex-col border-r border-white/10 bg-[#18181B]/60">
-          <p className="px-4 pt-4 pb-2 text-xs font-semibold uppercase tracking-wide text-white/40">Live channels</p>
+          <p className="px-4 pt-4 pb-2 text-xs font-semibold uppercase tracking-wide text-white/40">{terms.liveNoun}</p>
           <div className="flex-1 overflow-y-auto pb-4">
             {showingRealStream && (
               <ChannelRow
@@ -311,119 +643,50 @@ function DestinationTemplate({ site, content, sdkLoaded, liveSession, goLiveOpen
                 viewers={watchingYou}
                 hue={0}
                 accent={accent}
-                active
+                active={view === 'watch'}
                 isYou
-                onClick={() => {}}
+                onClick={() => setView('watch')}
               />
             )}
             {content.channels.map((c, i) => (
               <ChannelRow
-                key={c.streamer}
+                key={`${c.streamer}-${i}`}
                 streamer={c.streamer}
                 title={c.title}
-                viewers={i === selected ? viewers : c.viewers}
+                viewers={c.viewers}
                 hue={c.avatarHue}
                 accent={accent}
-                active={!showingRealStream && i === selected}
-                onClick={() => setSelected(i)}
+                active={view === 'watch' && !showingRealStream && i === selected}
+                onClick={() => openWatch(i)}
               />
             ))}
           </div>
         </aside>
 
-        {/* Main column */}
-        <main className="flex-1 min-w-0 flex flex-col">
-          {/* Player */}
-          <div className="relative bg-black aspect-video max-h-[62vh] w-full">
-            {showingRealStream ? (
-              <iframe
-                key={liveSession.streamId}
-                src={`/viewer/${liveSession.streamId}?auth=demo-viewer-token`}
-                title="Your live stream"
-                allow="autoplay; fullscreen"
-                className="absolute inset-0 h-full w-full"
-              />
-            ) : (
-              <iframe
-                key={channel.videoId}
-                src={embedUrl(channel.videoId)}
-                title={channel.title}
-                allow="autoplay; encrypted-media"
-                className="absolute inset-0 h-full w-full pointer-events-none"
-              />
-            )}
-            <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-bold text-white bg-red-600">
-              LIVE
-            </span>
-            <span className="absolute top-3 right-3 rounded bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-white/90">
-              {showingRealStream ? fmtViewers(watchingYou) : fmtViewers(viewers)} watching
-            </span>
-          </div>
-
-          {/* Stream meta */}
-          <div className="flex items-center gap-3 px-5 py-4 border-b border-white/10">
-            <Avatar name={showingRealStream ? 'You' : channel.streamer} hue={showingRealStream ? 0 : channel.avatarHue} accent={accent} isYou={showingRealStream} />
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold truncate">{showingRealStream ? 'You' : channel.streamer}</p>
-              <p className="text-sm text-white/50 truncate">
-                {showingRealStream ? `Broadcasting live on ${site.brandName} — real WebRTC, sub-second latency` : channel.title}
-              </p>
+        {view === 'home' ? (
+          <main className="flex-1 min-w-0 overflow-y-auto">
+            <div className="max-w-6xl mx-auto px-5 py-6 space-y-8">
+              <HeroCarousel channels={content.channels} accent={accent} personNoun={terms.personNoun} onWatch={openWatch} />
+              <CategoryTiles content={content} accent={accent} />
+              <StreamGrid channels={content.channels} accent={accent} heading={`Live on ${site.brandName}`} onWatch={openWatch} />
             </div>
-            <button className="rounded-full px-4 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-85" style={{ background: accent }}>
-              Follow
-            </button>
-          </div>
-
-          {/* Broadcast panel */}
-          {goLiveOpen && (
-            <div className="px-5 py-4 border-b border-white/10 bg-white/[0.02]">
-              <p className="text-xs font-semibold uppercase tracking-wide text-white/50 mb-3">
-                Your game — broadcasting into the player above
-              </p>
-              <GoLivePanel
-                accent={accent}
-                brandName={site.brandName}
-                playerName="You"
-                sdkLoaded={sdkLoaded}
-                onLive={onLive}
-                onStopped={onStopped}
-              />
-            </div>
-          )}
-
-          {/* Clips rail */}
-          <div className="px-5 py-4">
-            <div className="flex items-center gap-2 mb-3">
-              <p className="text-sm font-semibold">Top clips</p>
-              <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-white/50 uppercase tracking-wide">
-                auto-generated by AI
-              </span>
-            </div>
-            <div className="flex gap-3 overflow-x-auto pb-2">
-              {content.clips.map((clip) => (
-                <button key={clip.title} onClick={() => setClipModal(clip)} className="w-48 shrink-0 text-left group">
-                  <div className="relative rounded-lg overflow-hidden border border-white/10">
-                    <img src={ytThumb(clip.videoId)} alt={clip.title} className="w-full aspect-video object-cover group-hover:scale-105 transition-transform duration-300" />
-                    <span className="absolute bottom-1.5 right-1.5 rounded bg-black/80 px-1.5 py-0.5 text-[10px] font-semibold">{clip.duration}</span>
-                    <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="flex size-9 items-center justify-center rounded-full text-white" style={{ background: accent }}>▶</span>
-                    </span>
-                  </div>
-                  <p className="mt-1.5 text-xs font-medium leading-snug line-clamp-2">{clip.title}</p>
-                  <p className="text-[11px] text-white/40">{clip.streamer} · {clip.views} views</p>
-                </button>
-              ))}
-            </div>
-          </div>
-        </main>
-
-        {/* Chat */}
-        <aside className="hidden md:flex w-72 xl:w-80 shrink-0 flex-col border-l border-white/10 bg-[#18181B]/60">
-          <ChatPanel content={content} accent={accent} brandName={site.brandName} liveNow={showingRealStream} />
-        </aside>
+          </main>
+        ) : (
+          <WatchView
+            site={site}
+            content={content}
+            channel={content.channels[selected]}
+            sdkLoaded={props.sdkLoaded}
+            liveSession={liveSession}
+            goLiveOpen={goLiveOpen}
+            goLiveMode={content.vertical === 'gaming' ? 'game' : 'screen'}
+            clipsHeading="Top clips"
+            onLive={props.onLive}
+            onStopped={props.onStopped}
+            onBack={() => setView('home')}
+          />
+        )}
       </div>
-
-      {clipModal && <ClipModal clip={clipModal} accent={accent} onClose={() => setClipModal(null)} />}
     </>
   );
 }
@@ -465,47 +728,130 @@ function ChannelRow({
   );
 }
 
-function Avatar({ name, hue, accent, isYou }: { name: string; hue: number; accent: string; isYou?: boolean }) {
-  return (
-    <span
-      className="flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-      style={{ background: isYou ? accent : `hsl(${hue},55%,45%)` }}
-    >
-      {name.charAt(0).toUpperCase()}
-    </span>
-  );
-}
+// ─────────────────────────────────────────────────────────────────
+// Template 2: Event hub (music & sports verticals)
+// ─────────────────────────────────────────────────────────────────
 
-function ClipModal({ clip, accent, onClose }: { clip: SimClip; accent: string; onClose: () => void }) {
+function EventTemplate(props: TemplateProps) {
+  const { site, content, liveSession, goLiveOpen, setGoLiveOpen } = props;
+  const accent = site.accentColor;
+  const terms = TERMS[content.vertical];
+  const [view, setView] = useState<'home' | 'watch'>('home');
+  const [selected, setSelected] = useState(0);
+
+  const openWatch = (index: number) => {
+    setSelected(index);
+    setView('watch');
+  };
+
+  const openGoLive = () => {
+    const next = !goLiveOpen;
+    setGoLiveOpen(next);
+    if (next) setView('watch');
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
-      <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-[#18181B] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="relative aspect-video bg-black">
-          <iframe src={embedUrl(clip.videoId, false)} title={clip.title} allow="autoplay; encrypted-media" className="absolute inset-0 h-full w-full" />
-        </div>
-        <div className="px-5 py-4 flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold truncate">{clip.title}</p>
-            <p className="text-xs text-white/40 mt-0.5">
-              {clip.streamer} · {clip.views} views · clipped automatically by
-              <span className="font-medium" style={{ color: accent }}> Substream AI Highlights</span>
-            </p>
-          </div>
-          <button onClick={onClose} className="rounded-full border border-white/15 px-4 py-1.5 text-sm text-white/70 hover:bg-white/5">
-            Close
+    <>
+      <nav className="flex items-center gap-4 px-5 py-3 border-b border-white/10 bg-[#18181B]">
+        <BrandMark site={site} />
+        <div className="hidden sm:flex items-center gap-1 ml-2">
+          <button
+            onClick={() => setView('home')}
+            className={`rounded-full px-3.5 py-1.5 text-sm transition-colors ${view === 'home' ? 'text-white bg-white/10' : 'text-white/50 hover:text-white'}`}
+          >
+            {content.vertical === 'sports' ? 'Matchday' : 'Festival'}
+          </button>
+          <button
+            onClick={() => setView('watch')}
+            className={`rounded-full px-3.5 py-1.5 text-sm transition-colors ${view === 'watch' ? 'text-white bg-white/10' : 'text-white/50 hover:text-white'}`}
+          >
+            Watching
           </button>
         </div>
-      </div>
-    </div>
+        <button
+          onClick={openGoLive}
+          className="ml-auto inline-flex h-9 items-center gap-2 rounded-full px-4 text-sm font-semibold text-white transition-opacity hover:opacity-85 active:scale-95"
+          style={{ background: goLiveOpen ? '#3f3f46' : accent }}
+        >
+          {goLiveOpen ? 'Close broadcast panel' : `⦿ ${terms.goLive}`}
+        </button>
+      </nav>
+
+      {view === 'home' ? (
+        <main className="flex-1 min-w-0 overflow-y-auto">
+          <div className="max-w-6xl mx-auto px-5 py-6 space-y-8">
+            <HeroCarousel channels={content.channels} accent={accent} personNoun={terms.personNoun} onWatch={openWatch} />
+
+            {/* Schedule + live grid side by side */}
+            <div className="grid lg:grid-cols-[320px_1fr] gap-6">
+              <div>
+                <h2 className="text-base font-semibold mb-3">{terms.scheduleNoun}</h2>
+                <div className="rounded-2xl border border-white/10 bg-[#18181B]/60 divide-y divide-white/5 overflow-hidden">
+                  {content.schedule.map((item, i) => (
+                    <button
+                      key={`${item.name}-${i}`}
+                      onClick={() => item.status === 'live' && openWatch(i % content.channels.length)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left ${item.status === 'live' ? 'hover:bg-white/[0.04] cursor-pointer' : 'cursor-default'}`}
+                    >
+                      <span className="font-mono text-sm text-white/50 w-12 shrink-0">{item.time}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium truncate">{item.name}</span>
+                        <span className="block text-xs text-white/40 truncate">{item.detail}</span>
+                      </span>
+                      {item.status === 'live' ? (
+                        <LiveBadge />
+                      ) : (
+                        <span className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/40 border border-white/15">
+                          Up next
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-white/30 mt-2 px-1">
+                  Schedules, reminders, and replays — all on your domain.
+                </p>
+              </div>
+              <StreamGrid
+                channels={content.channels}
+                accent={accent}
+                heading={content.vertical === 'sports' ? 'Live now across all venues' : 'Live from every stage'}
+                onWatch={openWatch}
+              />
+            </div>
+
+            <CategoryTiles content={content} accent={accent} />
+          </div>
+        </main>
+      ) : (
+        <div className="flex flex-1 min-h-0">
+          <WatchView
+            site={site}
+            content={content}
+            channel={content.channels[selected]}
+            sdkLoaded={props.sdkLoaded}
+            liveSession={liveSession}
+            goLiveOpen={goLiveOpen}
+            goLiveMode="screen"
+            clipsHeading={content.vertical === 'sports' ? 'Top plays' : 'Best moments'}
+            onLive={props.onLive}
+            onStopped={props.onStopped}
+            onBack={() => setView('home')}
+          />
+        </div>
+      )}
+    </>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Template 2: social clips feed
+// Template 3: social clips feed
 // ─────────────────────────────────────────────────────────────────
 
-function FeedTemplate({ site, content, sdkLoaded, liveSession, goLiveOpen, setGoLiveOpen, onLive, onStopped }: TemplateProps) {
+function FeedTemplate(props: TemplateProps) {
+  const { site, content, sdkLoaded, liveSession, goLiveOpen, setGoLiveOpen, onLive, onStopped } = props;
   const accent = site.accentColor;
+  const terms = TERMS[content.vertical];
   const watchingYou = useDriftingCount(12);
 
   return (
@@ -517,12 +863,11 @@ function FeedTemplate({ site, content, sdkLoaded, liveSession, goLiveOpen, setGo
           className="ml-auto inline-flex h-9 items-center gap-2 rounded-full px-4 text-sm font-semibold text-white transition-opacity hover:opacity-85 active:scale-95"
           style={{ background: goLiveOpen ? '#3f3f46' : accent }}
         >
-          {goLiveOpen ? 'Close broadcast panel' : '⦿ Go live'}
+          {goLiveOpen ? 'Close broadcast panel' : `⦿ ${terms.goLive}`}
         </button>
       </nav>
 
       <main className="flex-1 w-full max-w-xl mx-auto px-4 py-6 space-y-4">
-        {/* Go-live card (the real moment) */}
         {goLiveOpen && (
           <div className="rounded-2xl border p-4 space-y-4" style={{ borderColor: `${accent}66`, background: `${accent}0d` }}>
             <p className="text-sm font-semibold">Broadcast to the {site.brandName} community — for real</p>
@@ -535,7 +880,7 @@ function FeedTemplate({ site, content, sdkLoaded, liveSession, goLiveOpen, setGo
                   allow="autoplay; fullscreen"
                   className="absolute inset-0 h-full w-full"
                 />
-                <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-bold text-white bg-red-600">LIVE</span>
+                <span className="absolute top-3 left-3"><LiveBadge /></span>
                 <span className="absolute top-3 right-3 rounded bg-black/70 px-2 py-0.5 text-[11px] font-semibold">{fmtViewers(watchingYou)} watching</span>
               </div>
             )}
@@ -544,6 +889,7 @@ function FeedTemplate({ site, content, sdkLoaded, liveSession, goLiveOpen, setGo
               brandName={site.brandName}
               playerName="You"
               sdkLoaded={sdkLoaded}
+              mode={content.vertical === 'gaming' ? 'game' : 'screen'}
               onLive={onLive}
               onStopped={onStopped}
             />
@@ -566,7 +912,7 @@ function FeedTemplate({ site, content, sdkLoaded, liveSession, goLiveOpen, setGo
                   allow="autoplay; fullscreen"
                   className="absolute inset-0 h-full w-full"
                 />
-                <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-bold text-white bg-red-600">LIVE</span>
+                <span className="absolute top-3 left-3"><LiveBadge /></span>
               </div>
             }
             likes={7}

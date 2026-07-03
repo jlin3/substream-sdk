@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Geist } from 'next/font/google';
-import { GENRES } from '@/lib/demo-gen/content';
+import { CONTENT_TYPES, GENRES_BY_VERTICAL, type Vertical } from '@/lib/demo-gen/content';
 
 const geist = Geist({ subsets: ['latin'] });
 
@@ -26,11 +26,37 @@ interface WizardState {
   brandName: string;
   logoUrl: string;
   accentColor: string;
-  template: 'DESTINATION' | 'FEED';
+  vertical: Vertical;
+  template: 'DESTINATION' | 'FEED' | 'EVENT';
   genre: string;
   platform: string;
   communitySize: string;
 }
+
+// Which experience templates make sense per content type
+const TEMPLATES_BY_VERTICAL: Record<Vertical, ('DESTINATION' | 'EVENT' | 'FEED')[]> = {
+  gaming: ['DESTINATION', 'FEED'],
+  music: ['EVENT', 'FEED'],
+  sports: ['EVENT', 'FEED'],
+};
+
+const TEMPLATE_COPY: Record<'DESTINATION' | 'EVENT' | 'FEED', { title: string; body: string; art: 'destination' | 'feed' | 'event' }> = {
+  DESTINATION: {
+    title: 'Twitch-style destination',
+    body: 'A full live hub on your domain — browse page, channel list, player, real-time chat, clips.',
+    art: 'destination',
+  },
+  EVENT: {
+    title: 'Event hub',
+    body: 'Broadcast-style home with a featured live event, schedule, and every stage or venue live.',
+    art: 'event',
+  },
+  FEED: {
+    title: 'Clips feed',
+    body: 'A scrolling social feed of auto-generated highlight clips from your community.',
+    art: 'feed',
+  },
+};
 
 const BUILD_STEPS = [
   'Pulling your brand…',
@@ -53,6 +79,7 @@ export default function TryPage() {
     brandName: '',
     logoUrl: '',
     accentColor: '#2B7FFF',
+    vertical: 'gaming',
     template: 'DESTINATION',
     genre: 'shooter',
     platform: 'web',
@@ -61,6 +88,14 @@ export default function TryPage() {
 
   const set = (patch: Partial<WizardState>) => setS((prev) => ({ ...prev, ...patch }));
   const accent = s.accentColor;
+
+  function setVertical(vertical: Vertical) {
+    set({
+      vertical,
+      genre: GENRES_BY_VERTICAL[vertical][0].id,
+      template: TEMPLATES_BY_VERTICAL[vertical][0],
+    });
+  }
 
   async function submitContact(e: React.FormEvent) {
     e.preventDefault();
@@ -112,7 +147,7 @@ export default function TryPage() {
           accentColor: s.accentColor,
           template: s.template,
           genre: s.genre,
-          survey: { platform: s.platform, communitySize: s.communitySize, template: s.template, genre: s.genre },
+          survey: { vertical: s.vertical, platform: s.platform, communitySize: s.communitySize, template: s.template, genre: s.genre },
         }),
       });
       if (!res.ok) {
@@ -176,7 +211,7 @@ export default function TryPage() {
               </h1>
               <p className="text-white/55 leading-relaxed">
                 Enter your website and we&apos;ll spin up a fully branded live-streaming experience for your
-                games — your logo, your colors, your community. Takes about a minute.
+                games, events, or shows — your logo, your colors, your community. Takes about a minute.
               </p>
             </div>
             <div className="space-y-3">
@@ -279,52 +314,67 @@ export default function TryPage() {
             </div>
 
             <div className="space-y-2">
-              <span className="text-xs text-white/50 uppercase tracking-wide font-semibold">Experience style</span>
-              <div className="grid sm:grid-cols-2 gap-3">
-                <TemplateCard
-                  active={s.template === 'DESTINATION'}
-                  accent={accent}
-                  onClick={() => set({ template: 'DESTINATION' })}
-                  title="Twitch-style destination"
-                  body="A full live hub on your domain — channel list, player, real-time chat, clips."
-                  art="destination"
-                />
-                <TemplateCard
-                  active={s.template === 'FEED'}
-                  accent={accent}
-                  onClick={() => set({ template: 'FEED' })}
-                  title="Clips feed"
-                  body="A scrolling social feed of auto-generated highlight clips from your players."
-                  art="feed"
-                />
+              <span className="text-xs text-white/50 uppercase tracking-wide font-semibold">What&apos;s your content?</span>
+              <div className="flex flex-wrap gap-2">
+                {CONTENT_TYPES.map((c) => (
+                  <Pill key={c.id} active={s.vertical === c.id} accent={accent} onClick={() => setVertical(c.id)}>{c.label}</Pill>
+                ))}
               </div>
             </div>
 
             <div className="space-y-2">
-              <span className="text-xs text-white/50 uppercase tracking-wide font-semibold">What kind of games do you make?</span>
+              <span className="text-xs text-white/50 uppercase tracking-wide font-semibold">Experience style</span>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {TEMPLATES_BY_VERTICAL[s.vertical].map((t) => (
+                  <TemplateCard
+                    key={t}
+                    active={s.template === t}
+                    accent={accent}
+                    onClick={() => set({ template: t })}
+                    title={TEMPLATE_COPY[t].title}
+                    body={TEMPLATE_COPY[t].body}
+                    art={TEMPLATE_COPY[t].art}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-xs text-white/50 uppercase tracking-wide font-semibold">
+                {s.vertical === 'gaming' ? 'What kind of games do you make?' : s.vertical === 'music' ? 'What kind of shows do you put on?' : 'What do you broadcast?'}
+              </span>
               <div className="flex flex-wrap gap-2">
-                {GENRES.map((g) => (
+                {GENRES_BY_VERTICAL[s.vertical].map((g) => (
                   <Pill key={g.id} active={s.genre === g.id} accent={accent} onClick={() => set({ genre: g.id })}>{g.label}</Pill>
                 ))}
               </div>
             </div>
 
             <div className="space-y-2">
-              <span className="text-xs text-white/50 uppercase tracking-wide font-semibold">Where do your games run?</span>
+              <span className="text-xs text-white/50 uppercase tracking-wide font-semibold">
+                {s.vertical === 'gaming' ? 'Where do your games run?' : 'Where would live video be embedded?'}
+              </span>
               <div className="flex flex-wrap gap-2">
-                {[
-                  ['web', 'Web / Browser'],
-                  ['unity', 'Unity'],
-                  ['ios', 'iOS'],
-                  ['multiple', 'Multiple platforms'],
-                ].map(([id, label]) => (
+                {(s.vertical === 'gaming'
+                  ? [
+                      ['web', 'Web / Browser'],
+                      ['unity', 'Unity'],
+                      ['ios', 'iOS'],
+                      ['multiple', 'Multiple platforms'],
+                    ]
+                  : [
+                      ['web', 'Our website'],
+                      ['ios', 'Our mobile app'],
+                      ['multiple', 'Both / everywhere'],
+                    ]
+                ).map(([id, label]) => (
                   <Pill key={id} active={s.platform === id} accent={accent} onClick={() => set({ platform: id })}>{label}</Pill>
                 ))}
               </div>
             </div>
 
             <div className="space-y-2">
-              <span className="text-xs text-white/50 uppercase tracking-wide font-semibold">How big is your player community?</span>
+              <span className="text-xs text-white/50 uppercase tracking-wide font-semibold">How big is your community?</span>
               <div className="flex flex-wrap gap-2">
                 {['<10k', '10k-100k', '100k-1M', '1M+'].map((size) => (
                   <Pill key={size} active={s.communitySize === size} accent={accent} onClick={() => set({ communitySize: size })}>{size}</Pill>
@@ -386,7 +436,7 @@ function Pill({ active, accent, onClick, children }: { active: boolean; accent: 
   );
 }
 
-function TemplateCard({ active, accent, onClick, title, body, art }: { active: boolean; accent: string; onClick: () => void; title: string; body: string; art: 'destination' | 'feed' }) {
+function TemplateCard({ active, accent, onClick, title, body, art }: { active: boolean; accent: string; onClick: () => void; title: string; body: string; art: 'destination' | 'feed' | 'event' }) {
   return (
     <button
       onClick={onClick}
@@ -409,6 +459,26 @@ function TemplateCard({ active, accent, onClick, title, body, art }: { active: b
               ))}
             </div>
           </>
+        ) : art === 'event' ? (
+          <div className="flex-1 flex flex-col gap-1.5">
+            <div className="h-10 rounded-sm relative overflow-hidden" style={{ background: `${accent}33` }}>
+              <div className="absolute bottom-1 left-1 h-1.5 w-10 rounded-full" style={{ background: accent }} />
+            </div>
+            <div className="flex-1 flex gap-1.5">
+              <div className="w-2/5 space-y-1">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="h-2 rounded-sm flex items-center gap-0.5 px-0.5 bg-white/[0.06]">
+                    <span className="block h-1 w-2 rounded-full" style={{ background: i === 0 ? accent : 'rgba(255,255,255,0.15)' }} />
+                  </div>
+                ))}
+              </div>
+              <div className="flex-1 grid grid-cols-2 gap-1">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="rounded-sm bg-white/[0.08]" />
+                ))}
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="flex-1 flex flex-col items-center gap-1.5">
             {[0, 1, 2].map((i) => (
