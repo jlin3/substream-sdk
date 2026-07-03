@@ -3,10 +3,14 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 
 /**
- * The one REAL moment inside the simulated demo: a playable canvas game
- * that publishes to AWS IVS Real-Time through the actual Substream
- * pipeline, so the prospect's "stream" plays back in their branded player
- * via a real WebRTC viewer.
+ * The one REAL moment inside the simulated demo: a live source that
+ * publishes to AWS IVS Real-Time through the actual Substream pipeline,
+ * so the prospect's "stream" plays back in their branded player via a
+ * real WebRTC viewer.
+ *
+ * Two capture modes:
+ * - 'game'   — a playable canvas Breakout (gaming vertical)
+ * - 'screen' — getDisplayMedia screen share (music/sports event verticals)
  */
 
 interface IvsStage {
@@ -36,6 +40,7 @@ export default function GoLivePanel({
   brandName,
   playerName,
   sdkLoaded,
+  mode = 'game',
   onLive,
   onStopped,
 }: {
@@ -43,16 +48,19 @@ export default function GoLivePanel({
   brandName: string;
   playerName: string;
   sdkLoaded: boolean;
+  mode?: 'game' | 'screen';
   onLive: (session: GoLiveSession) => void;
   onStopped: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const sessionRef = useRef<{ streamId: string; stage: IvsStage; canvasStream: MediaStream } | null>(null);
   const [phase, setPhase] = useState<'idle' | 'connecting' | 'live' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
   // Compact Breakout, themed with the demo site's accent color
   useEffect(() => {
+    if (mode !== 'game') return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -145,7 +153,7 @@ export default function GoLivePanel({
     raf = requestAnimationFrame(loop);
 
     return () => { cancelAnimationFrame(raf); canvas.removeEventListener('mousemove', onMove); };
-  }, [accent, brandName]);
+  }, [accent, brandName, mode]);
 
   const stop = useCallback(async () => {
     const session = sessionRef.current;
@@ -169,14 +177,37 @@ export default function GoLivePanel({
 
   async function start() {
     const ivs = getIvs();
-    const canvas = canvasRef.current;
-    if (!ivs || !canvas) {
+    if (!ivs || (mode === 'game' && !canvasRef.current)) {
       setErrorMsg('Streaming SDK still loading — try again in a second.');
       setPhase('error');
       return;
     }
     setPhase('connecting');
     setErrorMsg('');
+
+    // Capture the source first (screen share needs a user-gesture prompt)
+    let canvasStream: MediaStream;
+    try {
+      if (mode === 'screen') {
+        canvasStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { frameRate: 30 },
+          audio: false,
+        });
+        if (videoRef.current) {
+          videoRef.current.srcObject = canvasStream;
+          void videoRef.current.play().catch(() => {});
+        }
+        // browser-level "stop sharing" button should end the stream too
+        canvasStream.getVideoTracks()[0]?.addEventListener('ended', () => void stop());
+      } else {
+        canvasStream = canvasRef.current!.captureStream(30);
+      }
+    } catch {
+      setErrorMsg('Screen share was cancelled or blocked.');
+      setPhase('error');
+      return;
+    }
+
     try {
       const res = await fetch('/api/streams/web-publish', {
         method: 'POST',
@@ -193,8 +224,6 @@ export default function GoLivePanel({
         throw new Error(e.error || `HTTP ${res.status}`);
       }
       const info = await res.json();
-
-      const canvasStream = canvas.captureStream(30);
       const { Stage, LocalStageStream, SubscribeType, StageEvents } = ivs;
       const localStreams = canvasStream.getTracks().map((t) => new LocalStageStream(t));
       const strategy = {
@@ -212,6 +241,7 @@ export default function GoLivePanel({
       await stage.join();
       sessionRef.current = { streamId: info.streamId, stage, canvasStream };
     } catch (err) {
+      canvasStream.getTracks().forEach((t) => t.stop());
       setErrorMsg(err instanceof Error ? err.message : 'Failed to start stream');
       setPhase('error');
     }
@@ -220,7 +250,21 @@ export default function GoLivePanel({
   return (
     <div className="space-y-3">
       <div className="relative rounded-xl overflow-hidden border border-white/10">
-        <canvas ref={canvasRef} width={1280} height={720} className="w-full bg-[#0e0e10] cursor-crosshair block" />
+        {mode === 'game' ? (
+          <canvas ref={canvasRef} width={1280} height={720} className="w-full bg-[#0e0e10] cursor-crosshair block" />
+        ) : (
+          <div className="relative w-full aspect-video bg-[#0e0e10]">
+            <video ref={videoRef} muted playsInline className="absolute inset-0 h-full w-full object-contain" />
+            {phase === 'idle' && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center px-6">
+                <span className="flex size-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-xl">🖥</span>
+                <p className="text-sm text-white/40 max-w-xs">
+                  Share your screen and it becomes a live broadcast on {brandName} — through the real pipeline.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
         {phase === 'live' && (
           <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold text-white bg-red-600">
             <span className="size-1.5 rounded-full bg-white animate-pulse" /> BROADCASTING
@@ -235,7 +279,7 @@ export default function GoLivePanel({
             className="inline-flex items-center justify-center h-10 rounded-full px-5 text-sm font-semibold text-white active:scale-95 transition-all disabled:opacity-40"
             style={{ background: accent }}
           >
-            {phase === 'connecting' ? 'Connecting…' : !sdkLoaded ? 'Loading SDK…' : 'Start broadcasting'}
+            {phase === 'connecting' ? 'Connecting…' : !sdkLoaded ? 'Loading SDK…' : mode === 'screen' ? 'Share screen & broadcast' : 'Start broadcasting'}
           </button>
         ) : (
           <button
@@ -246,8 +290,9 @@ export default function GoLivePanel({
           </button>
         )}
         <p className="text-xs text-white/40 flex-1 min-w-[200px]">
-          Move your mouse to play. This is a <span className="text-white/70 font-medium">real WebRTC stream</span> through
-          Substream&apos;s pipeline — not a simulation.
+          {mode === 'game' ? 'Move your mouse to play. ' : ''}This is a{' '}
+          <span className="text-white/70 font-medium">real WebRTC stream</span> through Substream&apos;s pipeline — not a
+          simulation.
         </p>
       </div>
       {phase === 'error' && <p className="text-sm text-red-400">{errorMsg}</p>}

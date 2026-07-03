@@ -86,7 +86,7 @@ const session = await Substream.startStream({
             </Link>
           </div>
           <p className="text-sm text-white/40">
-            Enter your website — we&apos;ll generate a fully branded streaming experience for your games in under a minute.
+            Enter your website — we&apos;ll generate a fully branded streaming experience for your games, events, or shows in under a minute.
           </p>
         </div>
       </main>
