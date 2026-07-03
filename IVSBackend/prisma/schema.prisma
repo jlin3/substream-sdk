@@ -123,3 +123,45 @@ enum HighlightStatus {
   COMPLETED
   FAILED
 }
+
+// ============================================
+// PERSONALIZED DEMO GENERATOR
+// ============================================
+
+model Lead {
+  id         String   @id @default(uuid())
+  name       String
+  email      String
+  websiteUrl String?
+  survey     Json?
+  createdAt  DateTime @default(now())
+
+  demoSites  DemoSite[]
+
+  @@index([email])
+  @@index([createdAt])
+}
+
+model DemoSite {
+  id          String       @id @default(uuid())
+  slug        String       @unique
+  leadId      String?
+  lead        Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  brandName   String
+  websiteUrl  String?
+  logoUrl     String?
+  accentColor String       @default("#2B7FFF")
+  template    DemoTemplate @default(DESTINATION)
+  genre       String       @default("shooter")
+
+  createdAt   DateTime     @default(now())
+
+  @@index([slug])
+  @@index([createdAt])
+}
+
+enum DemoTemplate {
+  DESTINATION
+  FEED
+}
