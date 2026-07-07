@@ -50,7 +50,7 @@ export default async function LeadsPage() {
                     </td>
                     <td className="px-4 py-3 text-white/50 hidden lg:table-cell">
                       <span className="flex flex-wrap gap-1">
-                        {['template', 'genre', 'platform', 'communitySize']
+                        {['role', 'template', 'genre', 'platform', 'communitySize']
                           .filter((k) => survey[k])
                           .map((k) => (
                             <span key={k} className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px]">
@@ -58,6 +58,14 @@ export default async function LeadsPage() {
                             </span>
                           ))}
                       </span>
+                      {typeof survey.streamingGoals === 'string' && survey.streamingGoals && (
+                        <span
+                          className="mt-1 block max-w-[280px] truncate text-[11px] text-white/35 italic"
+                          title={survey.streamingGoals}
+                        >
+                          &ldquo;{survey.streamingGoals}&rdquo;
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {lead.demoSites.length > 0 ? (

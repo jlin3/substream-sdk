@@ -22,6 +22,8 @@ type Step = 'contact' | 'brand' | 'experience' | 'building';
 interface WizardState {
   name: string;
   email: string;
+  role: string;
+  streamingGoals: string;
   websiteUrl: string;
   brandName: string;
   logoUrl: string;
@@ -58,6 +60,8 @@ const TEMPLATE_COPY: Record<'DESTINATION' | 'EVENT' | 'FEED', { title: string; b
   },
 };
 
+const ROLES = ['Founder / CEO', 'Product', 'Engineering', 'Marketing / Community', 'Other'];
+
 const BUILD_STEPS = [
   'Pulling your brand…',
   'Provisioning streaming infrastructure…',
@@ -75,6 +79,8 @@ export default function TryPage() {
   const [s, setS] = useState<WizardState>({
     name: '',
     email: '',
+    role: '',
+    streamingGoals: '',
     websiteUrl: '',
     brandName: '',
     logoUrl: '',
@@ -147,7 +153,15 @@ export default function TryPage() {
           accentColor: s.accentColor,
           template: s.template,
           genre: s.genre,
-          survey: { vertical: s.vertical, platform: s.platform, communitySize: s.communitySize, template: s.template, genre: s.genre },
+          survey: {
+            vertical: s.vertical,
+            platform: s.platform,
+            communitySize: s.communitySize,
+            template: s.template,
+            genre: s.genre,
+            role: s.role || undefined,
+            streamingGoals: s.streamingGoals || undefined,
+          },
         }),
       });
       if (!res.ok) {
@@ -218,6 +232,21 @@ export default function TryPage() {
               <input required value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="Your name" className={INPUT} autoFocus />
               <input required type="email" value={s.email} onChange={(e) => set({ email: e.target.value })} placeholder="Work email" className={INPUT} />
               <input required value={s.websiteUrl} onChange={(e) => set({ websiteUrl: e.target.value })} placeholder="Your company website (e.g. supercell.com)" className={INPUT} />
+              <div className="space-y-1.5">
+                <span className="text-xs text-white/50 uppercase tracking-wide font-semibold">Your role</span>
+                <div className="flex flex-wrap gap-2">
+                  {ROLES.map((r) => (
+                    <Pill key={r} active={s.role === r} accent={accent} onClick={() => set({ role: r })}>{r}</Pill>
+                  ))}
+                </div>
+              </div>
+              <textarea
+                value={s.streamingGoals}
+                onChange={(e) => set({ streamingGoals: e.target.value })}
+                placeholder="What do you want streaming to do for your game? (optional — e.g. player retention, community content, monetization)"
+                rows={3}
+                className={INPUT + ' resize-none'}
+              />
             </div>
             <button type="submit" className={BTN_PRIMARY} style={{ background: '#2B7FFF' }}>
               Pull my brand →
@@ -427,6 +456,7 @@ export default function TryPage() {
 function Pill({ active, accent, onClick, children }: { active: boolean; accent: string; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={`rounded-full border px-4 py-2 text-sm transition-all ${active ? 'text-white border-transparent' : 'text-white/60 border-white/15 hover:bg-white/5'}`}
       style={active ? { background: accent } : undefined}
