@@ -30,6 +30,7 @@
     "next": "^15.2.8",
     "pg": "^8.16.3",
     "postcss": "^8.5.8",
+    "prisma": "^7.0.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwindcss": "^4.2.1",
@@ -44,7 +45,6 @@
     "@types/react-dom": "^19",
     "@types/uuid": "^11.0.0",
     "eslint": "^10.0.2",
-    "prisma": "^7.0.1",
     "tsx": "^4.21.0",
     "typescript": "^5",
     "typescript-eslint": "^8.56.1"
