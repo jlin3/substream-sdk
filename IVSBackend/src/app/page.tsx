@@ -118,11 +118,40 @@ const PILLARS = [
   },
 ];
 
+// How the fine-tuned highlight model turns raw gameplay into share-ready clips
+const HIGHLIGHTS = [
+  {
+    icon: 'brain',
+    step: 'Trained on your game',
+    body: 'We train and fine-tune a highlight model on your titles, modes, and events — so it learns what actually matters in your world: a clutch round, a boss kill, a personal best.',
+  },
+  {
+    icon: 'clip',
+    step: 'Auto-clipped in seconds',
+    body: 'Every session is analyzed as it happens. Reels are generated within ~60 seconds of a match ending — no editors, no manual tagging, no highlight team.',
+  },
+  {
+    icon: 'share',
+    step: 'Branded & ready to share',
+    body: 'Vertical and landscape cuts, captioned and watermarked with your brand, drop straight into your feed and players\u2019 socials to drive organic reach.',
+  },
+];
+
 const SECURITY = [
+  {
+    icon: 'badge',
+    title: 'SOC 2, GDPR & PCI DSS',
+    body: 'Enterprise compliance across the stack — SOC 2, GDPR, and PCI DSS. The controls your security and legal teams review before they sign.',
+  },
   {
     icon: 'lock',
     title: 'Encrypted end to end',
     body: 'Streams travel over encrypted WebRTC transport (TLS + SRTP). Stream keys are AES-encrypted at rest — never stored in plaintext.',
+  },
+  {
+    icon: 'shieldData',
+    title: 'DRM & geo-blocking',
+    body: 'Studio-grade content protection with DRM and geo-restrictions, so streams and VODs only play where — and how — you allow.',
   },
   {
     icon: 'key',
@@ -130,7 +159,7 @@ const SECURITY = [
     body: 'Server-issued, scoped tokens authorize every publish. Your backend stays in control of who can go live and when.',
   },
   {
-    icon: 'shieldData',
+    icon: 'data',
     title: 'Your data stays yours',
     body: 'Streams, VODs, viewers, and events live on your properties. Nothing is shared with a third-party audience platform.',
   },
@@ -143,6 +172,11 @@ const SECURITY = [
     icon: 'sliders',
     title: 'You set the rules',
     body: 'Streaming and highlights are configurable per game mode and content rating. Turn surfaces on or off per audience.',
+  },
+  {
+    icon: 'globe',
+    title: 'Global scale & SSO',
+    body: 'Multi-CDN delivery with a 99.995% uptime SLA and SAML SSO for your team — built to pass enterprise security review.',
   },
   {
     icon: 'server',
@@ -173,6 +207,11 @@ function Icon({ name }: { name: string }) {
     case 'child': return <svg {...common}><circle cx="12" cy="7" r="3.5" /><path d="M5.5 21c.6-4 3-6.5 6.5-6.5s5.9 2.5 6.5 6.5" /></svg>;
     case 'sliders': return <svg {...common}><path d="M4 8h10M18 8h2M4 16h4M12 16h8" /><circle cx="16" cy="8" r="2" /><circle cx="10" cy="16" r="2" /></svg>;
     case 'server': return <svg {...common}><rect x="3" y="4" width="18" height="7" rx="2" /><rect x="3" y="13" width="18" height="7" rx="2" /><path d="M7 7.5h.01M7 16.5h.01" /></svg>;
+    case 'brain': return <svg {...common}><path d="M9 3a3 3 0 0 0-3 3 3 3 0 0 0-1 5.5A3 3 0 0 0 6 17a3 3 0 0 0 6 .5V4.5A1.5 1.5 0 0 0 10.5 3 1.5 1.5 0 0 0 9 3Z" /><path d="M15 3a3 3 0 0 1 3 3 3 3 0 0 1 1 5.5A3 3 0 0 1 18 17a3 3 0 0 1-6 .5" /></svg>;
+    case 'clip': return <svg {...common}><circle cx="6" cy="6" r="2.5" /><circle cx="6" cy="18" r="2.5" /><path d="M8 7.5 20 17M8 16.5 20 7M14 12l6-5M14 12l6 5" /></svg>;
+    case 'share': return <svg {...common}><circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" /><path d="M8.2 10.8 15.8 6.2M8.2 13.2 15.8 17.8" /></svg>;
+    case 'badge': return <svg {...common}><path d="M12 2 4 5.5v6c0 5 3.4 8.6 8 10.5 4.6-1.9 8-5.5 8-10.5v-6L12 2Z" /><path d="m8.5 12 2.5 2.5L16 9" /></svg>;
+    case 'globe': return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.5 2.5 3.8 5.7 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.7-3.8-9s1.3-6.5 3.8-9Z" /></svg>;
     default: return null;
   }
 }
@@ -439,12 +478,58 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* AI highlight generation */}
+      <section id="highlights" className="py-20 px-6 border-b border-white/10 scroll-mt-16">
+        <div className="max-w-6xl mx-auto">
+          <Reveal className="text-center mb-14 max-w-2xl mx-auto">
+            <p className="text-sm font-medium text-[#2B7FFF] uppercase tracking-widest mb-2">AI highlights</p>
+            <h2 className="text-3xl md:text-4xl font-medium tracking-tighter">
+              A model that learns your game — and clips the best moments.
+            </h2>
+            <p className="text-white/50 mt-3 leading-relaxed">
+              We train and fine-tune a highlight model on your specific game, then run it on every
+              session. Players walk away with share-ready reels automatically — no editors, no
+              highlight team, no manual tagging.
+            </p>
+          </Reveal>
+
+          <div className="grid md:grid-cols-3 gap-5">
+            {HIGHLIGHTS.map((h, i) => (
+              <Reveal key={h.step} delay={i * 100}>
+                <div className="group relative h-full rounded-2xl border border-white/10 bg-white/[0.02] p-6 transition-all duration-500 hover:-translate-y-1 hover:border-[#2B7FFF]/40 hover:bg-white/[0.04]">
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex size-11 items-center justify-center rounded-xl bg-[#2B7FFF]/12 border border-[#2B7FFF]/25 transition-transform duration-500 group-hover:scale-110">
+                      <Icon name={h.icon} />
+                    </div>
+                    <span className="text-xs font-mono text-white/35">0{i + 1}</span>
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">{h.step}</h3>
+                  <p className="text-sm text-white/50 leading-relaxed">{h.body}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+
+          <Reveal delay={220}>
+            <div className="mt-10 rounded-2xl border border-[#2B7FFF]/25 bg-[#2B7FFF]/[0.06] px-6 py-7 text-center">
+              <p className="text-lg md:text-xl font-medium tracking-tight">
+                Fine-tuned per game. Sharper with every session.
+              </p>
+              <p className="text-sm text-white/45 mt-2 max-w-2xl mx-auto">
+                The model gets better as it learns which clips your community actually watches and
+                shares — turning every match into a re-engagement and acquisition loop you own.
+              </p>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
       {/* Security & trust */}
       <section id="security" className="py-20 px-6 border-b border-white/10 scroll-mt-16">
         <div className="max-w-6xl mx-auto">
           <Reveal className="text-center mb-12">
-            <p className="text-sm font-medium text-[#2B7FFF] uppercase tracking-widest mb-2">Security & trust</p>
-            <h2 className="text-3xl md:text-4xl font-medium tracking-tighter">Built for studios that answer to players and parents.</h2>
+            <p className="text-sm font-medium text-[#2B7FFF] uppercase tracking-widest mb-2">Security &amp; compliance</p>
+            <h2 className="text-3xl md:text-4xl font-medium tracking-tighter">Built to pass security review — and answer to players and parents.</h2>
           </Reveal>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {SECURITY.map((s, i) => (
