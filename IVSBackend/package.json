@@ -25,6 +25,7 @@
     "@prisma/client": "^7.0.1",
     "@tailwindcss/postcss": "^4.2.1",
     "amazon-ivs-web-broadcast": "^1.19.0",
+    "cobe": "^0.6.5",
     "dotenv": "^17.2.3",
     "jose": "^6.1.2",
     "next": "^15.2.8",
@@ -45,6 +46,7 @@
     "@types/react-dom": "^19",
     "@types/uuid": "^11.0.0",
     "eslint": "^10.0.2",
+    "playwright": "^1.61.1",
     "tsx": "^4.21.0",
     "typescript": "^5",
     "typescript-eslint": "^8.56.1"

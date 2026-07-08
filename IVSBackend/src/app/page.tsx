@@ -4,6 +4,12 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Geist } from 'next/font/google';
 import TwitchSiteDemo from '@/components/TwitchSiteDemo';
+import HeroPlatformDemo from '@/components/HeroPlatformDemo';
+import HighlightPipelineDemo from '@/components/HighlightPipelineDemo';
+import Globe from '@/components/ui/Globe';
+import FlickeringGrid from '@/components/ui/FlickeringGrid';
+import SecurityShield from '@/components/ui/SecurityShield';
+import { FAQS } from '@/lib/faqs';
 
 const geist = Geist({ subsets: ['latin'] });
 
@@ -82,11 +88,12 @@ print("Live!", session.viewerUrl)`,
   },
 };
 
+// Metrics band: numeric target + prefix/suffix for count-up animation
 const METRICS = [
-  { value: '5 lines', label: 'to integrate' },
-  { value: '<500ms', label: 'glass-to-glass latency' },
-  { value: '100%', label: 'on your domain' },
-  { value: '90 days', label: 'zero-cost proof of concept' },
+  { target: 5, prefix: '', suffix: ' lines', label: 'to integrate', icon: 'code' },
+  { target: 500, prefix: '<', suffix: 'ms', label: 'glass-to-glass latency', icon: 'bolt' },
+  { target: 100, prefix: '', suffix: '%', label: 'on your domain', icon: 'globe' },
+  { target: 90, prefix: '', suffix: ' days', label: 'zero-cost proof of concept', icon: 'calendar' },
 ];
 
 const FLOW = [
@@ -107,8 +114,8 @@ const PILLARS = [
   {
     icon: 'cash',
     title: 'Your revenue',
-    body: 'Multiple monetization levers built in. You choose what works for your community.',
-    points: ['Ads: video, banner, programmatic', 'Subscriptions: premium tiers for superfans', 'Merch & DLC upsell in highlight feeds', 'Revenue you own, on your platform'],
+    body: '100% of media revenue stays with the studio. Pick the monetization vectors that fit your community.',
+    points: ['Sovereign advertising: video, banner, programmatic — your partners, your frequency', 'Superfan subscriptions: extended replays, early access, creator highlights', 'Contextual commerce: merch, DLC, and item upsells at peak emotional engagement', 'No platform take rate — ever'],
   },
   {
     icon: 'people',
@@ -118,31 +125,51 @@ const PILLARS = [
   },
 ];
 
+// Third-party platforms vs. first-party comparison (attention-loop framing)
+const COMPARISON = [
+  {
+    dim: 'Data ownership',
+    them: 'Platforms own the relationship, emails, and behavioral graphs.',
+    us: 'You capture every view, click, replay, and share.',
+  },
+  {
+    dim: 'Engagement location',
+    them: 'Off-platform — pulling players away from active game sessions.',
+    us: 'Hosted on your launcher, client widget, or website.',
+  },
+  {
+    dim: 'Monetization',
+    them: 'Platforms capture the ad spend and subscription margins.',
+    us: '100% of ads, subscriptions, and commerce goes to the studio.',
+  },
+  {
+    dim: 'Re-engagement',
+    them: 'Generic, easily ignored push notifications and mass emails.',
+    us: 'Personalized post-session highlights that trigger return sessions.',
+  },
+];
+
 // How the fine-tuned highlight model turns raw gameplay into share-ready clips
 const HIGHLIGHTS = [
   {
     icon: 'brain',
     step: 'Trained on your game',
-    body: 'We train and fine-tune a highlight model on your titles, modes, and events — so it learns what actually matters in your world: a clutch round, a boss kill, a personal best.',
+    body: 'We fine-tune a highlight model on your titles, modes, and events — it learns what matters in your world: a clutch round, a boss kill, a personal best.',
   },
   {
     icon: 'clip',
     step: 'Auto-clipped in seconds',
-    body: 'Every session is analyzed as it happens. Reels are generated within ~60 seconds of a match ending — no editors, no manual tagging, no highlight team.',
+    body: 'Gemini scores every segment of every session. Reels land within ~60 seconds of a match ending — no editors, no manual tagging.',
   },
   {
     icon: 'share',
     step: 'Branded & ready to share',
-    body: 'Vertical and landscape cuts, captioned and watermarked with your brand, drop straight into your feed and players\u2019 socials to drive organic reach.',
+    body: 'Vertical and landscape cuts, captioned and watermarked with your brand, drop straight into your feed and players\u2019 socials.',
   },
 ];
 
+// Security cards (bento tiles for SOC 2 + globe handled separately)
 const SECURITY = [
-  {
-    icon: 'badge',
-    title: 'SOC 2, GDPR & PCI DSS',
-    body: 'Enterprise compliance across the stack — SOC 2, GDPR, and PCI DSS. The controls your security and legal teams review before they sign.',
-  },
   {
     icon: 'lock',
     title: 'Encrypted end to end',
@@ -174,16 +201,13 @@ const SECURITY = [
     body: 'Streaming and highlights are configurable per game mode and content rating. Turn surfaces on or off per audience.',
   },
   {
-    icon: 'globe',
-    title: 'Global scale & SSO',
-    body: 'Multi-CDN delivery with a 99.995% uptime SLA and SAML SSO for your team — built to pass enterprise security review.',
-  },
-  {
     icon: 'server',
     title: 'Managed infrastructure',
     body: 'We run the ingest, delivery, recording, and ML pipeline. Your only lift is the SDK integration.',
   },
 ];
+
+// FAQ content shared with the FAQPage JSON-LD in layout.tsx
 
 const VIDEO = {
   id: 'e4798d41d35046468db7ef4d035f7087',
@@ -191,12 +215,15 @@ const VIDEO = {
   label: 'Watch a Unity game go live with the Substream SDK',
 };
 
+// The actual Gemini-generated Halo highlight reel (from an 8-minute CTF session)
+const HALO_HIGHLIGHT_ID = 'Wh1tHg1Ytcs';
+
 // ============================================================
 // Icons
 // ============================================================
 
-function Icon({ name }: { name: string }) {
-  const common = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: BRAND, strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+function Icon({ name, size = 22 }: { name: string; size?: number }) {
+  const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: BRAND, strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   switch (name) {
     case 'data': return <svg {...common}><ellipse cx="12" cy="5" rx="8" ry="3" /><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" /></svg>;
     case 'cash': return <svg {...common}><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /></svg>;
@@ -212,6 +239,9 @@ function Icon({ name }: { name: string }) {
     case 'share': return <svg {...common}><circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" /><path d="M8.2 10.8 15.8 6.2M8.2 13.2 15.8 17.8" /></svg>;
     case 'badge': return <svg {...common}><path d="M12 2 4 5.5v6c0 5 3.4 8.6 8 10.5 4.6-1.9 8-5.5 8-10.5v-6L12 2Z" /><path d="m8.5 12 2.5 2.5L16 9" /></svg>;
     case 'globe': return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.5 2.5 3.8 5.7 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.7-3.8-9s1.3-6.5 3.8-9Z" /></svg>;
+    case 'code': return <svg {...common}><path d="m8 6-6 6 6 6M16 6l6 6-6 6" /></svg>;
+    case 'bolt': return <svg {...common}><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" /></svg>;
+    case 'calendar': return <svg {...common}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4M16 3v4M3 10h18" /></svg>;
     default: return null;
   }
 }
@@ -249,6 +279,47 @@ function Reveal({ children, delay = 0, className = '' }: { children: React.React
 }
 
 // ============================================================
+// Count-up metric
+// ============================================================
+
+function CountUp({ target, prefix, suffix }: { target: number; prefix: string; suffix: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [value, setValue] = useState(0);
+  const started = useRef(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting || started.current) return;
+      started.current = true;
+      io.disconnect();
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        setValue(target);
+        return;
+      }
+      const duration = 1200;
+      const t0 = performance.now();
+      const frame = (t: number) => {
+        const p = Math.min(1, (t - t0) / duration);
+        const eased = 1 - Math.pow(1 - p, 3);
+        setValue(Math.round(target * eased));
+        if (p < 1) requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+    }, { threshold: 0.4 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [target]);
+
+  return (
+    <span ref={ref} className="tabular-nums">
+      {prefix}{value}{suffix}
+    </span>
+  );
+}
+
+// ============================================================
 // Shared styles
 // ============================================================
 
@@ -257,6 +328,7 @@ const BTN_OUTLINE = 'inline-flex items-center justify-center h-11 rounded-full b
 
 export default function LandingPage() {
   const [tab, setTab] = useState<IntegrationKey>('web');
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   return (
     <div className={`${geist.className} min-h-screen flex flex-col bg-[#18181B] text-[#FAFAFA] tracking-tight`}>
@@ -282,44 +354,66 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero */}
-      <header className="relative overflow-hidden px-6 pt-20 pb-16">
+      {/* Hero — copy left, live platform demo right */}
+      <header className="relative overflow-hidden px-6 pt-16 pb-16 lg:pt-20">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 -z-0 h-[560px] w-full"
+          className="pointer-events-none absolute inset-x-0 top-0 -z-0 h-[640px] w-full"
           style={{ background: 'radial-gradient(120% 100% at 50% 0%, #18181B 50%, rgba(43,127,255,0.30) 100%)' }}
         />
-        <div className="relative z-10 max-w-3xl mx-auto text-center space-y-7">
-          <p className="inline-flex h-8 items-center gap-2 rounded-full border border-white/12 bg-white/[0.04] px-3.5 text-sm text-white/70">
-            <span className="ss-pulse size-1.5 rounded-full bg-[#2B7FFF]" />
-            White-label streaming for game studios
-          </p>
-          <h1 className="text-balance text-4xl sm:text-5xl lg:text-6xl font-medium tracking-tighter leading-[1.05]">
-            Your own private Twitch
-            <br />
-            <span className="text-[#2B7FFF]">for your community.</span>
-          </h1>
-          <p className="max-w-xl mx-auto text-base md:text-lg text-white/55 leading-relaxed">
-            One SDK lets your players stream gameplay to your own site — you own the
-            content, the data, and the revenue. AI highlights included.
-          </p>
-          <div className="flex gap-3 justify-center flex-wrap">
-            <Link href="/try" className={BTN_PRIMARY}>See your own streaming platform</Link>
-            <a href="#demo" className={BTN_OUTLINE}>Watch it in action</a>
+        <div className="relative z-10 max-w-6xl mx-auto grid lg:grid-cols-[1fr_440px] xl:grid-cols-[1fr_480px] gap-12 lg:gap-14 items-center">
+          <div className="space-y-7 text-center lg:text-left">
+            <p className="inline-flex h-8 items-center gap-2 rounded-full border border-white/12 bg-white/[0.04] px-3.5 text-sm text-white/70">
+              <span className="ss-pulse size-1.5 rounded-full bg-[#2B7FFF]" />
+              White-label streaming for game studios
+            </p>
+            <h1 className="text-balance text-4xl sm:text-5xl xl:text-6xl font-medium tracking-tighter leading-[1.05]">
+              Your own private Twitch
+              <br className="hidden sm:block" />
+              <span className="text-[#2B7FFF]"> for your community.</span>
+            </h1>
+            <p className="max-w-xl mx-auto lg:mx-0 text-base md:text-lg text-white/55 leading-relaxed">
+              One SDK lets your players stream gameplay to your own site — you own the
+              content, the data, and the revenue. AI highlights included.
+            </p>
+            <div className="flex gap-3 justify-center lg:justify-start flex-wrap">
+              <Link href="/try" className={BTN_PRIMARY}>See your own streaming platform</Link>
+              <a href="#demo" className={BTN_OUTLINE}>Try the live demo</a>
+            </div>
+            <p className="text-sm text-white/35">
+              Enter your website — we generate a fully branded streaming experience in about a minute.
+            </p>
           </div>
-          <p className="text-sm text-white/35">
-            Enter your website — we generate a fully branded streaming experience in about a minute.
-          </p>
+          <Reveal delay={150} className="max-w-[520px] w-full mx-auto lg:mx-0">
+            <HeroPlatformDemo />
+          </Reveal>
         </div>
       </header>
 
-      {/* Metrics */}
-      <section className="border-y border-white/10 py-12 px-6">
-        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
+      {/* Metrics band */}
+      <section className="relative border-y border-white/10 py-10 px-6 overflow-hidden">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-px"
+          style={{ background: 'linear-gradient(90deg, transparent, rgba(43,127,255,0.6), transparent)' }}
+        />
+        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4">
           {METRICS.map((m, i) => (
-            <Reveal key={m.label} delay={i * 80} className="text-center">
-              <div className="text-3xl md:text-4xl font-semibold tracking-tight text-[#2B7FFF]">{m.value}</div>
-              <div className="text-sm text-white/50 mt-1">{m.label}</div>
+            <Reveal
+              key={m.label}
+              delay={i * 90}
+              className={`relative flex flex-col items-center text-center px-4 py-3 ${i > 0 ? 'md:border-l md:border-white/[0.07]' : ''} ${i % 2 === 1 ? 'border-l border-white/[0.07] md:border-l' : ''}`}
+            >
+              <span className="mb-2.5 flex size-9 items-center justify-center rounded-lg bg-[#2B7FFF]/10 border border-[#2B7FFF]/20">
+                <Icon name={m.icon} size={17} />
+              </span>
+              <div
+                className="text-3xl md:text-4xl font-semibold tracking-tight bg-clip-text text-transparent"
+                style={{ backgroundImage: 'linear-gradient(180deg, #9EC3FF 0%, #2B7FFF 100%)' }}
+              >
+                <CountUp target={m.target} prefix={m.prefix} suffix={m.suffix} />
+              </div>
+              <div className="text-[13px] text-white/45 mt-1.5">{m.label}</div>
             </Reveal>
           ))}
         </div>
@@ -377,14 +471,45 @@ export default function LandingPage() {
           <Reveal className="max-w-3xl mx-auto text-center mb-14">
             <p className="text-sm font-medium text-[#2B7FFF] uppercase tracking-widest mb-2">The problem</p>
             <h2 className="text-3xl md:text-4xl font-medium tracking-tighter mb-4">
-              Twitch, YouTube, and TikTok own the relationship with your players.
+              You&apos;re funding your own player attrition.
             </h2>
             <p className="text-white/55 leading-relaxed">
-              When players clip, stream, and share your game on someone else&apos;s platform, you get
-              zero data back. No emails, no watch patterns, no re-engagement lever — and no
-              content-driven reason for a lapsed player to return. Substream flips that.
+              When players clip, stream, and share your game on Twitch, YouTube, or TikTok, those
+              platforms capture 100% of the audience relationship. You get zero data back — no emails,
+              no watch patterns, no churn feedback loop. Worse: those networks use your players&apos;
+              engagement to retarget them with ads for competing games. Substream flips that.
             </p>
           </Reveal>
+
+          {/* Them vs. you comparison */}
+          <Reveal delay={80}>
+            <div className="mb-12 rounded-2xl border border-white/10 overflow-hidden">
+              <div className="grid grid-cols-[1fr_1fr] sm:grid-cols-[140px_1fr_1fr] text-sm">
+                <div className="hidden sm:block px-4 py-3 bg-white/[0.02] border-b border-white/10" />
+                <div className="px-4 py-3 bg-white/[0.02] border-b border-white/10 text-white/45 font-medium">
+                  Twitch · YouTube · TikTok
+                </div>
+                <div className="px-4 py-3 bg-[#2B7FFF]/[0.08] border-b border-white/10 border-l border-white/10 font-semibold text-[#7EB1FF]">
+                  Your platform, powered by Substream
+                </div>
+                {COMPARISON.map((row, i) => (
+                  <div key={row.dim} className="contents">
+                    <div className={`hidden sm:flex items-center px-4 py-3.5 text-xs font-semibold uppercase tracking-wide text-white/40 ${i > 0 ? 'border-t border-white/[0.06]' : ''}`}>
+                      {row.dim}
+                    </div>
+                    <div className={`px-4 py-3.5 text-white/45 leading-relaxed ${i > 0 ? 'border-t border-white/[0.06]' : ''}`}>
+                      <span className="sm:hidden block text-[10px] font-semibold uppercase tracking-wide text-white/35 mb-1">{row.dim}</span>
+                      {row.them}
+                    </div>
+                    <div className={`px-4 py-3.5 leading-relaxed border-l border-white/10 bg-[#2B7FFF]/[0.04] text-white/80 ${i > 0 ? 'border-t border-white/[0.06]' : ''}`}>
+                      {row.us}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Reveal>
+
           <div className="grid md:grid-cols-3 gap-5">
             {PILLARS.map((p, i) => (
               <Reveal key={p.title} delay={i * 100}>
@@ -408,12 +533,18 @@ export default function LandingPage() {
               </Reveal>
             ))}
           </div>
+
+          {/* LTV callout */}
           <Reveal delay={200}>
-            <div className="mt-10 rounded-2xl border border-[#2B7FFF]/25 bg-[#2B7FFF]/[0.06] px-6 py-7 text-center">
-              <p className="text-lg md:text-xl font-medium tracking-tight">
-                You keep the player. You keep the data. You keep the revenue.
+            <div className="mt-10 rounded-2xl border border-[#2B7FFF]/25 bg-[#2B7FFF]/[0.06] px-6 py-8 text-center">
+              <p className="font-mono text-sm text-[#7EB1FF] mb-3 tracking-tight">
+                LTV = ARPU ÷ churn
               </p>
-              <p className="text-sm text-white/45 mt-2">
+              <p className="text-lg md:text-xl font-medium tracking-tight max-w-2xl mx-auto">
+                Substream moves both variables: automated post-session highlights cut churn by pulling
+                players back, and first-party ads, subscriptions, and commerce raise ARPU.
+              </p>
+              <p className="text-sm text-white/45 mt-3">
                 Every view is a re-engagement event. Every replay increases LTV. Every share drives organic acquisition.
               </p>
             </div>
@@ -481,17 +612,56 @@ export default function LandingPage() {
       {/* AI highlight generation */}
       <section id="highlights" className="py-20 px-6 border-b border-white/10 scroll-mt-16">
         <div className="max-w-6xl mx-auto">
-          <Reveal className="text-center mb-14 max-w-2xl mx-auto">
+          <Reveal className="text-center mb-12 max-w-2xl mx-auto">
             <p className="text-sm font-medium text-[#2B7FFF] uppercase tracking-widest mb-2">AI highlights</p>
             <h2 className="text-3xl md:text-4xl font-medium tracking-tighter">
-              A model that learns your game — and clips the best moments.
+              Watch Gemini turn a full session into a highlight reel.
             </h2>
             <p className="text-white/50 mt-3 leading-relaxed">
-              We train and fine-tune a highlight model on your specific game, then run it on every
-              session. Players walk away with share-ready reels automatically — no editors, no
-              highlight team, no manual tagging.
+              This is the real pipeline, running on a real Halo Infinite session: Gemini scores every
+              segment, the best moments are selected, and FFmpeg assembles a share-ready reel of
+              15–30 second clips — about 60 seconds after the match ends.
             </p>
           </Reveal>
+
+          {/* Animated pipeline + result video */}
+          <div className="grid lg:grid-cols-2 gap-6 mb-12 items-stretch">
+            <Reveal delay={80}>
+              <HighlightPipelineDemo />
+            </Reveal>
+            <Reveal delay={180}>
+              <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-[#0e0e10] overflow-hidden shadow-xl shadow-black/40">
+                <div className="relative aspect-video bg-black">
+                  <iframe
+                    src={`https://www.youtube.com/embed/${HALO_HIGHLIGHT_ID}?autoplay=1&mute=1&loop=1&playlist=${HALO_HIGHLIGHT_ID}&controls=1&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3`}
+                    title="AI-generated Halo Infinite highlight reel"
+                    allow="autoplay; encrypted-media; fullscreen"
+                    className="absolute inset-0 h-full w-full"
+                  />
+                  <div className="absolute top-3 left-3 pointer-events-none inline-flex items-center gap-1.5 rounded-md border border-[#2B7FFF]/40 bg-[#101321]/85 backdrop-blur px-2 py-1 text-[10px] font-semibold text-white/90">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={BRAND} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
+                    </svg>
+                    AI-generated reel
+                  </div>
+                </div>
+                <div className="flex-1 flex flex-col justify-center px-5 py-4">
+                  <p className="text-sm font-semibold">The output — untouched by human hands</p>
+                  <p className="text-xs text-white/45 mt-1 leading-relaxed">
+                    Generated automatically from the full Halo session on the left. Seven moments,
+                    75 seconds, crossfade transitions, normalized audio. No editor involved.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {['7 clips selected', '51 segments scored', '~60s after match end', 'fine-tuned per title'].map((chip) => (
+                      <span key={chip} className="rounded-full border border-[#2B7FFF]/25 bg-[#2B7FFF]/[0.08] px-2.5 py-1 text-[10px] font-medium text-[#9EC3FF]">
+                        {chip}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </Reveal>
+          </div>
 
           <div className="grid md:grid-cols-3 gap-5">
             {HIGHLIGHTS.map((h, i) => (
@@ -531,7 +701,41 @@ export default function LandingPage() {
             <p className="text-sm font-medium text-[#2B7FFF] uppercase tracking-widest mb-2">Security &amp; compliance</p>
             <h2 className="text-3xl md:text-4xl font-medium tracking-tighter">Built to pass security review — and answer to players and parents.</h2>
           </Reveal>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+
+          {/* Feature bento: SOC 2 shield + rotating globe */}
+          <div className="grid md:grid-cols-2 gap-5 mb-5">
+            <Reveal>
+              <div className="relative h-full min-h-[340px] rounded-2xl border border-white/10 bg-white/[0.02] overflow-hidden transition-colors duration-500 hover:border-[#2B7FFF]/40">
+                <div className="absolute inset-0 [mask-image:linear-gradient(to_top,transparent,black_55%)]">
+                  <FlickeringGrid rgb="43, 127, 255" gridGap={4} squareSize={2} maxOpacity={0.22} className="mix-blend-screen" />
+                </div>
+                <SecurityShield className="absolute inset-x-0 top-6 bottom-24 mx-auto w-[210px]" />
+                <div className="absolute inset-x-0 bottom-0 p-6">
+                  <h3 className="text-lg font-semibold tracking-tight">SOC 2, GDPR &amp; PCI DSS</h3>
+                  <p className="text-sm text-white/50 mt-1">
+                    Enterprise compliance across the stack — the controls your security and legal
+                    teams review before they sign.
+                  </p>
+                </div>
+              </div>
+            </Reveal>
+            <Reveal delay={100}>
+              <div className="relative h-full min-h-[340px] rounded-2xl border border-white/10 bg-white/[0.02] overflow-hidden transition-colors duration-500 hover:border-[#2B7FFF]/40">
+                <div className="absolute inset-x-0 top-10 bottom-16 [mask-image:linear-gradient(to_top,transparent_5%,black_45%)]">
+                  <Globe />
+                </div>
+                <div className="absolute inset-x-0 bottom-0 p-6">
+                  <h3 className="text-lg font-semibold tracking-tight">Global scale &amp; SSO</h3>
+                  <p className="text-sm text-white/50 mt-1">
+                    Multi-CDN delivery with a 99.995% uptime SLA and SAML SSO for your team —
+                    built for a worldwide player base.
+                  </p>
+                </div>
+              </div>
+            </Reveal>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {SECURITY.map((s, i) => (
               <Reveal key={s.title} delay={i * 70}>
                 <div className="h-full rounded-2xl border border-white/10 bg-white/[0.02] p-5 transition-all duration-500 hover:border-[#2B7FFF]/40 hover:bg-white/[0.04]">
@@ -551,6 +755,48 @@ export default function LandingPage() {
               segment your competitors can&apos;t.
             </p>
           </Reveal>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section id="faq" className="py-20 px-6 border-b border-white/10 bg-white/[0.015] scroll-mt-16">
+        <div className="max-w-3xl mx-auto">
+          <Reveal className="text-center mb-10">
+            <p className="text-sm font-medium text-[#2B7FFF] uppercase tracking-widest mb-2">FAQ</p>
+            <h2 className="text-3xl md:text-4xl font-medium tracking-tighter">Questions game studios ask us</h2>
+          </Reveal>
+          <div className="space-y-3">
+            {FAQS.map((f, i) => {
+              const open = openFaq === i;
+              return (
+                <Reveal key={f.q} delay={i * 60}>
+                  <div className={`rounded-2xl border transition-colors duration-300 ${open ? 'border-[#2B7FFF]/40 bg-[#2B7FFF]/[0.04]' : 'border-white/10 bg-white/[0.02]'}`}>
+                    <button
+                      onClick={() => setOpenFaq(open ? null : i)}
+                      className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
+                      aria-expanded={open}
+                    >
+                      <span className="font-medium text-[15px]">{f.q}</span>
+                      <svg
+                        width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                        className={`shrink-0 text-white/40 transition-transform duration-300 ${open ? 'rotate-180 text-[#2B7FFF]' : ''}`}
+                      >
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </button>
+                    <div
+                      className="grid transition-[grid-template-rows] duration-300 ease-out"
+                      style={{ gridTemplateRows: open ? '1fr' : '0fr' }}
+                    >
+                      <div className="overflow-hidden">
+                        <p className="px-5 pb-5 text-sm text-white/55 leading-relaxed">{f.a}</p>
+                      </div>
+                    </div>
+                  </div>
+                </Reveal>
+              );
+            })}
+          </div>
         </div>
       </section>
 
