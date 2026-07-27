@@ -124,6 +124,30 @@ class WindowClip:
     t_end: float
     data: bytes
     mime_type: str = "video/mp4"
+    # Stable cache key for file-derived clips. Basename + time range, never the
+    # encoded bytes — those change across ffmpeg builds and break the offline
+    # demo fallback the first time it crosses a machine boundary.
+    cache_identity: Optional[str] = None
+
+
+def clip_cache_identity(
+    source_path: str, t_start: float, t_end: float, scale_height: int = 480
+) -> str:
+    return (
+        f"{os.path.basename(source_path)}|{t_start:.3f}|{t_end:.3f}|h{scale_height}"
+    )
+
+
+def media_ref_for_clip(
+    clip: WindowClip, *, fps: float, media_resolution: str
+) -> MediaRef:
+    return MediaRef(
+        data=clip.data,
+        mime_type=clip.mime_type,
+        fps=fps,
+        media_resolution=media_resolution,
+        cache_identity=clip.cache_identity,
+    )
 
 
 @dataclass
@@ -324,11 +348,8 @@ def triage_window(
             prompt=prompt,
             response_schema=TRIAGE_SCHEMA,
             purpose="triage",
-            media=MediaRef(
-                data=clip.data,
-                mime_type=clip.mime_type,
-                fps=config.ANNOTATION_FPS,
-                media_resolution="low",
+            media=media_ref_for_clip(
+                clip, fps=config.ANNOTATION_FPS, media_resolution="low"
             ),
             meter=meter,
             temperature=0.0,
@@ -391,9 +412,8 @@ def annotate_window(
             prompt=prompt,
             response_schema=DENSE_WINDOW_SCHEMA,
             purpose="dense_annotation",
-            media=MediaRef(
-                data=clip.data,
-                mime_type=clip.mime_type,
+            media=media_ref_for_clip(
+                clip,
                 fps=config.ANNOTATION_FPS,
                 media_resolution=media_resolution_for(genre),
             ),
@@ -477,9 +497,8 @@ def score_segment(
             prompt=prompt,
             response_schema=NARRATIVE_SEGMENT_SCHEMA,
             purpose="narrative_arbiter",
-            media=MediaRef(
-                data=clip.data,
-                mime_type=clip.mime_type,
+            media=media_ref_for_clip(
+                clip,
                 fps=config.ANNOTATION_FPS,
                 media_resolution=media_resolution_for(genre),
             ),
@@ -553,11 +572,8 @@ def identify_episode(
             prompt=prompt,
             response_schema=EPISODE_IDENTIFY_SCHEMA,
             purpose="identify",
-            media=MediaRef(
-                data=clip.data,
-                mime_type=clip.mime_type,
-                fps=config.ANNOTATION_FPS,
-                media_resolution="high",
+            media=media_ref_for_clip(
+                clip, fps=config.ANNOTATION_FPS, media_resolution="high"
             ),
             meter=meter,
             temperature=0.0,
@@ -837,7 +853,13 @@ class StreamAnnotator:
                 )
                 if data is None:
                     return None
-                clip = WindowClip(index=idx, t_start=start, t_end=end, data=data)
+                clip = WindowClip(
+                    index=idx,
+                    t_start=start,
+                    t_end=end,
+                    data=data,
+                    cache_identity=clip_cache_identity(source_path, start, end),
+                )
                 context = self._context_for_span(start, end)
                 segment = await loop.run_in_executor(
                     None,

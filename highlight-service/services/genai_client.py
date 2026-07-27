@@ -333,6 +333,11 @@ class MediaRef:
 
     Exactly one of `uri` or `data` is used. `fps` and `media_resolution` map to
     the Gemini 3 video controls and are the main levers on annotation cost.
+
+    `cache_identity` overrides the data hash in the cache key. Use it for clips
+    cut from a known source file: ffmpeg output is not bit-identical across
+    platforms, so hashing the encoded bytes made a Mac-warmed cache miss on
+    every Linux container call and silently burned the Gemini budget.
     """
 
     mime_type: str = "video/mp4"
@@ -342,6 +347,7 @@ class MediaRef:
     start_offset_seconds: Optional[float] = None
     end_offset_seconds: Optional[float] = None
     media_resolution: Optional[str] = None
+    cache_identity: Optional[str] = None
 
     def fingerprint(self) -> str:
         """Stable identity for caching, without hashing whole video payloads."""
@@ -353,7 +359,9 @@ class MediaRef:
             f"{self.end_offset_seconds}",
             self.media_resolution or "",
         ]
-        if self.data is not None:
+        if self.cache_identity:
+            bits.append(f"id:{self.cache_identity}")
+        elif self.data is not None:
             bits.append(hashlib.sha256(self.data).hexdigest()[:32])
         return "|".join(bits)
 
