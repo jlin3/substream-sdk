@@ -9,20 +9,28 @@ Substream provides usage-based billing so you can build a streaming business on 
 
 ## How Pricing Works
 
-| Component | Rate | Description |
-|-----------|------|-------------|
-| **Stream hours** | $0.12/hr | Time your players spend streaming |
-| **Viewer hours** | $0.03/hr | Time viewers spend watching streams |
-| **AI highlights** | $0.50/each | Auto-generated highlight reels |
+Billing is usage-based across three metered dimensions. These are the units that show up on your invoice and in the dashboard:
+
+| Component | Metered by | Description |
+|-----------|------------|-------------|
+| **Stream hours** | Each hour a player is live | Time your players spend streaming, counted whether or not anyone is watching |
+| **Viewer hours** | Each hour watched, per viewer | Time viewers spend watching streams, so this tracks audience size |
+| **AI highlights** | Each generated reel | Auto-generated highlight reels |
+
+Stream hours and viewer hours are metered separately because they scale independently. A stream nobody watches still costs ingest and transcode; a stream with a large audience is mostly delivery. AI highlights are metered per reel because annotation cost follows stream time rather than audience size.
+
+**Rates are quoted per agreement.** Substream is pre-general-availability, and we don't publish per-unit rates yet. Your region, delivery architecture, and committed volume each move the underlying cost by more than a rounding error, so a single published number would be wrong for most teams in one direction or the other. [Tell us about your title](https://substream.ai/try) and we'll quote against your actual volumes.
 
 ## Plans
 
-| Plan | Price | Included |
-|------|-------|----------|
-| **Starter** | Free | 100 stream hours/month |
-| **Growth** | $99/mo | 1,000 stream hours/month |
-| **Scale** | $499/mo | 10,000 stream hours/month |
-| **Enterprise** | Custom | Unlimited + SLA + dedicated support |
+| Plan | Included | Best for |
+|------|----------|----------|
+| **Starter** | 100 stream hours/month | Evaluating the SDK and shipping a prototype |
+| **Growth** | 1,000 stream hours/month | A single live title |
+| **Scale** | 10,000 stream hours/month | Several titles, or one with a large concurrent audience |
+| **Enterprise** | Unlimited, plus SLA and dedicated support | Portfolio deployments with procurement and uptime requirements |
+
+Every plan meters the three dimensions above once you pass its included allowance. Plan pricing, and what the Starter allowance costs, are both settled during onboarding — [get in touch](https://substream.ai/try) to size a plan.
 
 ## Dashboard
 
