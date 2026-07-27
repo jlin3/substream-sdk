@@ -2,16 +2,25 @@ import { getSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 
-const PRICE_PER_STREAM_HOUR = 0.12;
-const PRICE_PER_VIEWER_HOUR = 0.03;
-const PRICE_PER_HIGHLIGHT = 0.50;
-
+/**
+ * Rates are deliberately absent. This page is reachable without credentials
+ * via /api/auth/demo-auto, so anything it renders is public, and per-unit
+ * pricing is quoted per agreement rather than published. Wording here is kept
+ * in step with docs-site/docs/monetization.md.
+ */
 const TIERS = [
-  { name: 'Starter', maxHours: 100, price: 0, included: '100 stream hours/mo' },
-  { name: 'Growth', maxHours: 1000, price: 99, included: '1,000 stream hours/mo' },
-  { name: 'Scale', maxHours: 10000, price: 499, included: '10,000 stream hours/mo' },
-  { name: 'Enterprise', maxHours: Infinity, price: null, included: 'Unlimited' },
+  { name: 'Starter', maxHours: 100, included: '100 stream hours/mo' },
+  { name: 'Growth', maxHours: 1000, included: '1,000 stream hours/mo' },
+  { name: 'Scale', maxHours: 10000, included: '10,000 stream hours/mo' },
+  { name: 'Enterprise', maxHours: Infinity, included: 'Unlimited' },
 ];
+
+/**
+ * Viewer hours are not yet metered per session, so this stands in until viewer
+ * telemetry lands. Shown as an assumption on the page rather than as a
+ * measurement.
+ */
+const ASSUMED_VIEWERS_PER_STREAM_HOUR = 2.4;
 
 export default async function BillingPage() {
   const session = await getSession();
@@ -41,13 +50,8 @@ export default async function BillingPage() {
   const monthStreamsList = allStreams.filter(s => s.createdAt >= monthStart);
   const monthStreamHours = monthStreamsList.reduce((acc, s) => acc + (s.durationSecs || 0), 0) / 3600;
 
-  const estimatedViewerHours = monthStreamHours * 2.4;
+  const estimatedViewerHours = monthStreamHours * ASSUMED_VIEWERS_PER_STREAM_HOUR;
   const liveNow = allStreams.filter(s => s.status === 'LIVE').length;
-
-  const streamCost = monthStreamHours * PRICE_PER_STREAM_HOUR;
-  const viewerCost = estimatedViewerHours * PRICE_PER_VIEWER_HOUR;
-  const highlightCost = monthHighlights * PRICE_PER_HIGHLIGHT;
-  const totalCost = streamCost + viewerCost + highlightCost;
 
   const currentTier = TIERS.find(t => monthStreamHours <= t.maxHours) || TIERS[TIERS.length - 1];
 
@@ -82,42 +86,50 @@ export default async function BillingPage() {
 
       {/* Usage stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard label="Stream Hours" value={formatHours(monthStreamHours)} subtext={`${monthStreams} streams this month`} />
-        <MetricCard label="Viewer Hours (est.)" value={formatHours(estimatedViewerHours)} subtext={`~${(estimatedViewerHours / Math.max(monthStreamHours, 0.01)).toFixed(1)}x multiplier`} />
+        <MetricCard label="Stream Hours" value={formatHours(monthStreamHours)} subtext={`${monthStreams} streams · ${formatHours(totalStreamHours)} hrs all time`} />
+        <MetricCard label="Viewer Hours (est.)" value={formatHours(estimatedViewerHours)} subtext={`assumed ${ASSUMED_VIEWERS_PER_STREAM_HOUR}x, telemetry pending`} />
         <MetricCard label="AI Highlights" value={monthHighlights.toString()} subtext={`${totalHighlights} total`} />
         <MetricCard label="Live Now" value={liveNow.toString()} subtext={`${totalStreams} total streams`} accent={liveNow > 0} />
       </div>
 
       {/* Cost breakdown and weekly chart side by side */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Cost breakdown */}
+        {/* What is metered */}
         <section className="rounded-xl border border-white/10 bg-surface-100 overflow-hidden">
           <div className="px-5 py-4 border-b border-white/10">
-            <h2 className="font-semibold">Estimated Cost</h2>
-            <p className="text-xs text-white/40 mt-0.5">Based on current month usage</p>
+            <h2 className="font-semibold">What We Meter</h2>
+            <p className="text-xs text-white/40 mt-0.5">Your billable usage this month</p>
           </div>
           <div className="p-5 space-y-4">
-            <CostLine
+            <MeteredLine
               label="Stream hours"
+              basis="Each hour a broadcaster is live, watched or not"
               quantity={`${formatHours(monthStreamHours)} hrs`}
-              rate={`$${PRICE_PER_STREAM_HOUR}/hr`}
-              total={streamCost}
             />
-            <CostLine
+            <MeteredLine
               label="Viewer hours"
+              basis="Each hour watched, per viewer"
               quantity={`${formatHours(estimatedViewerHours)} hrs`}
-              rate={`$${PRICE_PER_VIEWER_HOUR}/hr`}
-              total={viewerCost}
+              estimated
             />
-            <CostLine
+            <MeteredLine
               label="AI highlights"
-              quantity={`${monthHighlights} highlights`}
-              rate={`$${PRICE_PER_HIGHLIGHT.toFixed(2)}/each`}
-              total={highlightCost}
+              basis="Each generated reel"
+              quantity={`${monthHighlights} reels`}
             />
-            <div className="border-t border-white/10 pt-4 flex items-center justify-between">
-              <span className="font-semibold">Total Estimated</span>
-              <span className="text-2xl font-bold text-brand-400">${totalCost.toFixed(2)}</span>
+            <div className="border-t border-white/10 pt-4 space-y-2.5">
+              <p className="text-sm font-semibold">Rates are set per agreement</p>
+              <p className="text-xs text-white/50 leading-relaxed">
+                We don&apos;t publish per-unit rates yet. Region, delivery architecture and
+                committed volume each move the underlying cost by more than a rounding error, so
+                your rate card is quoted against the usage above rather than off a list price.
+              </p>
+              <a
+                href="https://substream.ai/try"
+                className="inline-block rounded-lg bg-brand-600/20 text-brand-400 px-4 py-2 text-sm font-semibold hover:bg-brand-600/30 transition-colors"
+              >
+                Get a quote &rarr;
+              </a>
             </div>
           </div>
         </section>
@@ -162,7 +174,10 @@ export default async function BillingPage() {
       <section className="rounded-xl border border-white/10 bg-surface-100 overflow-hidden">
         <div className="px-5 py-4 border-b border-white/10">
           <h2 className="font-semibold">Plans</h2>
-          <p className="text-xs text-white/40 mt-0.5">Usage-based pricing with included tiers</p>
+          <p className="text-xs text-white/40 mt-0.5">
+            Included stream hours per tier. Usage beyond the allowance is metered on the three
+            dimensions above.
+          </p>
         </div>
         <div className="grid sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-white/10">
           {TIERS.map((tier) => (
@@ -172,14 +187,11 @@ export default async function BillingPage() {
             >
               <div>
                 <p className="font-semibold">{tier.name}</p>
-                <p className="text-2xl font-bold mt-1">
-                  {tier.price === null ? 'Custom' : tier.price === 0 ? 'Free' : `$${tier.price}`}
-                  {tier.price !== null && tier.price > 0 && (
-                    <span className="text-sm text-white/40 font-normal">/mo</span>
-                  )}
+                <p className="text-2xl font-bold mt-1">{tier.included.replace(' stream hours/mo', '')}</p>
+                <p className="text-xs text-white/40 mt-0.5">
+                  {tier.maxHours === Infinity ? 'stream hours' : 'stream hours/mo'}
                 </p>
               </div>
-              <p className="text-xs text-white/50">{tier.included}</p>
               {tier.name === currentTier.name && (
                 <span className="inline-block text-xs text-brand-400 font-medium">Current plan</span>
               )}
@@ -203,16 +215,19 @@ function MetricCard({ label, value, subtext, accent }: {
   );
 }
 
-function CostLine({ label, quantity, rate, total }: {
-  label: string; quantity: string; rate: string; total: number;
+function MeteredLine({ label, basis, quantity, estimated }: {
+  label: string; basis: string; quantity: string; estimated?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between text-sm">
+    <div className="flex items-start justify-between gap-4 text-sm">
       <div className="space-y-0.5">
         <p className="text-white/80">{label}</p>
-        <p className="text-xs text-white/30">{quantity} × {rate}</p>
+        <p className="text-xs text-white/30">{basis}</p>
       </div>
-      <span className="font-medium">${total.toFixed(2)}</span>
+      <div className="text-right shrink-0">
+        <span className="font-medium tabular-nums">{quantity}</span>
+        {estimated && <p className="text-xs text-white/30">estimated</p>}
+      </div>
     </div>
   );
 }
