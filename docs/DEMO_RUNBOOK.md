@@ -30,14 +30,24 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 `warm_demo_cache.py` is the insurance policy. Once the cache is warm, `GEMINI_BACKEND=replay` serves the whole demo from disk: no credentials, no network, no spend, identical output.
 
+**This is verified, not assumed.** The cache is warmed at 8x and has been replayed at 4x and 10x across all four titles, matching the warm run exactly on every counter — windows annotated, events, causal links, narrative segments — with zero live API calls and $0.00 spend. That property is load-bearing enough to have a regression test (`tests/test_replay_fidelity.py`): the cache key deliberately excludes the rolling context that varies with annotation timing, because keying on it made replay miss on nearly every window and silently produce an almost-empty feed.
+
+A full warm currently costs about **$1.40** and takes roughly five minutes for all four titles.
+
 ### Run it
 
 ```bash
 cd highlight-service
-.venv/bin/uvicorn main:app --port 8000
+.venv/bin/uvicorn main:app --port 8080
 ```
 
-Open **`http://localhost:8000/demo`**, pick a title, press play. (`/` serves the older VOD-upload page — do not type the bare host from memory.)
+Open **`http://localhost:8080/demo`**, pick a title, press play. (`/` serves the older VOD-upload page — do not type the bare host from memory.)
+
+The console accepts `title`, `speed` and `autostart` in the query string, so the safest thing is to bookmark the exact run rather than work the dropdowns live:
+
+```
+http://localhost:8080/demo?title=halo&speed=1&autostart=1
+```
 
 Check `GET /api/v1/demo/status` first. It returns `ready` plus an explicit `blockers` list, so you know before you start whether the demo can actually run:
 
@@ -105,7 +115,7 @@ Run through this the morning of.
 ```bash
 cd highlight-service
 .venv/bin/python -m pytest tests/ -q                    # expect 65 passed
-curl -s localhost:8000/api/v1/demo/status | jq          # must report ready: true
+curl -s localhost:8080/api/v1/demo/status | jq          # must report ready: true
 ```
 
 - [ ] All Python tests pass

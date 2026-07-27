@@ -2,7 +2,9 @@
 
 For a large mobile-first studio embedding a Twitch-style streaming platform plus AI highlights.
 
-Infrastructure figures come from the interactive cost model (`streaming-infra-cost-model.canvas.tsx`, opened beside the chat in Cursor), built on AWS, LiveKit and bunny.net list prices verified 2026-07. AI figures come from the tiered annotator's own cost meter, not estimates. Every assumption in the model is listed on the canvas so it can be argued with live.
+Infrastructure figures come from the interactive cost model published at **`/cost-calculator`** on the docs site (source: `docs-site/src/components/CostModel/`), built on AWS, LiveKit and bunny.net list prices verified 2026-07. That page is unlisted — not in the sidebar, not indexed — so it is shareable by link without being public. Every input is editable and the URL carries the configuration, so a specific scenario can be sent to the studio's finance team as a link.
+
+AI figures come from the tiered annotator's own cost meter, measured over four real titles, not estimated.
 
 ---
 
@@ -81,17 +83,27 @@ Start on IVS anyway. Time-to-market dominates at pilot scale, and the commodity 
 
 ## 3. AI usage — per unit
 
-The cost side moved decisively with this release. Google Cloud Video Intelligence was roughly 85% of per-video cost at about $0.10/minute, and Gemini 3 does shot detection, on-screen text reading and object tracking natively. Removing it, plus the Flash-Lite triage tier gating dense annotation, is what makes these prices work.
+The cost side moved with this release, but not as far as an earlier draft of this document claimed. Google Cloud Video Intelligence was roughly 85% of per-video cost at about $0.10/minute, and Gemini 3 does shot detection, on-screen text reading and object tracking natively, so removing it was a real saving. Setting dense annotation to `thinking_level=low` roughly halved the largest remaining line for no measurable loss in annotation quality.
 
-| Product | Price | Our cost | Margin |
+**These are metered numbers, not estimates.** The figures below come from running all four demo titles end to end through the live pipeline and reading the cost meter. Reproduce with `scripts/warm_demo_cache.py`.
+
+| Product | Our measured cost | Recommended price | Margin |
 |---|---|---|---|
-| Highlight reel (30-min VOD) | $1.50 | $0.40 | 73% |
-| Live annotation | $3.00 / stream-hour | $1.20 | 60% |
-| Dense world-model annotation | $2.00 / video-hour | $0.50 | 75% |
+| Live annotation + reel | **$5.10 / stream-hour** | $9.00 / stream-hour | 43% |
+| Highlight reel (30-min VOD) | **$2.55** | $4.50 | 43% |
+| Dense world-model annotation | **$5.10 / video-hour** | $8.00 / video-hour | 36% |
 
-Note for internal reference: the previously published $0.50/highlight price was underwater against the old $3–5 cost. It clears about 20% margin now, which is why the recommendation is $1.50 and not a defense of $0.50.
+Cost varies with how eventful the footage is, because the triage tier decides how many windows reach the expensive model. Measured range across titles: **$3.59/hour** for sparse mobile gameplay up to **$8.31/hour** for dense arena shooter footage. Price the blended rate and absorb the variance rather than exposing it — a per-title rate card invites an argument about which bucket each title falls into.
 
-Live annotation is priced highest relative to cost because it is the differentiated capability — the reel is ready the instant the stream ends. It is also the line most exposed to model price changes in either direction, so keep the contract language pinned to a per-unit price we can revisit annually rather than a cost-plus formula.
+Where the money goes, per the cost meter: dense annotation 50%, narrative arbiter 31%, episode identification 12%, triage 7%. The triage tier is 200 of 327 calls but only 7% of spend, which is the tiering working exactly as intended.
+
+**Two warnings to carry into the room.**
+
+The previously published **$0.50/highlight price is badly underwater** — roughly 5x below cost — and so is the $3.00/stream-hour live annotation figure in earlier drafts. Do not quote either. If $0.50 has already been shown to this studio, lead with the correction rather than letting them find it.
+
+**AI is not a rounding error against infrastructure.** At 40 concurrent viewers, delivery runs about $2.40 per stream-hour on commodity CDN while annotation runs $5.10. Annotation scales with *stream*-hours and delivery scales with *viewer*-hours, so for the long tail of streams with small audiences the model is the entire bill. Two levers keep this sane, and both should be in the contract: annotate on a **coverage fraction** rather than every stream, and gate annotation behind a minimum concurrent-viewer threshold so streams nobody watches are never annotated.
+
+Live annotation still carries the highest price relative to cost because it is the differentiated capability — the reel is ready the instant the stream ends. It is also the line most exposed to model price moves in either direction, so keep the contract pinned to a per-unit price revisited annually rather than a cost-plus formula.
 
 ---
 

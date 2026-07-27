@@ -264,9 +264,32 @@ def reset_client() -> None:
 # --------------------------------------------------------------------------
 
 
-def _cache_key(purpose: str, model: str, prompt: str, media_fingerprint: str) -> str:
+def _cache_key(
+    purpose: str,
+    model: str,
+    prompt: str,
+    media_fingerprint: str,
+    system_instruction: str = "",
+    thinking_level: str = "",
+    temperature: str = "",
+) -> str:
+    """Hash every input that can change the response.
+
+    The system instruction in particular has to be in here. It carries the
+    annotation rules and gets edited far more often than the per-window prompt,
+    so leaving it out means a prompt change silently replays annotations
+    produced by the previous version of the rules.
+    """
     h = hashlib.sha256()
-    for part in (purpose, model, prompt, media_fingerprint):
+    for part in (
+        purpose,
+        model,
+        prompt,
+        media_fingerprint,
+        system_instruction,
+        thinking_level,
+        temperature,
+    ):
         h.update(part.encode("utf-8"))
         h.update(b"\x00")
     return h.hexdigest()[:32]
@@ -379,12 +402,19 @@ def _build_media_part(media: MediaRef) -> Any:
 
     if video_metadata is not None:
         part.video_metadata = video_metadata
-
-    resolution = media.media_resolution or config.ANNOTATION_MEDIA_RESOLUTION
-    mapped = _MEDIA_RESOLUTION_MAP.get(resolution.lower())
-    if mapped:
-        part.media_resolution = mapped
     return part
+
+
+def resolve_media_resolution(media: Optional[MediaRef]) -> Optional[str]:
+    """Map our short resolution name onto the API enum.
+
+    Set on the request config rather than on the media part. Part-level
+    `media_resolution` is accepted by Vertex but rejected by the Gemini
+    Developer API with a 400, and since each window is its own call, config
+    scope still gives per-window control — which is all the tiering needs.
+    """
+    name = (media.media_resolution if media else None) or config.ANNOTATION_MEDIA_RESOLUTION
+    return _MEDIA_RESOLUTION_MAP.get(name.lower())
 
 
 @dataclass
@@ -405,6 +435,7 @@ def generate_structured(
     thinking_level: Optional[str] = None,
     use_cache: bool = True,
     temperature: Optional[float] = None,
+    cache_prompt: Optional[str] = None,
 ) -> GenerateResult:
     """Run one structured-output generation and meter it.
 
@@ -414,7 +445,22 @@ def generate_structured(
     """
     started = time.perf_counter()
     media_fp = media.fingerprint() if media else ""
-    key = _cache_key(purpose, model, prompt, media_fp)
+    # `cache_prompt` lets a caller name the stable identity of the request when
+    # the real prompt carries something that legitimately varies between runs.
+    # Dense annotation is the case that matters: its prompt embeds a rolling
+    # summary of previously completed windows, and because windows are
+    # annotated concurrently, that summary depends on completion order. Keying
+    # on the full prompt made the replay cache miss on nearly every window, so
+    # the offline demo fallback silently degraded to almost no annotation.
+    key = _cache_key(
+        purpose,
+        model,
+        prompt if cache_prompt is None else cache_prompt,
+        media_fp,
+        system_instruction or "",
+        thinking_level or "",
+        "" if temperature is None else f"{temperature}",
+    )
 
     if use_cache:
         cached = cache_read(key)
@@ -452,6 +498,9 @@ def generate_structured(
         "response_mime_type": "application/json",
         "response_schema": response_schema,
     }
+    resolution = resolve_media_resolution(media)
+    if media is not None and resolution:
+        cfg_kwargs["media_resolution"] = resolution
     if system_instruction:
         cfg_kwargs["system_instruction"] = system_instruction
     if temperature is not None:

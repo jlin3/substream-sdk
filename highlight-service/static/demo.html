@@ -694,6 +694,34 @@
     } catch (e) {
       toast('Could not load prepared content list.', true);
     }
+
+    applyUrlPreferences();
+  }
+
+  // Preselect title and pacing from the query string, and optionally start
+  // immediately. A bookmarked link means no fumbling with dropdowns in front
+  // of an audience: /demo?title=stumble&speed=1&autostart=1
+  function applyUrlPreferences() {
+    const params = new URLSearchParams(window.location.search);
+
+    const wanted = (params.get('title') || '').toLowerCase();
+    if (wanted) {
+      const sel = el('contentSel');
+      const match = Array.from(sel.options).find(
+        (o) => o.value.toLowerCase().includes(wanted) ||
+               (o.dataset.title || '').toLowerCase().includes(wanted),
+      );
+      if (match) sel.value = match.value;
+    }
+
+    const speed = params.get('speed');
+    if (speed && Array.from(el('speedSel').options).some((o) => o.value === speed)) {
+      el('speedSel').value = speed;
+    }
+
+    if (params.get('autostart') === '1' && !el('startBtn').disabled) {
+      start();
+    }
   }
 
   // ---------- start ----------

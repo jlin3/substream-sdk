@@ -363,20 +363,28 @@ def annotate_window(
         if rolling_context
         else ""
     )
-    prompt = (
-        f"Annotate this {clip.t_end - clip.t_start:.0f} second window of gameplay"
-        f"{game_ctx}.\n\n"
-        f"{genre_prompt(genre)}\n"
-        f"{context_block}\n"
-        f"IMPORTANT: this clip was cut from a longer recording. It begins at "
-        f"{clip.t_start:.1f}s in the source video. Report all event timestamps "
-        f"in seconds relative to the START OF THE SOURCE VIDEO, so a moment "
-        f"halfway through this clip is "
-        f"{clip.t_start + (clip.t_end - clip.t_start) / 2:.1f}, not "
-        f"{(clip.t_end - clip.t_start) / 2:.1f}.\n\n"
-        f"Produce the complete annotation. Link caused events with "
-        f"cause_event_id. Be honest in the confidence fields."
-    )
+    def build(context: str) -> str:
+        return (
+            f"Annotate this {clip.t_end - clip.t_start:.0f} second window of gameplay"
+            f"{game_ctx}.\n\n"
+            f"{genre_prompt(genre)}\n"
+            f"{context}\n"
+            f"IMPORTANT: this clip was cut from a longer recording. It begins at "
+            f"{clip.t_start:.1f}s in the source video. Report all event timestamps "
+            f"in seconds relative to the START OF THE SOURCE VIDEO, so a moment "
+            f"halfway through this clip is "
+            f"{clip.t_start + (clip.t_end - clip.t_start) / 2:.1f}, not "
+            f"{(clip.t_end - clip.t_start) / 2:.1f}.\n\n"
+            f"Produce the complete annotation. Link caused events with "
+            f"cause_event_id. Be honest in the confidence fields."
+        )
+
+    prompt = build(context_block)
+    # Windows are annotated concurrently, so the rolling context depends on
+    # which earlier windows happened to finish first. Keying the cache on it
+    # would make a cached run unreplayable at any other speed or concurrency,
+    # which is exactly what the offline demo path relies on.
+    cache_prompt = build("")
     try:
         result = generate_structured(
             model=config.GEMINI_DENSE_MODEL,
@@ -392,6 +400,8 @@ def annotate_window(
             system_instruction=load_prompt("system_annotation"),
             meter=meter,
             temperature=0.1,
+            thinking_level=config.DENSE_THINKING_LEVEL,
+            cache_prompt=cache_prompt,
         )
     except RuntimeError as exc:
         logger.warning("Dense annotation failed for window %d: %s", clip.index, exc)
@@ -440,19 +450,27 @@ def score_segment(
 ) -> Optional[NarrativeSegment]:
     """Final narrative judgement over a candidate span."""
     game_ctx = f" from '{game_title}'" if game_title else ""
-    prompt = (
-        f"This is a candidate highlight clip{game_ctx}.\n\n"
-        f"{genre_prompt(genre)}\n\n"
-        f"What the dense annotator already found in this span:\n"
-        f"{window_context}\n\n"
-        f"Judge it as highlight material. Score 0-100 for overall quality and "
-        f"separately for shareability. Identify its narrative role, its "
-        f"emotional register, and whether it contains a causal action chain "
-        f"that must not be cut apart. Set spoiler_risk high if it reveals a "
-        f"match outcome that would spoil the rest of a reel.\n\n"
-        f"Judge against the genre's own standards. A spectacular failure in a "
-        f"party game is excellent material; a routine kill in a shooter is not."
-    )
+
+    def build(context: str) -> str:
+        return (
+            f"This is a candidate highlight clip{game_ctx}.\n\n"
+            f"{genre_prompt(genre)}\n\n"
+            f"What the dense annotator already found in this span:\n"
+            f"{context}\n\n"
+            f"Judge it as highlight material. Score 0-100 for overall quality and "
+            f"separately for shareability. Identify its narrative role, its "
+            f"emotional register, and whether it contains a causal action chain "
+            f"that must not be cut apart. Set spoiler_risk high if it reveals a "
+            f"match outcome that would spoil the rest of a reel.\n\n"
+            f"Judge against the genre's own standards. A spectacular failure in a "
+            f"party game is excellent material; a routine kill in a shooter is not."
+        )
+
+    prompt = build(window_context)
+    # Same reasoning as dense annotation: the summary of what the dense pass
+    # found is a live input that varies with annotation timing, while the span
+    # itself is the stable identity of the request.
+    cache_prompt = build("")
     try:
         result = generate_structured(
             model=config.GEMINI_ARBITER_MODEL,
@@ -468,6 +486,7 @@ def score_segment(
             system_instruction=load_prompt("system_base"),
             meter=meter,
             temperature=0.2,
+            cache_prompt=cache_prompt,
         )
     except RuntimeError as exc:
         logger.warning("Arbiter failed for span %.1f-%.1f: %s", clip.t_start, clip.t_end, exc)

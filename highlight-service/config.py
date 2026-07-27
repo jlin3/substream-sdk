@@ -1,6 +1,21 @@
 import json
 import os
 
+# Load .env before reading anything below, so a local file can supply
+# GEMINI_API_KEY without every entry point having to export it first. Real
+# environment variables still win, which keeps deployed config authoritative.
+try:
+    from dotenv import load_dotenv
+
+    for _candidate in (
+        os.path.join(os.path.dirname(__file__), ".env"),
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"),
+    ):
+        if os.path.isfile(_candidate):
+            load_dotenv(_candidate, override=False)
+except ImportError:
+    pass
+
 _creds_json = os.environ.get("GCP_CREDENTIALS_JSON")
 if _creds_json and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
     _creds_path = "/tmp/gcp-credentials.json"
@@ -71,6 +86,14 @@ ANNOTATION_FPS = float(os.environ.get("ANNOTATION_FPS", "1.0"))
 # and is only worth it when HUD text has to be read reliably.
 ANNOTATION_MEDIA_RESOLUTION = os.environ.get("ANNOTATION_MEDIA_RESOLUTION", "low")
 ANNOTATION_MAX_CONCURRENCY = int(os.environ.get("ANNOTATION_MAX_CONCURRENCY", "6"))
+
+# Dense annotation is the single largest cost line, and its output tokens —
+# which include thinking tokens — dominate it. Gemini 3 defaults to dynamic
+# thinking, which measured 2x the cost of "low" across 9 windows and 3 titles
+# for no gain in events, entities or OCR fields recovered. See
+# scripts/probe_thinking_level.py to re-run that comparison. Raise this if a
+# genre turns out to need deliberation the transcript does not show.
+DENSE_THINKING_LEVEL = os.environ.get("DENSE_THINKING_LEVEL", "low")
 
 # --- Video Intelligence --------------------------------------------------
 # Off by default. At roughly $0.10/minute it dominated per-video cost, and
