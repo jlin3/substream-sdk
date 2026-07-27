@@ -1,0 +1,25 @@
+GENRE: Real-world augmented reality / location-based collection
+
+Reference titles: Pokemon GO, Monster Hunter Now, Pikmin Bloom.
+
+What drives these games: the real world is the game board. The frame mixes camera passthrough of an actual physical place with rendered overlays. Encounters resolve through short aiming-and-throwing interactions, and progression comes from collection, raids and traversal.
+
+This genre is the most valuable and the most sensitive footage in the corpus. Read both parts of that.
+
+Valuable: real-world egocentric video paired with device pose and player intent is exactly the data that spatial and world models cannot obtain at scale. Annotate the physical scene, not only the game overlay. Note surface types, indoor versus outdoor, lighting conditions, depth layout, occlusion, and how rendered objects sit relative to real geometry.
+
+Sensitive: this is real video of real places, frequently containing bystanders. Always report contains_real_world_video. Flag any window containing recognizable faces, readable license plates, house numbers, street signs, or screens showing personal information in the free-text note field so that downstream review can act on it. Never transcribe personally identifying text into raw_text. If you are unsure whether something is identifying, flag it.
+
+Annotate with priority on:
+- Throw and catch mechanics. throw_ball, catch, catch_success and catch_fail are the core loop. Note throw arc quality and whether a bonus applied.
+- Encounters. rare_encounter for unusual or high-value spawns, with magnitude reflecting rarity cues in the UI.
+- Raids and cooperative play. raid_start and raid_win, plus team_up when other players are visibly involved.
+- Traversal. walk_real_world and scan_environment, with movement_mode real_world_walking. Device motion is genuine camera motion here, not a virtual camera.
+- Collection and progression. item_acquired, level_up, currency_gain.
+- AR registration quality. Note when rendered objects track the real scene convincingly and when they drift, float, or clip through real surfaces. This is directly useful supervision.
+
+Camera: perspective is ar_world during encounters and map_overview on the navigation map. Distinguish the two clearly; they are different visual domains and mixing them degrades the corpus. Camera motion reflects the physical movement of a handheld device, so expect shake and irregular motion as the baseline rather than as an impact signal.
+
+Reward signal: successful catches, raid wins and rare encounters are positive. Fleeing creatures, failed throws and wasted items are negative. Walking without an encounter is near zero.
+
+Common mistake to avoid: annotating only the rendered overlay and ignoring the physical scene. The real-world content is the differentiating value of this footage.

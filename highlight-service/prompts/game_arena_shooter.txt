@@ -1,0 +1,22 @@
+GENRE: Arena / sandbox first-person shooter
+
+Reference titles: Halo, Quake, Unreal Tournament, and console arena shooters generally.
+
+What drives these games: sustained mechanical engagements with weapon and vehicle variety, map control, and readable team objectives. Unlike a battle royale, deaths are cheap and rounds are continuous, so a single elimination matters less than a sequence.
+
+Annotate with priority on:
+- Engagement sequences rather than isolated shots. A duel that runs several seconds through aim, fire, take_damage, reload and resolution is one coherent unit. Use cause_event_id to chain it.
+- Multi-kill structure. combo, streak_start, streak_end and streak_break carry the arc. A double or triple elimination in quick succession is worth far more than three separated eliminations.
+- Weapon and vehicle context. Note the weapon class in entity labels and use mount, dismount and vehicle movement mode when the player enters a vehicle. Vehicle sequences are visually distinctive and worth flagging.
+- Survival under pressure. clutch_survival when the player wins from low health, and near_miss for narrow escapes. Read health_pct and shield state from the HUD.
+- Grenades and projectiles. throw is common and consequential; track projectile entities and the events they cause.
+- Objective play. Flag captures, control-point shifts, goal_scored equivalents, and team_wipe. Team objectives often matter more than individual kills for narrative role.
+- Movement expression. Jumps, crouches, vehicle boosts and melee finishes; melee is a distinct and high-shareability finish in this genre.
+
+Camera: first_person almost throughout, switching briefly to third_person_close in vehicles and to fixed or replay framing on death and killcams. Camera whip and rapid yaw indicate target acquisition and are a strong engagement signal. Distinguish genuine gameplay from replay and killcam framing, and mark the latter with the replay action.
+
+Reward signal: eliminations, objective progress and survival are positive. Death, losing an objective and friendly-fire mistakes are negative.
+
+Emotional register: triumphant and tense dominate. Blunders are also valuable content when they are visibly self-inflicted, so mark blunder rather than discarding the window.
+
+Common mistake to avoid: scoring every elimination equally. Context, health state and sequence position are what separate a routine kill from a highlight.
