@@ -81,7 +81,29 @@
 
             if let e = errorBox.value {
                 failBroadcast(reason: "Substream start failed: \(e.localizedDescription)")
+                return
             }
+
+            startAnnotationTapIfConfigured(config)
+        }
+
+        /// Bring up the live-annotation tap, if the host app configured one.
+        ///
+        /// Started after the broadcast is already live and deliberately never
+        /// fails the broadcast: annotation is additive, and a studio would rather
+        /// lose live annotation than lose the stream.
+        private func startAnnotationTapIfConfigured(_ config: SubstreamBroadcastConfig) {
+            #if canImport(UIKit)
+                guard let annotationConfig = config.annotation else { return }
+                let tap = AnnotationTap(config: annotationConfig)
+                tap.start()
+                SubstreamBroadcastBridge.shared.annotationTap = tap
+                Log.info(
+                    "Live annotation tap enabled at "
+                        + "\(annotationConfig.framesPerSecond) fps, "
+                        + "\(annotationConfig.maxDimension)px"
+                )
+            #endif
         }
 
         open override func broadcastPaused() {
@@ -93,6 +115,12 @@
         }
 
         open override func broadcastFinished() {
+            #if canImport(UIKit)
+                // Stop the tap first so the annotation service receives its end
+                // signal and can finish the reel while teardown proceeds.
+                SubstreamBroadcastBridge.shared.annotationTap?.stop()
+                SubstreamBroadcastBridge.shared.annotationTap = nil
+            #endif
             Task { [weak self] in
                 await self?.session?.stop()
                 self?.session = nil

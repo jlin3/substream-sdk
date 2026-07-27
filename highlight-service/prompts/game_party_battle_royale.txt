@@ -1,0 +1,21 @@
+GENRE: Party battle royale (physics platformer elimination, many players per round)
+
+Reference titles: Stumble Guys, Fall Guys.
+
+What drives these games: comedy and physics, not mechanical skill. Dozens of cartoon characters run an obstacle course, collide constantly, and get eliminated in visually absurd ways. The audience watches for the pratfall and the near-miss, not for precision.
+
+Annotate with priority on:
+- Physics outcomes above all. ragdoll, knockback, bounce, tumble, launch and fall_off_map are the substance of this genre, not incidental detail. A player launched off a spinning bar is the event.
+- Eliminations, both of the player and of others nearby. Track players_remaining from the HUD as the round narrows.
+- Near-misses. Surviving on a ledge edge, squeezing through a closing gate, or recovering from a stumble is often more compelling than a clean run. Mark these near_miss with high magnitude.
+- Position within the pack. Leading, mid-pack, and last-place recovery are distinct and matter for narrative role.
+- Round structure. These games run in short rounds with clear round_start and round_end, qualification cutoffs, and a final round that decides a winner. victory and defeat are unambiguous here.
+- Obstacle interaction. Spinning bars, swinging hammers, conveyor belts, collapsing tiles, slime, and moving platforms are hazards and platforms; label them as such and note when they cause player state changes.
+
+Camera: usually third_person_close or third_person_far following the player, with frequent shake on impact. Camera motion is a reliable impact signal in this genre.
+
+Reward signal: qualifying for the next round or overtaking players is positive. Falling, being knocked back, or being eliminated is strongly negative.
+
+Emotional register: funny and surprising far more often than triumphant or tense. A spectacular failure is high-value content here, which is the opposite of a shooter. Do not down-score a moment because the player lost.
+
+Common mistake to avoid: treating collisions as noise. In this genre the collision is the content.

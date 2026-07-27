@@ -94,6 +94,56 @@ The extension calls `Substream.stop()` automatically when the user taps **Stop B
 
 ---
 
+## Live annotation (optional)
+
+The extension can tee a second, much cheaper stream to the annotation service so gameplay is annotated *while* it is being broadcast. The payoff is that the highlight reel is ready the instant the stream ends, rather than minutes later.
+
+Enable it by adding an `annotation` block to the config. The extension needs no code change.
+
+```swift
+// Create the annotation session first — the service returns the URL to tee to.
+// This is a normal HTTPS call against the highlight service.
+let session = try await createAnnotationSession(gameTitle: "Stumble Guys")
+
+try SubstreamBroadcastConfig.save(
+    .init(
+        backendUrl: URL(string: "https://api.substream.dev")!,
+        authToken: "sk_live_…",
+        streamerId: "player-456",
+        annotation: AnnotationTapConfig(
+            framesUrl: session.framesWebSocketUrl,  // wss://…/live/sessions/{id}/frames
+            framesPerSecond: 1.0,
+            maxDimension: 480
+        )
+    ),
+    appGroup: "group.com.acme.mygame"
+)
+```
+
+Leave `annotation` out and the broadcast behaves exactly as it did before — no socket, no encoding, no overhead.
+
+**What it costs.** At the defaults (1 fps, 480px longest edge, quality 0.5) a frame is roughly 20–60 KB, so the tap adds well under 1 Mbps of upload and one JPEG encode per second. That encode runs on ReplayKit's sample-buffer queue and takes a few milliseconds, which is why the frame rate is capped at 4 fps.
+
+**Why it can't hurt the broadcast.** The tap is offered each frame only *after* IVS has it, and every failure path is swallowed and logged:
+
+- The send queue is bounded (`maxQueuedFrames`, default 4). When it is full, frames are dropped and counted rather than buffered.
+- A send failure disables the tap for the rest of the session instead of starting a retry loop that would compete with the live stream for memory and CPU.
+- An encoder failure drops that one frame.
+
+Read `tap.currentStats` for `framesSampled`, `framesSent`, both drop counters, and `bytesSent`.
+
+**Protocol.** For each frame the tap sends a JSON text message followed by the raw JPEG, then a single `{"type":"end"}` at stop:
+
+```
+-> {"type":"frame","pts":12.500}
+-> <binary jpeg>
+-> {"type":"end"}
+```
+
+Splitting the header from the payload keeps the binary message a plain JPEG with no framing to parse, which matters under the memory cap. The literal header format is asserted from both sides — see `AnnotationTapTests` and `test_ios_client_literal_wire_format`.
+
+---
+
 ## Memory limits
 
 Broadcast Upload Extensions are capped at **50 MB** of RSS. SubstreamSDK stays well under that because:
@@ -101,6 +151,7 @@ Broadcast Upload Extensions are capped at **50 MB** of RSS. SubstreamSDK stays w
 - Pixel buffers flow directly from ReplayKit to IVS via `CVPixelBuffer` — no copies.
 - We never retain frames past the IVS `onSampleBuffer` call.
 - Audio samples are forwarded by reference.
+- The annotation tap, when enabled, downscales *during* encode so a full-resolution intermediate is never allocated, and holds at most `maxQueuedFrames` JPEGs.
 
 If you add your own overlays or heavy processing, audit with Instruments → Leaks + Allocations against the extension process.
 
@@ -127,3 +178,5 @@ This keeps long-lived secrets out of the shared container.
 | No audio | Ensure `showsMicrophoneButton = true` **and** the user tapped the mic icon in the picker |
 | Stream stops on lock screen | That's expected on older iOS; newer iOS supports background broadcast — test on iOS 14+ |
 | Extension uses >50MB | Disable HDR / 4K; the SDK targets 720p@30fps by default which stays around 15 MB |
+| Annotation feed is empty | Check the session id in `framesUrl` still exists on the service; a closed session is rejected with WebSocket code 4404 |
+| Annotation stops partway through | Expected after a send failure — the tap disables itself rather than retrying. Check `framesDroppedQueueFull` and the extension log for `tap disabled` |

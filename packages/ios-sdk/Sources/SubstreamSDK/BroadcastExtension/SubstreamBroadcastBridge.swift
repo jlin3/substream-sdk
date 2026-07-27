@@ -41,6 +41,12 @@ final class SubstreamBroadcastBridge: @unchecked Sendable {
     #endif
     private weak var _audioSource: ReplayKitAudioSource?
 
+    #if canImport(UIKit)
+        // Retained, unlike the capture sources, because the bridge is the tap's
+        // only owner. The extension has no other object with a matching lifetime.
+        private var _annotationTap: AnnotationTap?
+    #endif
+
     private init() {}
 
     // MARK: - Public accessors (lock-serialized)
@@ -63,22 +69,32 @@ final class SubstreamBroadcastBridge: @unchecked Sendable {
         set { withLock { _audioSource = newValue } }
     }
 
+    #if canImport(UIKit)
+        /// Optional live-annotation tap. Set before the broadcast starts.
+        var annotationTap: AnnotationTap? {
+            get { withLock { _annotationTap } }
+            set { withLock { _annotationTap = newValue } }
+        }
+    #endif
+
     // MARK: - Hot path
 
     #if canImport(ReplayKit) && canImport(UIKit)
         func forward(sampleBuffer: CMSampleBuffer, bufferType: RPSampleBufferType) {
             // Snapshot the refs under the lock, then release before calling
             // into the sinks to avoid holding the lock on the frame-push path.
-            let (image, audio): (ReplayKitInAppSource?, ReplayKitAudioSource?) = withLock {
-                (_imageSource, _audioSource)
+            let (image, audio, tap) = withLock {
+                (_imageSource, _audioSource, _annotationTap)
             }
 
             switch bufferType {
             case .video:
-                guard let image else { return }
                 guard let pb = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
                 let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-                image.deliver(pixelBuffer: pb, pts: pts)
+                // The broadcast comes first. The annotation tap is offered the
+                // frame only after IVS has it, and it ignores all but ~1 in 30.
+                image?.deliver(pixelBuffer: pb, pts: pts)
+                tap?.consume(pixelBuffer: pb, pts: pts)
             case .audioApp, .audioMic:
                 audio?.forward(sampleBuffer)
             @unknown default:

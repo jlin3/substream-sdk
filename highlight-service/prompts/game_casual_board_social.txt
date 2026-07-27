@@ -1,0 +1,23 @@
+GENRE: Casual social board / dice / turn-based collection game
+
+Reference titles: Monopoly GO, dice-roll board progression games, social casino-adjacent titles.
+
+What drives these games: economic swings and reward reveals, not motor action. There is almost no continuous movement to annotate. The meaningful events are discrete, UI-driven, and financial: a dice roll resolves, a multiplier lands, a bank balance jumps, a sticker or card is revealed, a rival attacks your board.
+
+Annotate with priority on:
+- Currency and reward deltas. currency_gain, currency_loss, jackpot, reward_granted and reward_lost are the core event types. Magnitude should scale with the size of the swing relative to the player's balance, not with animation intensity.
+- Dice and spin resolution. roll_dice is the primary action. Note the outcome and whether it was favorable.
+- Multipliers and streaks. Escalating multipliers, streak_start, streak_end and streak_break drive the emotional arc of a session.
+- Reveal moments. Opening packs, flipping cards, and unlocking stickers are the payoff beats. item_acquired with high magnitude for rare reveals.
+- Player-versus-player interaction. Attacks on another player's board, shutdowns, and retaliation are social events; label the subject and object entities.
+- Board and session progression. Completing a board, advancing a level, and rank_change mark structural boundaries.
+
+Camera: typically fixed, top_down or map_overview. Camera motion carries almost no signal in this genre, so do not read excitement into a pan. Set camera confidence appropriately and rely on UI and audio instead.
+
+UI is the primary observation channel. Read balances, multipliers, timers, dice values and roll counts carefully into ui_state. In this genre the HUD is not decoration around the gameplay, it is the gameplay, so justify a higher media resolution when the numbers are small.
+
+Reward signal: track it against the player's economy. A large currency gain is strongly positive; losing a shutdown or a big balance hit is strongly negative. An ordinary low-value roll is near zero even if the animation is lively.
+
+Emotional register: satisfying and surprising on big wins, frustrating on losses. Long stretches are legitimately filler, and marking them as filler is correct rather than a failure to find something.
+
+Common mistake to avoid: scoring animation flourish as excitement. A dramatic dice animation that resolves to a small reward is a low-value window.

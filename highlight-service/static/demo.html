@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Substream — Live World-Model Annotation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #08090d;
+    --bg-raised: #0f1117;
+    --bg-card: #14161f;
+    --border: #212533;
+    --border-bright: #2e3446;
+    --text: #eef1f7;
+    --text-dim: #98a1b5;
+    --text-faint: #626b80;
+    --accent: #5b8cff;
+    --accent-dim: #2a4180;
+    --green: #35d49a;
+    --amber: #ffb648;
+    --red: #ff5f6d;
+    --purple: #b47cff;
+    --cyan: #3ddbd9;
+    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- header ---------- */
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-raised);
+    flex-shrink: 0;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+  }
+
+  .brand-mark {
+    width: 26px; height: 26px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    display: grid; place-items: center;
+    font-size: 14px; font-weight: 700;
+  }
+
+  .brand-sub {
+    color: var(--text-faint);
+    font-weight: 500;
+    font-size: 12px;
+    padding-left: 11px;
+    border-left: 1px solid var(--border-bright);
+  }
+
+  .header-spacer { flex: 1; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  .pill .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--text-faint);
+    flex-shrink: 0;
+  }
+  .pill.live .dot { background: var(--red); animation: pulse 1.4s ease-in-out infinite; }
+  .pill.live { color: var(--text); border-color: #4a2530; }
+  .pill.done .dot { background: var(--green); }
+  .pill.done { color: var(--green); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.45; transform: scale(0.82); }
+  }
+
+  /* ---------- controls ---------- */
+
+  .btn {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 15px;
+    border-radius: 8px;
+    border: 1px solid var(--border-bright);
+    background: var(--bg-card);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.14s ease;
+    white-space: nowrap;
+  }
+  .btn:hover:not(:disabled) { background: #1b1f2b; border-color: #3b435a; }
+  .btn:disabled { opacity: 0.38; cursor: not-allowed; }
+  .btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #06070c;
+  }
+  .btn.primary:hover:not(:disabled) { background: #6d99ff; }
+
+  select, input[type=file] {
+    font-family: inherit; font-size: 13px;
+    padding: 8px 11px;
+    border-radius: 8px;
+    border: 1px solid var(--border-bright);
+    background: var(--bg-card);
+    color: var(--text);
+  }
+
+  /* ---------- stat strip ---------- */
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .stat {
+    background: var(--bg-raised);
+    padding: 11px 16px;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-faint);
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+
+  .stat-value {
+    font-family: var(--mono);
+    font-size: 19px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    transition: color 0.3s ease;
+  }
+  .stat-value.bump { color: var(--accent); }
+  .stat-value.cost { color: var(--amber); }
+  .stat-value.good { color: var(--green); }
+
+  /* ---------- layout ---------- */
+
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    min-height: 0;
+  }
+
+  .col {
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .panel-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-raised);
+    flex-shrink: 0;
+  }
+
+  .panel-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+  }
+
+  .panel-note { font-size: 11px; color: var(--text-faint); margin-left: auto; }
+
+  /* ---------- video ---------- */
+
+  .video-wrap {
+    position: relative;
+    background: #000;
+    aspect-ratio: 16 / 9;
+    flex-shrink: 0;
+  }
+  .video-wrap video { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+  .video-empty {
+    position: absolute; inset: 0;
+    display: grid; place-items: center;
+    color: var(--text-faint);
+    font-size: 13px;
+    text-align: center;
+    padding: 30px;
+  }
+
+  .overlay-caption {
+    position: absolute;
+    left: 14px; right: 14px; bottom: 14px;
+    background: rgba(8,9,13,0.86);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border-bright);
+    border-radius: 9px;
+    padding: 10px 13px;
+    font-size: 13px;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  .overlay-caption.show { opacity: 1; }
+  .overlay-caption .oc-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--cyan); font-weight: 700; margin-bottom: 3px;
+  }
+
+  /* ---------- timeline ---------- */
+
+  .timeline-section { padding: 14px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+
+  .timeline {
+    position: relative;
+    height: 40px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    overflow: hidden;
+  }
+
+  .tl-window {
+    position: absolute; top: 0; bottom: 0;
+    background: rgba(91,140,255,0.13);
+    border-left: 1px solid rgba(91,140,255,0.3);
+  }
+  .tl-window.skipped { background: rgba(98,107,128,0.09); border-left-color: rgba(98,107,128,0.2); }
+
+  .tl-event {
+    position: absolute; top: 4px; bottom: 4px;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--amber);
+    animation: markIn 0.35s ease;
+  }
+  .tl-event.high { background: var(--red); box-shadow: 0 0 9px rgba(255,95,109,0.65); }
+  .tl-event.physics { background: var(--purple); }
+
+  @keyframes markIn {
+    from { transform: scaleY(0.2); opacity: 0; }
+    to { transform: scaleY(1); opacity: 1; }
+  }
+
+  .tl-playhead {
+    position: absolute; top: 0; bottom: 0; width: 2px;
+    background: #fff;
+    box-shadow: 0 0 8px rgba(255,255,255,0.55);
+    transition: left 0.2s linear;
+  }
+
+  .tl-labels {
+    display: flex; justify-content: space-between;
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-faint); margin-top: 5px;
+  }
+
+  /* ---------- reel rail ---------- */
+
+  .rail-section { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .rail { flex: 1; overflow-y: auto; padding: 12px 18px; display: flex; flex-direction: column; gap: 8px; }
+
+  .reel-card {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 11px 13px;
+    transition: all 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation: cardIn 0.35s ease;
+  }
+  .reel-card:hover { border-color: var(--border-bright); }
+  .reel-card.top { border-color: rgba(53,212,154,0.4); background: rgba(53,212,154,0.05); }
+
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .reel-rank {
+    font-family: var(--mono); font-size: 15px; font-weight: 600;
+    color: var(--text-faint); width: 26px; text-align: center; flex-shrink: 0;
+  }
+  .reel-card.top .reel-rank { color: var(--green); }
+
+  .reel-body { flex: 1; min-width: 0; }
+  .reel-label { font-weight: 600; font-size: 13px; margin-bottom: 3px; }
+  .reel-meta { font-family: var(--mono); font-size: 11px; color: var(--text-faint); }
+
+  .reel-score {
+    font-family: var(--mono); font-size: 17px; font-weight: 600;
+    flex-shrink: 0; text-align: right;
+  }
+  .reel-badges { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
+
+  .badge {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 6px; border-radius: 4px;
+    background: var(--border); color: var(--text-dim);
+  }
+  .badge.chain { background: rgba(180,124,255,0.16); color: var(--purple); }
+  .badge.spoiler { background: rgba(255,95,109,0.16); color: var(--red); }
+  .badge.funny { background: rgba(255,182,72,0.16); color: var(--amber); }
+
+  /* ---------- annotation feed ---------- */
+
+  .tabs { display: flex; gap: 2px; margin-left: auto; }
+  .tab {
+    font-size: 11px; font-weight: 600; padding: 4px 10px;
+    border-radius: 6px; border: none; cursor: pointer;
+    background: transparent; color: var(--text-faint);
+    font-family: inherit; transition: all 0.14s;
+  }
+  .tab:hover { color: var(--text-dim); }
+  .tab.active { background: var(--bg-card); color: var(--text); }
+
+  .feed { flex: 1; overflow-y: auto; padding: 12px 16px; }
+  .feed.hidden { display: none; }
+
+  .ann {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--accent);
+    border-radius: 8px;
+    padding: 11px 13px;
+    margin-bottom: 8px;
+    animation: annIn 0.3s ease;
+  }
+  .ann.skip { border-left-color: var(--text-faint); opacity: 0.62; }
+  .ann.err { border-left-color: var(--red); }
+
+  @keyframes annIn {
+    from { opacity: 0; transform: translateX(10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .ann-head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 7px;
+  }
+  .ann-time {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--cyan); font-weight: 500;
+  }
+  .ann-action {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 2px 7px; border-radius: 5px;
+    background: rgba(91,140,255,0.14); color: var(--accent);
+  }
+  .ann-reward { font-family: var(--mono); font-size: 11px; margin-left: auto; font-weight: 500; }
+  .ann-reward.pos { color: var(--green); }
+  .ann-reward.neg { color: var(--red); }
+
+  .ann-caption { font-size: 13px; margin-bottom: 8px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+  .chip {
+    font-size: 10px; font-weight: 600;
+    padding: 3px 7px; border-radius: 5px;
+    background: rgba(255,182,72,0.13); color: var(--amber);
+    font-family: var(--mono);
+  }
+  .chip.phys { background: rgba(180,124,255,0.13); color: var(--purple); }
+  .chip.ent { background: rgba(61,219,217,0.11); color: var(--cyan); }
+  .chip.causal { background: rgba(255,95,109,0.14); color: var(--red); }
+
+  .conf-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 6px; margin-top: 8px;
+  }
+  .conf { }
+  .conf-label {
+    font-size: 9px; text-transform: uppercase; color: var(--text-faint);
+    font-weight: 600; margin-bottom: 3px; letter-spacing: 0.04em;
+  }
+  .conf-bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .conf-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+
+  /* ---------- raw rows ---------- */
+
+  .rows { font-family: var(--mono); font-size: 11px; }
+  .row-item {
+    padding: 7px 9px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+    white-space: nowrap; overflow-x: auto;
+    animation: annIn 0.25s ease;
+  }
+  .row-item:hover { background: var(--bg-card); color: var(--text); }
+  .row-item .k { color: var(--text-faint); }
+  .row-item .v { color: var(--cyan); }
+
+  .rows-header {
+    padding: 8px 9px;
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-faint);
+    border-bottom: 1px solid var(--border-bright);
+    position: sticky; top: 0; background: var(--bg);
+  }
+
+  /* ---------- usage breakdown ---------- */
+
+  .usage { padding: 4px 0; }
+  .usage-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 11px;
+    border-bottom: 1px solid var(--border);
+  }
+  .usage-model {
+    font-family: var(--mono); font-size: 11px;
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  }
+  .usage-calls { font-family: var(--mono); font-size: 11px; color: var(--text-faint); }
+  .usage-cost { font-family: var(--mono); font-size: 12px; color: var(--amber); font-weight: 500; }
+
+  .tier-note {
+    margin: 12px 11px;
+    padding: 11px 13px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+  .tier-note strong { color: var(--text); }
+
+  .empty {
+    padding: 40px 20px; text-align: center;
+    color: var(--text-faint); font-size: 13px;
+  }
+
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 5px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3d4459; }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--bg-card); border: 1px solid var(--border-bright);
+    padding: 11px 18px; border-radius: 9px; font-size: 13px;
+    opacity: 0; pointer-events: none; transition: opacity 0.25s;
+    z-index: 100; max-width: 70vw;
+  }
+  .toast.show { opacity: 1; }
+  .toast.err { border-color: var(--red); color: var(--red); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-mark">S</div>
+    <span>Substream</span>
+    <span class="brand-sub">Live World-Model Annotation</span>
+  </div>
+  <div class="header-spacer"></div>
+  <span class="pill" id="backendPill"><span class="dot"></span><span id="backendText">checking…</span></span>
+  <span class="pill" id="statusPill"><span class="dot"></span><span id="statusText">idle</span></span>
+  <select id="speedSel" title="Playback pacing">
+    <option value="1">1× real time</option>
+    <option value="2">2× rehearsal</option>
+    <option value="4">4× rehearsal</option>
+    <option value="8">8× rehearsal</option>
+  </select>
+  <select id="contentSel" title="Prepared content"></select>
+  <button class="btn primary" id="startBtn">Start stream</button>
+</header>
+
+<div class="stats">
+  <div class="stat"><div class="stat-label">Stream time</div><div class="stat-value" id="sStream">0:00</div></div>
+  <div class="stat"><div class="stat-label">Windows</div><div class="stat-value" id="sWindows">0</div></div>
+  <div class="stat"><div class="stat-label">Events</div><div class="stat-value" id="sEvents">0</div></div>
+  <div class="stat"><div class="stat-label">Causal links</div><div class="stat-value" id="sCausal">0</div></div>
+  <div class="stat"><div class="stat-label">Tokens</div><div class="stat-value" id="sTokens">0</div></div>
+  <div class="stat"><div class="stat-label">Cost</div><div class="stat-value cost" id="sCost">$0.0000</div></div>
+  <div class="stat"><div class="stat-label">Annotation lag</div><div class="stat-value" id="sLag">—</div></div>
+</div>
+
+<main>
+  <div class="col">
+    <div class="panel-head">
+      <span class="panel-title">Stream</span>
+      <span class="panel-note" id="episodeNote">no session</span>
+    </div>
+    <div class="video-wrap">
+      <video id="video" muted playsinline></video>
+      <div class="video-empty" id="videoEmpty">Pick prepared content and start the stream.<br />Annotation runs while it plays.</div>
+      <div class="overlay-caption" id="overlay">
+        <div class="oc-label" id="ocLabel">annotating</div>
+        <div id="ocText"></div>
+      </div>
+    </div>
+
+    <div class="timeline-section">
+      <div class="timeline" id="timeline">
+        <div class="tl-playhead" id="playhead" style="left:0"></div>
+      </div>
+      <div class="tl-labels"><span>0:00</span><span id="tlEnd">—</span></div>
+    </div>
+
+    <div class="rail-section">
+      <div class="panel-head">
+        <span class="panel-title">Highlight candidates</span>
+        <span class="panel-note" id="railNote">re-ranks live</span>
+      </div>
+      <div class="rail" id="rail">
+        <div class="empty">Candidates appear as the arbiter scores them.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="panel-head">
+      <span class="panel-title">SWA-1 annotation</span>
+      <div class="tabs">
+        <button class="tab active" data-tab="feed">Feed</button>
+        <button class="tab" data-tab="rows">Rows</button>
+        <button class="tab" data-tab="usage">Cost</button>
+      </div>
+    </div>
+
+    <div class="feed" id="tabFeed">
+      <div class="empty">Annotations stream in here as windows are processed.</div>
+    </div>
+
+    <div class="feed hidden" id="tabRows">
+      <div class="rows" id="rowsBody">
+        <div class="rows-header">episode_id · window_id · t_start · action · event_types · reward · causal</div>
+        <div class="empty">Flattened Parquet rows appear here.</div>
+      </div>
+    </div>
+
+    <div class="feed hidden" id="tabUsage">
+      <div class="tier-note">
+        <strong>Tiered annotation.</strong> Every window gets a cheap triage pass;
+        only windows that clear the salience threshold get dense annotation, and
+        only candidate spans reach the arbiter. Annotating everything densely
+        would cost roughly 2.8× more per stream-hour.
+      </div>
+      <div class="usage" id="usageBody">
+        <div class="empty">Per-model cost breakdown appears here.</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const API = '/api/v1';
+  const el = (id) => document.getElementById(id);
+
+  const state = {
+    sessionId: null,
+    source: null,
+    duration: 0,
+    speed: 1,
+    startedAt: 0,
+    es: null,
+    segments: new Map(),
+    lastStats: null,
+    lagSamples: [],
+    running: false,
+  };
+
+  // ---------- helpers ----------
+
+  const fmtTime = (s) => {
+    if (!isFinite(s) || s < 0) s = 0;
+    const m = Math.floor(s / 60), r = Math.floor(s % 60);
+    return `${m}:${String(r).padStart(2, '0')}`;
+  };
+
+  const fmtNum = (n) => (n || 0).toLocaleString();
+
+  const fmtCost = (c) => {
+    const v = c || 0;
+    return v < 1 ? `$${v.toFixed(4)}` : `$${v.toFixed(2)}`;
+  };
+
+  const esc = (s) =>
+    String(s ?? '').replace(/[&<>"']/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  let toastTimer;
+  function toast(msg, isErr) {
+    const t = el('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isErr ? ' err' : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => (t.className = 'toast'), 4200);
+  }
+
+  function bump(id, value) {
+    const node = el(id);
+    if (node.textContent === value) return;
+    node.textContent = value;
+    node.classList.add('bump');
+    setTimeout(() => node.classList.remove('bump'), 320);
+  }
+
+  function setStatus(text, cls) {
+    el('statusText').textContent = text;
+    el('statusPill').className = 'pill' + (cls ? ' ' + cls : '');
+  }
+
+  // ---------- boot ----------
+
+  async function boot() {
+    try {
+      const res = await fetch('/health');
+      const health = await res.json();
+      const g = health.gemini || {};
+      const backend = g.backend || 'unknown';
+      el('backendText').textContent =
+        `${backend} · ${(g.models && g.models.dense) || '?'}`;
+      el('backendPill').className = 'pill' + (backend === 'replay' ? '' : ' done');
+      if (backend === 'replay') {
+        toast('Gemini backend is in replay mode — serving cached annotations only.', true);
+      }
+    } catch (e) {
+      el('backendText').textContent = 'service unreachable';
+    }
+
+    try {
+      const res = await fetch(`${API}/demo/content`);
+      const data = await res.json();
+      const sel = el('contentSel');
+      sel.innerHTML = '';
+      if (!data.content || !data.content.length) {
+        sel.innerHTML = '<option value="">no prepared content</option>';
+        el('startBtn').disabled = true;
+        toast('No prepared content found. Run scripts/prepare_demo_content.py first.', true);
+        return;
+      }
+      for (const item of data.content) {
+        const opt = document.createElement('option');
+        opt.value = item.path;
+        opt.textContent = `${item.title} · ${fmtTime(item.duration)}`;
+        opt.dataset.duration = item.duration;
+        opt.dataset.title = item.title;
+        sel.appendChild(opt);
+      }
+    } catch (e) {
+      toast('Could not load prepared content list.', true);
+    }
+
+    applyUrlPreferences();
+  }
+
+  // Preselect title and pacing from the query string, and optionally start
+  // immediately. A bookmarked link means no fumbling with dropdowns in front
+  // of an audience: /demo?title=stumble&speed=1&autostart=1
+  function applyUrlPreferences() {
+    const params = new URLSearchParams(window.location.search);
+
+    const wanted = (params.get('title') || '').toLowerCase();
+    if (wanted) {
+      const sel = el('contentSel');
+      const match = Array.from(sel.options).find(
+        (o) => o.value.toLowerCase().includes(wanted) ||
+               (o.dataset.title || '').toLowerCase().includes(wanted),
+      );
+      if (match) sel.value = match.value;
+    }
+
+    const speed = params.get('speed');
+    if (speed && Array.from(el('speedSel').options).some((o) => o.value === speed)) {
+      el('speedSel').value = speed;
+    }
+
+    if (params.get('autostart') === '1' && !el('startBtn').disabled) {
+      start();
+    }
+  }
+
+  // ---------- start ----------
+
+  async function start() {
+    const sel = el('contentSel');
+    const opt = sel.selectedOptions[0];
+    if (!opt || !opt.value) return;
+
+    el('startBtn').disabled = true;
+    setStatus('starting…');
+    resetView();
+
+    state.source = opt.value;
+    state.duration = parseFloat(opt.dataset.duration) || 0;
+    state.speed = parseFloat(el('speedSel').value) || 1;
+    el('tlEnd').textContent = fmtTime(state.duration);
+
+    try {
+      const res = await fetch(`${API}/live/replay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_path: state.source,
+          game_title: opt.dataset.title,
+          speed: state.speed,
+          run_arbiter: true,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      state.sessionId = data.session_id;
+      state.startedAt = performance.now();
+      state.running = true;
+
+      el('episodeNote').textContent = `${data.episode_id} · ${state.speed}×`;
+      setStatus(state.speed === 1 ? 'live' : `live ${state.speed}×`, 'live');
+
+      startVideo();
+      subscribe(data.session_id);
+      tick();
+    } catch (e) {
+      toast('Failed to start: ' + e.message, true);
+      setStatus('failed');
+      el('startBtn').disabled = false;
+    }
+  }
+
+  function startVideo() {
+    const v = el('video');
+    v.src = `${API}/demo/content/stream?path=${encodeURIComponent(state.source)}`;
+    v.playbackRate = state.speed;
+    el('videoEmpty').style.display = 'none';
+    v.play().catch(() => {
+      toast('Autoplay blocked — press play on the video.', true);
+    });
+  }
+
+  function resetView() {
+    state.segments.clear();
+    state.lagSamples = [];
+    state.lastStats = null;
+    el('tabFeed').innerHTML = '';
+    el('rowsBody').innerHTML =
+      '<div class="rows-header">episode_id · window_id · t_start · action · event_types · reward · causal</div>';
+    el('rail').innerHTML = '<div class="empty">Candidates appear as the arbiter scores them.</div>';
+    el('usageBody').innerHTML = '';
+    document.querySelectorAll('.tl-window, .tl-event').forEach((n) => n.remove());
+    ['sWindows', 'sEvents', 'sCausal', 'sTokens'].forEach((id) => (el(id).textContent = '0'));
+    el('sCost').textContent = '$0.0000';
+    el('sLag').textContent = '—';
+  }
+
+  // ---------- event stream ----------
+
+  function subscribe(sessionId) {
+    if (state.es) state.es.close();
+    const es = new EventSource(`${API}/live/sessions/${sessionId}/annotations`);
+    state.es = es;
+
+    const on = (kind, fn) =>
+      es.addEventListener(kind, (e) => {
+        try { fn(JSON.parse(e.data)); } catch (err) { /* keep the stream alive */ }
+      });
+
+    on('episode_identified', onIdentified);
+    on('triage', onTriage);
+    on('window', onWindow);
+    on('segment', onSegment);
+    on('stats', onStats);
+    on('error', (d) => addError(d));
+    on('done', onDone);
+
+    es.onerror = () => {
+      if (state.running) setStatus('stream interrupted');
+    };
+  }
+
+  function onIdentified(d) {
+    el('episodeNote').textContent =
+      `${d.game_title || 'unknown'} · ${d.genre} · ${d.perspective}`;
+    let note = `genre ${d.genre} · media resolution ${d.media_resolution}`;
+    if (d.contains_real_world_video) note += ' · real-world video flagged';
+    el('railNote').textContent = note;
+  }
+
+  function onTriage(d) {
+    if (!state.duration) return;
+    const tl = el('timeline');
+    const div = document.createElement('div');
+    const skipped = d.salience < 35;
+    div.className = 'tl-window' + (skipped ? ' skipped' : '');
+    div.style.left = `${(d.t_start / state.duration) * 100}%`;
+    div.style.width = `${((d.t_end - d.t_start) / state.duration) * 100}%`;
+    div.title = `${fmtTime(d.t_start)} salience ${d.salience}${skipped ? ' (skipped)' : ''}`;
+    tl.appendChild(div);
+
+    if (skipped) addSkip(d);
+  }
+
+  function onWindow(d) {
+    const w = d.window;
+    addAnnotation(w, d.triage_salience);
+    addRow(w);
+    markEvents(w);
+    showOverlay(w);
+
+    // Annotation lag: how far behind the stream the annotation landed.
+    if (state.running && state.speed) {
+      const streamElapsed = ((performance.now() - state.startedAt) / 1000) * state.speed;
+      const lag = streamElapsed - w.t_end;
+      if (lag >= 0 && lag < 120) {
+        state.lagSamples.push(lag);
+        const sorted = [...state.lagSamples].sort((a, b) => a - b);
+        const p50 = sorted[Math.floor(sorted.length / 2)];
+        el('sLag').textContent = `${p50.toFixed(1)}s`;
+        el('sLag').className = 'stat-value ' + (p50 < 15 ? 'good' : 'cost');
+      }
+    }
+  }
+
+  function markEvents(w) {
+    if (!state.duration) return;
+    const tl = el('timeline');
+    for (const ev of w.events || []) {
+      const div = document.createElement('div');
+      const high = (ev.magnitude || 0) >= 70;
+      div.className = 'tl-event' + (high ? ' high' : '');
+      div.style.left = `${(ev.t / state.duration) * 100}%`;
+      div.title = `${ev.event_type} @ ${fmtTime(ev.t)} (magnitude ${ev.magnitude})`;
+      tl.appendChild(div);
+    }
+    const physics = (w.physics || []).filter((p) => p !== 'none');
+    if (physics.length) {
+      const div = document.createElement('div');
+      div.className = 'tl-event physics';
+      div.style.left = `${(w.t_start / state.duration) * 100}%`;
+      div.title = `physics: ${physics.join(', ')}`;
+      tl.appendChild(div);
+    }
+  }
+
+  function showOverlay(w) {
+    if (!w.scene_caption) return;
+    el('ocLabel').textContent =
+      `${fmtTime(w.t_start)}–${fmtTime(w.t_end)} · ${w.agent.action}`;
+    el('ocText').textContent = w.scene_caption;
+    el('overlay').classList.add('show');
+  }
+
+  const CONF_FIELDS = [
+    ['camera', 'cam'],
+    ['agent', 'agent'],
+    ['entities', 'ent'],
+    ['events', 'events'],
+    ['ui_state', 'ui'],
+  ];
+
+  function confColor(v) {
+    if (v >= 75) return 'var(--green)';
+    if (v >= 50) return 'var(--amber)';
+    return 'var(--red)';
+  }
+
+  function addAnnotation(w, salience) {
+    const feed = el('tabFeed');
+    if (feed.querySelector('.empty')) feed.innerHTML = '';
+
+    const chips = [];
+    for (const ev of w.events || []) {
+      const causal = ev.cause_event_id ? ' causal' : '';
+      const arrow = ev.cause_event_id ? ' ←' : '';
+      chips.push(
+        `<span class="chip${causal}">${esc(ev.event_type)}${arrow} ${ev.magnitude}</span>`
+      );
+    }
+    for (const p of (w.physics || []).filter((x) => x !== 'none')) {
+      chips.push(`<span class="chip phys">${esc(p)}</span>`);
+    }
+    for (const e of (w.entities || []).slice(0, 3)) {
+      chips.push(`<span class="chip ent">${esc(e.role)}: ${esc(e.label)}</span>`);
+    }
+
+    const reward = w.reward_signal || 0;
+    const rewardCls = reward > 0.05 ? 'pos' : reward < -0.05 ? 'neg' : '';
+
+    const conf = CONF_FIELDS.map(([key, label]) => {
+      const v = (w.uncertainty && w.uncertainty[key]) || 0;
+      return `<div class="conf">
+        <div class="conf-label">${label}</div>
+        <div class="conf-bar"><div class="conf-fill" style="width:${v}%;background:${confColor(v)}"></div></div>
+      </div>`;
+    }).join('');
+
+    const div = document.createElement('div');
+    div.className = 'ann';
+    div.innerHTML = `
+      <div class="ann-head">
+        <span class="ann-time">${fmtTime(w.t_start)}–${fmtTime(w.t_end)}</span>
+        <span class="ann-action">${esc(w.agent.action)}</span>
+        <span class="ann-reward ${rewardCls}">${reward >= 0 ? '+' : ''}${reward.toFixed(2)}</span>
+      </div>
+      <div class="ann-caption">${esc(w.scene_caption)}</div>
+      ${chips.length ? `<div class="chips">${chips.join('')}</div>` : ''}
+      <div class="conf-grid">${conf}</div>`;
+    feed.insertBefore(div, feed.firstChild);
+    trim(feed, 60);
+  }
+
+  function addSkip(d) {
+    const feed = el('tabFeed');
+    if (feed.querySelector('.empty')) feed.innerHTML = '';
+    const div = document.createElement('div');
+    div.className = 'ann skip';
+    div.innerHTML = `
+      <div class="ann-head">
+        <span class="ann-time">${fmtTime(d.t_start)}–${fmtTime(d.t_end)}</span>
+        <span class="ann-action" style="background:var(--border);color:var(--text-faint)">skipped</span>
+        <span class="ann-reward">salience ${d.salience}</span>
+      </div>
+      <div class="ann-caption" style="color:var(--text-faint)">${esc(d.reason)}</div>`;
+    feed.insertBefore(div, feed.firstChild);
+    trim(feed, 60);
+  }
+
+  function addError(d) {
+    const feed = el('tabFeed');
+    if (feed.querySelector('.empty')) feed.innerHTML = '';
+    const div = document.createElement('div');
+    div.className = 'ann err';
+    div.innerHTML = `<div class="ann-caption">${esc(d.message || 'annotation error')}</div>`;
+    feed.insertBefore(div, feed.firstChild);
+  }
+
+  function addRow(w) {
+    const body = el('rowsBody');
+    const empty = body.querySelector('.empty');
+    if (empty) empty.remove();
+    const events = (w.events || []).map((e) => e.event_type).join('|') || '—';
+    const causal = (w.events || []).some((e) => e.cause_event_id);
+    const div = document.createElement('div');
+    div.className = 'row-item';
+    div.innerHTML =
+      `<span class="k">${esc(w.window_id)}</span> ` +
+      `<span class="v">${w.t_start.toFixed(1)}</span> ` +
+      `<span class="k">${esc(w.agent.action_category)}/</span><span class="v">${esc(w.agent.action)}</span> ` +
+      `<span class="k">[${esc(events)}]</span> ` +
+      `<span class="v">${(w.reward_signal || 0).toFixed(2)}</span> ` +
+      `<span class="k">causal=</span><span class="v">${causal}</span>`;
+    body.appendChild(div);
+    if (body.children.length > 200) body.children[1].remove();
+  }
+
+  function onSegment(d) {
+    const s = d.segment;
+    state.segments.set(s.segment_id, s);
+    renderRail();
+  }
+
+  function renderRail() {
+    const rail = el('rail');
+    const items = [...state.segments.values()].sort(
+      (a, b) => (b.score * 0.6 + b.shareability * 0.4) - (a.score * 0.6 + a.shareability * 0.4)
+    );
+    if (!items.length) {
+      rail.innerHTML = '<div class="empty">Candidates appear as the arbiter scores them.</div>';
+      return;
+    }
+    rail.innerHTML = items
+      .map((s, i) => {
+        const blended = s.score * 0.6 + s.shareability * 0.4;
+        const badges = [`<span class="badge">${esc(s.narrative_role)}</span>`];
+        if (s.protected_chain) badges.push('<span class="badge chain">causal chain</span>');
+        if (s.spoiler_risk >= 60) badges.push('<span class="badge spoiler">spoiler</span>');
+        if (s.emotional_valence === 'funny') badges.push('<span class="badge funny">funny</span>');
+        return `<div class="reel-card${i === 0 ? ' top' : ''}">
+          <div class="reel-rank">${i + 1}</div>
+          <div class="reel-body">
+            <div class="reel-label">${esc(s.label || s.narrative_role)}</div>
+            <div class="reel-meta">${fmtTime(s.t_start)}–${fmtTime(s.t_end)} · share ${s.shareability} · ${esc(s.pacing)}</div>
+            <div class="reel-badges">${badges.join('')}</div>
+          </div>
+          <div class="reel-score">${blended.toFixed(0)}</div>
+        </div>`;
+      })
+      .join('');
+  }
+
+  function onStats(d) {
+    state.lastStats = d;
+    bump('sWindows', fmtNum(d.windows_annotated));
+    bump('sEvents', fmtNum(d.events_extracted));
+    bump('sCausal', fmtNum(d.causal_links));
+    const usage = d.usage || {};
+    const tokens = (usage.input_tokens || 0) + (usage.output_tokens || 0);
+    bump('sTokens', fmtNum(tokens));
+    el('sCost').textContent = fmtCost(usage.cost_usd);
+    renderUsage(usage);
+  }
+
+  function renderUsage(usage) {
+    const body = el('usageBody');
+    const byModel = usage.by_model || {};
+    const names = Object.keys(byModel);
+    if (!names.length) return;
+
+    const rows = names
+      .sort((a, b) => byModel[b].cost_usd - byModel[a].cost_usd)
+      .map(
+        (m) => `<div class="usage-row">
+          <div class="usage-model">${esc(m)}</div>
+          <div class="usage-calls">${byModel[m].calls} calls · ${fmtNum(byModel[m].input_tokens)} in</div>
+          <div class="usage-cost">${fmtCost(byModel[m].cost_usd)}</div>
+        </div>`
+      );
+
+    const extra = `<div class="usage-row" style="border-top:1px solid var(--border-bright)">
+        <div class="usage-model" style="color:var(--text-faint)">p50 / p95 latency</div>
+        <div class="usage-calls">${usage.p50_latency_ms || 0}ms / ${usage.p95_latency_ms || 0}ms</div>
+        <div class="usage-cost">${fmtCost(usage.cost_usd)}</div>
+      </div>`;
+
+    body.innerHTML = rows.join('') + extra;
+  }
+
+  function onDone(d) {
+    state.running = false;
+    setStatus('complete', 'done');
+    el('startBtn').disabled = false;
+    if (state.es) state.es.close();
+
+    const ttr = d.time_to_reel_seconds;
+    if (typeof ttr === 'number') {
+      toast(
+        `Stream ended. Highlight reel ready ${ttr.toFixed(1)}s later — ` +
+        `dense annotation was already done.`
+      );
+    }
+    if (d.segments) {
+      for (const s of d.segments) state.segments.set(s.segment_id, s);
+      renderRail();
+    }
+    if (d.annotation) onStats(d.annotation);
+    el('railNote').textContent =
+      `${state.segments.size} candidates · reel ready in ${(ttr || 0).toFixed(1)}s`;
+  }
+
+  // ---------- playhead ----------
+
+  function tick() {
+    if (!state.running && !state.lastStats) return;
+    const v = el('video');
+    if (state.duration > 0 && isFinite(v.currentTime)) {
+      el('playhead').style.left = `${Math.min(100, (v.currentTime / state.duration) * 100)}%`;
+      el('sStream').textContent = fmtTime(v.currentTime);
+    }
+    if (state.running) requestAnimationFrame(tick);
+  }
+
+  function trim(node, max) {
+    while (node.children.length > max) node.lastChild.remove();
+  }
+
+  // ---------- tabs ----------
+
+  document.querySelectorAll('.tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+      const target = tab.dataset.tab;
+      for (const name of ['feed', 'rows', 'usage']) {
+        el('tab' + name[0].toUpperCase() + name.slice(1)).classList.toggle(
+          'hidden',
+          name !== target
+        );
+      }
+    });
+  });
+
+  el('startBtn').addEventListener('click', start);
+  el('video').addEventListener('timeupdate', () => {
+    if (!state.running) el('sStream').textContent = fmtTime(el('video').currentTime);
+  });
+
+  boot();
+})();
+</script>
+</body>
+</html>

@@ -21,13 +21,21 @@ public struct SubstreamBroadcastConfig: Codable, Sendable {
     public let streamerName: String?
     public let title: String?
 
+    /// Live-annotation tap settings. Absent means no tap, and the broadcast
+    /// behaves exactly as it did before annotation existed.
+    ///
+    /// Optional with a decode fallback so a host app built against an older SDK
+    /// keeps working: a stored payload without this key still decodes.
+    public let annotation: AnnotationTapConfig?
+
     public init(
         backendUrl: URL,
         authToken: String,
         streamerId: String,
         orgId: String? = nil,
         streamerName: String? = nil,
-        title: String? = nil
+        title: String? = nil,
+        annotation: AnnotationTapConfig? = nil
     ) {
         self.backendUrl = backendUrl
         self.authToken = authToken
@@ -35,6 +43,7 @@ public struct SubstreamBroadcastConfig: Codable, Sendable {
         self.orgId = orgId
         self.streamerName = streamerName
         self.title = title
+        self.annotation = annotation
     }
 
     // MARK: Storage

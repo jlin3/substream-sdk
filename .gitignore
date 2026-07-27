@@ -89,3 +89,14 @@ IVSBackend/.env
 
 # Build outputs
 packages/web-sdk/dist/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Highlight service local artifacts
+highlight-service/demo_cache/
+highlight-service/demo_content/
+highlight-service/exports/
