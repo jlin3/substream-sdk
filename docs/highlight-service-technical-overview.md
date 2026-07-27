@@ -35,8 +35,8 @@ Both paths feed into the same 6-step pipeline.
 | Layer | Technology | Why |
 |-------|-----------|-----|
 | **API Framework** | FastAPI + Uvicorn | Async Python, native background tasks, auto-generated OpenAPI docs |
-| **Scene Analysis** | Google Video Intelligence API | Shot detection, label detection, OCR (text detection), object tracking — all in one API call |
-| **Segment Scoring** | Vertex AI Gemini 2.5 Flash | Multimodal model that "watches" sampled frames and scores them for highlight-worthiness. Game-agnostic by design. |
+| **Scene Analysis** | Gemini 3 (native video understanding) | Shot detection, on-screen text and object tracking come from the annotation model itself. Google Video Intelligence did this separately and is now off by default. |
+| **Segment Scoring** | Vertex AI Gemini 3, tiered | A cheap triage pass over every window, a dense annotation model for the windows that earn it, and a pro-tier arbiter for final narrative scoring. Game-agnostic by design. |
 | **Audio Analysis** | pydub + numpy (local) | RMS energy computation over sliding windows to detect volume peaks (explosions, cheering, music). No API cost. |
 | **Video Processing** | FFmpeg (subprocess) | Segment cutting, crossfade transitions, audio normalization (loudnorm), H.264+AAC encoding |
 | **Storage** | Google Cloud Storage | Source video ingestion, highlight output, signed URL delivery |
@@ -49,7 +49,9 @@ Both paths feed into the same 6-step pipeline.
 
 The source video is downloaded from GCS to a temp directory on the Cloud Run instance. Accepted formats: `.webm`, `.mp4`, `.mov`. Duration limits: 1-60 minutes.
 
-### Step 2: Scene Analysis (Video Intelligence API)
+### Step 2: Scene Analysis (Video Intelligence API — disabled by default)
+
+**This step no longer runs by default.** `USE_VIDEO_INTELLIGENCE` defaults to `false`: Gemini 3 does shot detection, on-screen text reading and object tracking natively, so the separate Video Intelligence call became redundant as well as expensive. The code path is retained behind the flag, and the description below applies only when it is switched back on. Steps 4 and 5 still describe consuming its output, which is stale — see the note under Step 5.
 
 A single `annotate_video` call runs four detection features in parallel:
 
@@ -58,7 +60,7 @@ A single `annotate_video` call runs four detection features in parallel:
 - **Text detection (OCR)** — Captures in-game text: scores, kill feeds, "Victory", "Game Over". High-signal for highlights.
 - **Object tracking** — Tracks moving entities across frames. Density of tracked objects serves as an action-intensity proxy.
 
-This is the most expensive API call (~$0.10/min of video). It runs as a long-running operation that typically completes in 2-5 minutes for a 30-minute video.
+When enabled, this is the most expensive API call (~$0.10/min of video, so ~$3.00 for a 30-minute video — more than the entire pipeline costs without it). It runs as a long-running operation that typically completes in 2-5 minutes for a 30-minute video.
 
 ### Step 3: Audio Analysis (local, zero API cost)
 
@@ -88,6 +90,8 @@ Three scores are combined into a composite:
 ```
 final_score = 0.4 * gemini_score + 0.3 * video_intel_score + 0.3 * audio_score
 ```
+
+This composite, and Step 4's use of Video Intelligence labels as a scoring input, both describe the pipeline as it ran with Video Intelligence enabled. With that step off by default the `video_intel_score` term no longer has a source, and selection is driven by the tiered annotator instead. The live weighting is in the service code rather than here; this section has not been re-derived for the current path.
 
 Segments are sorted by composite score, then greedily selected until the target duration is reached (default 90s). Two constraints ensure quality:
 
@@ -123,15 +127,22 @@ Processing is fully async. The POST returns a `job_id` immediately, and the clie
 
 All costs fall within the $80K Google Cloud credits.
 
+Video Intelligence is disabled by default (`USE_VIDEO_INTELLIGENCE=false`), which removed roughly 85% of per-video cost. What remains is Gemini inference across the tiered annotator, plus effectively negligible storage and compute.
+
+The Gemini line below is a **metered** figure, not an estimate: it comes from running four real gameplay titles end to end and reading the pipeline's own cost meter.
+
 | Service | Unit Cost | 30-min Video |
 |---------|----------|--------------|
-| Video Intelligence API | ~$0.10/min analyzed | ~$3.00 |
-| Gemini 2.5 Flash (Vertex AI) | ~$0.002/frame | ~$0.50 (250 frames) |
+| Gemini, tiered annotator (Vertex AI) | $5.10/stream-hour | ~$2.55 |
 | Cloud Storage | ~$0.02/GB/month | negligible |
 | Cloud Run | ~$0.00003/vCPU-sec | ~$0.05 |
-| **Total per video** | | **~$3-5** |
+| **Total per video** | | **~$2.60** |
 
-At $4 average per video, the $80K credits support ~20,000 highlight generations.
+Cost varies with how eventful the footage is, because the triage tier decides how many windows reach the expensive model. Measured range across titles: **$3.59/stream-hour** for sparse mobile gameplay up to **$8.31/stream-hour** for dense arena shooter footage.
+
+Where the spend goes, per the cost meter: dense annotation 50%, narrative arbiter 31%, episode identification 12%, triage 7%. Triage is the majority of calls but a small minority of spend, which is the tiering working as intended.
+
+At ~$2.60 per 30-minute video the $80K credits support roughly 30,000 highlight generations. Per-million-token rates for every model in the ladder live in `services/genai_client.py` and were verified against Google's published pricing in July 2026.
 
 ## Deployment
 
@@ -154,7 +165,7 @@ gcloud run deploy highlight-service \
 The service account needs three IAM roles:
 - `roles/storage.objectAdmin` — Read source videos, write highlights
 - `roles/aiplatform.user` — Invoke Gemini via Vertex AI
-- `roles/videointelligence.editor` — Run Video Intelligence annotations
+- `roles/videointelligence.editor` — Run Video Intelligence annotations; only needed if `USE_VIDEO_INTELLIGENCE` is turned back on
 
 ## Configuration
 
@@ -166,7 +177,10 @@ All settings are environment variables with sensible defaults:
 | `GCP_REGION` | `us-central1` | Vertex AI endpoint region |
 | `GCS_SOURCE_BUCKET` | `bookvid-prod-vr-recordings` | Where source recordings live |
 | `GCS_HIGHLIGHTS_BUCKET` | same as source | Where highlight output goes |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | Can swap for `gemini-2.5-pro` for higher quality |
+| `GEMINI_MODEL` | `gemini-3.1-pro-preview` | Also the default arbiter model |
+| `GEMINI_TRIAGE_MODEL` | `gemini-3.5-flash-lite` | Cheap pass over every window |
+| `GEMINI_DENSE_MODEL` | `gemini-3.6-flash` | The annotation workhorse |
+| `USE_VIDEO_INTELLIGENCE` | `false` | Re-enables the separate Video Intelligence call |
 | `DEFAULT_HIGHLIGHT_DURATION_SECONDS` | `90` | Target reel length |
 | `MAX_VIDEO_DURATION_SECONDS` | `3600` | Reject inputs over 1 hour |
 | `MIN_VIDEO_DURATION_SECONDS` | `60` | Reject inputs under 1 minute |
@@ -174,7 +188,7 @@ All settings are environment variables with sensible defaults:
 ## Design Decisions and Trade-offs
 
 **Why Gemini for scoring instead of a custom ML model?**
-A custom model would need training data (thousands of labeled "highlight" / "not highlight" segments per game). Gemini already understands visual content across game genres with zero training. The trade-off is per-request API cost and latency — but at ~$0.50/video for scoring, it's negligible against the value delivered.
+A custom model would need training data (thousands of labeled "highlight" / "not highlight" segments per game). Gemini already understands visual content across game genres with zero training. The trade-off is per-request API cost and latency — and since Video Intelligence came out of the pipeline, Gemini inference is now essentially the whole bill at ~$2.55 per 30-minute video, so it is worth metering rather than waving through as negligible.
 
 **Why per-shot scoring instead of whole-video analysis?**
 Gemini has context window limits. Sending a full 30-minute video would require the video-capable Gemini model with large context, which is slower and more expensive. By segmenting at shot boundaries and sending 3 frames per segment, we get faster results and can parallelize scoring in the future.
