@@ -76,8 +76,12 @@ MODEL_RATES: dict[str, ModelRates] = {
     "gemini-3.5-flash-lite": ModelRates(
         input_per_m=0.30, output_per_m=2.50, cached_input_per_m=0.03
     ),
+    # Re-checked against Google's published Gemini pricing page on 2026-07-27:
+    # $0.25 in / $1.50 out per 1M tokens. The previous $0.30/$2.50 was stale.
+    # No pipeline stage defaults to this model, so no quoted cost figure moves.
+    # cached_input_per_m is left as-is: it was not part of that verification.
     "gemini-3.1-flash-lite": ModelRates(
-        input_per_m=0.30, output_per_m=2.50, cached_input_per_m=0.03
+        input_per_m=0.25, output_per_m=1.50, cached_input_per_m=0.03
     ),
 }
 
