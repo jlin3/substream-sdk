@@ -63,7 +63,9 @@ class WallClockPacer:
     def stop(self) -> None:
         self._stop.set()
 
-    async def run(self, run_arbiter: bool = True) -> PacerResult:
+    async def run(
+        self, run_arbiter: bool = True, build_reel: bool = False
+    ) -> PacerResult:
         loop = asyncio.get_running_loop()
         duration = await loop.run_in_executor(None, probe_duration, self.source_path)
         if duration <= 0:
@@ -100,7 +102,9 @@ class WallClockPacer:
                 pass
 
         wall_seconds = time.monotonic() - started
-        summary = await self.session.finish(run_arbiter=run_arbiter)
+        summary = await self.session.finish(
+            run_arbiter=run_arbiter, build_reel=build_reel
+        )
 
         return PacerResult(
             session_id=self.session.session_id,
@@ -119,6 +123,7 @@ async def replay_file(
     speed: float = 1.0,
     session: Optional[LiveSession] = None,
     run_arbiter: bool = True,
+    build_reel: bool = False,
 ) -> PacerResult:
     """Convenience entry point: pace one file through a fresh session."""
     from pipeline.live_session import registry
@@ -127,7 +132,7 @@ async def replay_file(
     session = session or registry.create(game_title=game_title)
     pacer = WallClockPacer(session, source_path, speed=speed)
     try:
-        return await pacer.run(run_arbiter=run_arbiter)
+        return await pacer.run(run_arbiter=run_arbiter, build_reel=build_reel)
     finally:
         if owned:
             logger.info("[%s] Pacer run complete", session.session_id)

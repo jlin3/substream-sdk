@@ -61,6 +61,7 @@ class ReplayRequest(BaseModel):
     game_title: Optional[str] = None
     speed: float = Field(default=1.0, gt=0.0, le=60.0)
     run_arbiter: bool = Field(default=True)
+    build_reel: bool = Field(default=False)
 
 
 def _validate_overlap(window: Optional[float], overlap: Optional[float]) -> None:
@@ -263,7 +264,7 @@ async def start_replay(
 
     async def run() -> None:
         try:
-            await pacer.run(run_arbiter=req.run_arbiter)
+            await pacer.run(run_arbiter=req.run_arbiter, build_reel=req.build_reel)
         except Exception as exc:
             logger.exception("[%s] Replay failed", session.session_id)
             # Without this the browser waits on a stream that will never produce

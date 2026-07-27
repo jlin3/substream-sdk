@@ -1034,6 +1034,10 @@
   // real gaps at 1x are a few seconds; 25s of nothing means something broke.
   const STALL_SECONDS = 25;
 
+  // Scoring plus ffmpeg assembly is announced by the server and reports its own
+  // running total, so this only needs to catch a genuinely wedged encode.
+  const FINISHING_STALL_SECONDS = 180;
+
   const state = {
     sessionId: null,
     source: null,
@@ -1051,6 +1055,9 @@
     errorCards: new Map(),
     lastStats: null,
     lastEventAt: 0,
+    finishing: null,
+    finishingAt: 0,
+    reelUrl: null,
     drops: 0,
     reconnecting: false,
     stalled: false,
@@ -1400,6 +1407,7 @@
           game_title: state.sourceTitle,
           speed: state.speed,
           run_arbiter: true,
+          build_reel: true,
         }),
       });
       if (!res.ok) throw new Error(await describeHttpError(res));
@@ -1480,6 +1488,9 @@
   function startVideo() {
     const v = el('video');
     state.videoOk = true;
+    // A previous run may have left the reel looping here with controls showing.
+    v.loop = false;
+    v.controls = false;
     v.src = `${API}/demo/content/stream?path=${encodeURIComponent(state.source)}`;
     v.playbackRate = state.speed;
     el('videoEmpty').classList.add('hidden');
@@ -1499,6 +1510,8 @@
     state.reconnecting = false;
     state.stalled = false;
     state.finished = false;
+    state.finishing = null;
+    state.reelUrl = null;
     el('tabFeed').innerHTML =
       '<div class="empty">Each window the model annotates appears here as it lands.</div>';
     el('rowsBody').innerHTML =
@@ -1559,6 +1572,7 @@
       });
 
     on('episode_identified', onIdentified);
+    on('finishing', onFinishing);
     on('triage', onTriage);
     on('window', onWindow);
     on('segment', onSegment);
@@ -1649,6 +1663,31 @@
       el('sElapsed').textContent = fmtTime(wall);
     }
     if (!state.running || state.finished || state.reconnecting) return;
+
+    // Arbiter scoring and reel assembly are legitimately silent. Raising a
+    // "nothing is happening" alarm over them would be worse than the stall it
+    // was written to catch, so the threshold moves and the wording changes once
+    // the server has said which phase it is in.
+    if (state.finishing) {
+      tickFinishing();
+      const waiting = (performance.now() - state.finishingAt) / 1000;
+      if (waiting > FINISHING_STALL_SECONDS && !state.stalled) {
+        state.stalled = true;
+        const phase = state.finishing === 'reel' ? 'Reel assembly' : 'Candidate scoring';
+        setStatus('stalled', 'bad');
+        setStage(state.finishing === 'reel' ? 'reel' : 'select', 'error',
+          `stuck after ${Math.round(waiting)}s`);
+        banner(
+          'bad',
+          `${phase} has taken ${Math.round(waiting)}s`,
+          'That is far longer than it should. The annotation results above are ' +
+            'already complete and correct — this is the assembly step only.',
+          { label: 'Restart', onClick: () => restart() }
+        );
+      }
+      return;
+    }
+
     const quiet = (performance.now() - state.lastEventAt) / 1000;
     if (quiet > STALL_SECONDS && !state.stalled) {
       state.stalled = true;
@@ -1673,6 +1712,32 @@
     if (d.contains_real_world_video) note += ' · real-world video flagged';
     el('railNote').textContent = note;
     setDiag('identified', `${d.game_title || '?'} · ${d.genre} · ${d.perspective}`);
+  }
+
+  // Scoring and ffmpeg assembly emit nothing per-window, so the console counts
+  // the wait out loud. A ticking number is the difference between "working" and
+  // "stalled" to anyone watching, and it lands at the emotional peak of the demo.
+  function onFinishing(d) {
+    state.finishing = d.phase || 'arbiter';
+    state.finishingAt = performance.now();
+    setStatus('finishing', 'live');
+    if (state.finishing === 'reel') {
+      setStage('select', 'done');
+      setStage('reel', 'active', 'assembling mp4 · 0s');
+    } else {
+      setStage('analyze', 'done');
+      setStage('select', 'active', 'scoring candidates · 0s');
+    }
+  }
+
+  function tickFinishing() {
+    if (!state.finishing) return;
+    const secs = Math.round((performance.now() - state.finishingAt) / 1000);
+    if (state.finishing === 'reel') {
+      setStage('reel', 'active', `assembling mp4 · ${secs}s`);
+    } else {
+      setStage('select', 'active', `scoring candidates · ${secs}s`);
+    }
   }
 
   function onTriage(d) {
@@ -2142,6 +2207,7 @@
     state.finished = true;
     state.reconnecting = false;
     state.stalled = false;
+    state.finishing = null;
     setStatus('complete', 'done');
     el('startBtn').disabled = false;
     el('stopBtn').classList.add('hidden');
@@ -2164,13 +2230,29 @@
     // The service selects and orders the reel at stream end; it only cuts an
     // mp4 when the session was finished with build_reel, which the demo path
     // does not do. Say what actually happened rather than implying a file.
-    if (picks) {
+    const reel = d.reel && d.reel.output_path ? d.reel : null;
+
+    if (reel) {
+      const clips = reel.segment_count || (reel.segments || []).length;
+      const dur = reel.total_duration || 0;
+      const build = typeof d.reel_seconds === 'number' ? d.reel_seconds : null;
+      setStage(
+        'reel',
+        'done',
+        `${clips} clips · ${dur.toFixed(0)}s mp4` + (build !== null ? ` · built in ${build.toFixed(1)}s` : '')
+      );
+      el('railNote').textContent =
+        `${picks} candidates · reel cut in ${(ttr || 0).toFixed(1)}s after stream end`;
+      playReel();
+      setDiag('reel path', reel.output_path);
+      setDiag('reel seconds (ffmpeg)', String(d.reel_seconds));
+    } else if (picks) {
       const top = [...state.segments.values()].sort((a, b) => blend(b) - blend(a)).slice(0, 8);
       const reelSeconds = top.reduce((acc, s) => acc + Math.max(0, (s.t_end || 0) - (s.t_start || 0)), 0);
       setStage(
         'reel',
         'done',
-        `${top.length} clips · ${reelSeconds.toFixed(0)}s` + (ttr !== null ? ` · ready in ${ttr.toFixed(1)}s` : '')
+        `${top.length} clips · ${reelSeconds.toFixed(0)}s selected`
       );
       el('railNote').textContent =
         `${picks} candidates` + (ttr !== null ? ` · reel ready ${ttr.toFixed(1)}s after stream end` : '');
@@ -2197,19 +2279,40 @@
       }
     }
 
-    if (d.reel && d.reel.output_path) {
-      banner('info', 'Highlight reel assembled', 'The service cut an mp4 for this session.', {
-        label: 'Open reel',
-        primary: true,
-        onClick: () => window.open(`${API}/demo/reel?session_id=${state.sessionId}`, '_blank'),
-      });
-    }
-
     setDiag('wall seconds', String(d.wall_seconds));
     setDiag('time to reel seconds', String(d.time_to_reel_seconds));
     // The pre-flight panel deliberately stays hidden here: bringing it back at
     // the moment the reel lands would push the whole stage down on screen. It
     // returns on an explicit stop, and Restart is always in the header.
+  }
+
+  // The reel plays in the same frame the gameplay was in, on a loop, so the
+  // demo ends on the artefact itself rather than on a download prompt. Muted and
+  // with controls: browsers refuse unmuted autoplay, and the operator needs one
+  // click to unmute or scrub.
+  function playReel() {
+    const url = `${API}/demo/reel?session_id=${state.sessionId}`;
+    state.reelUrl = url;
+    const v = el('video');
+    el('overlay').classList.remove('show');
+
+    const onFail = () => {
+      banner('warn', 'The reel was built but will not play here',
+        'Open it in a new tab instead.',
+        { label: 'Open reel', primary: true, onClick: () => window.open(url, '_blank') });
+    };
+    v.addEventListener('error', onFail, { once: true });
+
+    v.pause();
+    v.loop = true;
+    v.controls = true;
+    v.playbackRate = 1;
+    v.src = url;
+    v.play().catch(onFail);
+
+    banner('info', 'Highlight reel ready — playing above',
+      'Cut from this run, looping. Unmute or scrub with the player controls.',
+      { label: 'Open in new tab', onClick: () => window.open(url, '_blank') });
   }
 
   // ---------- playhead ----------

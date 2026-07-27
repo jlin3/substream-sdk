@@ -171,7 +171,17 @@ async def get_reel(session_id: str = Query(...)):
     output = session.reel["output_path"]
     if not os.path.isfile(output):
         raise HTTPException(status_code=404, detail="reel file is missing")
-    return FileResponse(output, media_type="video/mp4", filename=os.path.basename(output))
+    # Inline rather than an attachment: the last beat of the demo is the reel
+    # playing in the console, not a file landing in the downloads folder.
+    return FileResponse(
+        output,
+        media_type="video/mp4",
+        headers={
+            "Content-Disposition": "inline",
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.get("/demo/status")

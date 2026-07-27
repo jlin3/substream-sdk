@@ -470,6 +470,16 @@ class LiveSession:
         await self.mark_ended()
         await self.drain()
 
+        # Scoring and assembly are the one stretch of a run with no per-window
+        # events to emit. A UI watching this stream cannot tell silence from a
+        # crash, so each phase announces itself before it starts.
+        await self._publish(
+            AnnotationEvent(
+                kind="finishing",
+                payload={"phase": "arbiter", "build_reel": build_reel},
+            )
+        )
+
         arbiter_started = time.time()
         segments: list[Any] = []
         if run_arbiter:
@@ -485,7 +495,15 @@ class LiveSession:
         arbiter_seconds = time.time() - arbiter_started
 
         self.reel = None
+        reel_seconds = 0.0
         if build_reel and segments:
+            await self._publish(
+                AnnotationEvent(
+                    kind="finishing",
+                    payload={"phase": "reel", "candidates": len(segments)},
+                )
+            )
+            reel_started = time.time()
             try:
                 self.reel = await self._build_reel(target_duration, preset)
             except Exception as exc:
@@ -493,6 +511,7 @@ class LiveSession:
                 await self._publish(
                     AnnotationEvent(kind="error", payload={"message": f"reel: {exc}"})
                 )
+            reel_seconds = time.time() - reel_started
 
         self.stats.ended_at = time.time()
         summary = self.summary()
@@ -500,6 +519,9 @@ class LiveSession:
         # to do once the stream stops, so report how long that tail actually was.
         summary["time_to_reel_seconds"] = round(time.time() - arbiter_started, 2)
         summary["arbiter_seconds"] = round(arbiter_seconds, 2)
+        # Split out so the ffmpeg cost of assembly is visible on its own rather
+        # than hidden inside the headline number.
+        summary["reel_seconds"] = round(reel_seconds, 2)
         await self._publish(AnnotationEvent(kind="done", payload=summary))
         return summary
 
