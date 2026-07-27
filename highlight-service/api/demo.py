@@ -196,6 +196,10 @@ async def demo_status() -> dict[str, Any]:
         "cached_responses": cache_entries,
         "gemini": gemini,
         "blockers": _blockers(content["content"], gemini, cache_entries),
+        # The console renders its pre-flight panel and its title picker from
+        # this one response, so the two can never disagree about what is loaded.
+        "content": content["content"],
+        "manifest": content["manifest"],
     }
 
 

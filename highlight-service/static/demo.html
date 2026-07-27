@@ -4,9 +4,6 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Substream — Live World-Model Annotation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
   :root {
     --bg: #08090d;
@@ -24,7 +21,8 @@
     --red: #ff5f6d;
     --purple: #b47cff;
     --cyan: #3ddbd9;
-    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -32,8 +30,8 @@
   body {
     background: var(--bg);
     color: var(--text);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    font-size: 14px;
+    font-family: var(--sans);
+    font-size: 15px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     height: 100vh;
@@ -42,59 +40,63 @@
     flex-direction: column;
   }
 
+  /* Every number on this page is read from across a room while it changes, so
+     digits are tabular everywhere and never carry a size or weight animation
+     that would reflow the row. */
+  .num {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
   /* ---------- header ---------- */
 
   header {
     display: flex;
     align-items: center;
-    gap: 20px;
-    padding: 14px 22px;
+    gap: 16px;
+    padding: 12px 24px;
     border-bottom: 1px solid var(--border);
     background: var(--bg-raised);
     flex-shrink: 0;
   }
 
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-    font-weight: 700;
-    font-size: 15px;
-    letter-spacing: -0.01em;
-  }
+  .brand { display: flex; align-items: center; gap: 12px; }
 
   .brand-mark {
-    width: 26px; height: 26px;
-    border-radius: 7px;
+    width: 32px; height: 32px;
+    border-radius: 8px;
     background: linear-gradient(135deg, var(--accent), var(--purple));
     display: grid; place-items: center;
-    font-size: 14px; font-weight: 700;
+    font-size: 17px; font-weight: 700; color: #06070c;
   }
+
+  .brand-name { font-weight: 700; font-size: 19px; letter-spacing: -0.01em; }
 
   .brand-sub {
     color: var(--text-faint);
     font-weight: 500;
-    font-size: 12px;
-    padding-left: 11px;
+    font-size: 14px;
+    padding-left: 13px;
     border-left: 1px solid var(--border-bright);
   }
 
   .header-spacer { flex: 1; }
 
   .pill {
-    display: inline-flex; align-items: center; gap: 7px;
-    padding: 5px 11px;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 13px;
     border-radius: 999px;
     background: var(--bg-card);
     border: 1px solid var(--border);
-    font-size: 12px;
-    font-weight: 500;
+    font-size: 13px;
+    font-weight: 600;
     color: var(--text-dim);
     white-space: nowrap;
   }
 
   .pill .dot {
-    width: 7px; height: 7px; border-radius: 50%;
+    width: 8px; height: 8px; border-radius: 50%;
     background: var(--text-faint);
     flex-shrink: 0;
   }
@@ -102,6 +104,10 @@
   .pill.live { color: var(--text); border-color: #4a2530; }
   .pill.done .dot { background: var(--green); }
   .pill.done { color: var(--green); }
+  .pill.warn .dot { background: var(--amber); }
+  .pill.warn { color: var(--amber); }
+  .pill.bad .dot { background: var(--red); }
+  .pill.bad { color: var(--red); }
 
   @keyframes pulse {
     0%, 100% { opacity: 1; transform: scale(1); }
@@ -112,15 +118,15 @@
 
   .btn {
     font-family: inherit;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
-    padding: 8px 15px;
+    padding: 9px 17px;
     border-radius: 8px;
     border: 1px solid var(--border-bright);
     background: var(--bg-card);
     color: var(--text);
     cursor: pointer;
-    transition: all 0.14s ease;
+    transition: background 0.14s ease, border-color 0.14s ease;
     white-space: nowrap;
   }
   .btn:hover:not(:disabled) { background: #1b1f2b; border-color: #3b435a; }
@@ -131,58 +137,207 @@
     color: #06070c;
   }
   .btn.primary:hover:not(:disabled) { background: #6d99ff; }
+  .btn.danger { border-color: #52303a; color: var(--red); }
+  .btn.danger:hover:not(:disabled) { background: rgba(255,95,109,0.1); }
+  .btn.big { font-size: 16px; padding: 12px 26px; }
+  .btn.hidden { display: none; }
 
-  select, input[type=file] {
-    font-family: inherit; font-size: 13px;
-    padding: 8px 11px;
+  select {
+    font-family: inherit; font-size: 14px; font-weight: 500;
+    padding: 9px 12px;
     border-radius: 8px;
     border: 1px solid var(--border-bright);
     background: var(--bg-card);
     color: var(--text);
+    max-width: 260px;
   }
 
-  /* ---------- stat strip ---------- */
+  /* ---------- banner ---------- */
 
-  .stats {
+  .banner {
+    display: none;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 24px;
+    font-size: 16px;
+    font-weight: 500;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .banner.show { display: flex; }
+  .banner .b-icon {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 15px; font-weight: 700; flex-shrink: 0;
+  }
+  .banner .b-text { flex: 1; min-width: 0; }
+  .banner .b-title { font-weight: 700; }
+  .banner .b-detail { font-size: 14px; opacity: 0.85; font-weight: 400; }
+
+  .banner.info { background: rgba(91,140,255,0.1); color: #cfdcff; border-bottom-color: var(--accent-dim); }
+  .banner.info .b-icon { background: var(--accent); color: #06070c; }
+  .banner.warn { background: rgba(255,182,72,0.11); color: #ffe0b0; border-bottom-color: #6a4d1c; }
+  .banner.warn .b-icon { background: var(--amber); color: #2a1c02; }
+  .banner.bad { background: rgba(255,95,109,0.12); color: #ffd2d6; border-bottom-color: #6b2b33; }
+  .banner.bad .b-icon { background: var(--red); color: #2a0508; }
+
+  /* ---------- pipeline stages ---------- */
+
+  .stages {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 1px;
     background: var(--border);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
   }
 
-  .stat {
+  .stage {
     background: var(--bg-raised);
-    padding: 11px 16px;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    position: relative;
+    transition: background 0.3s ease;
+  }
+  .stage[data-state="active"] { background: rgba(91,140,255,0.09); }
+  .stage[data-state="done"] { background: rgba(53,212,154,0.06); }
+  .stage[data-state="error"] { background: rgba(255,95,109,0.09); }
+
+  .stage-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 13px; font-weight: 700;
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    color: var(--text-faint);
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+  }
+  .stage[data-state="active"] .stage-num {
+    background: var(--accent); border-color: var(--accent); color: #06070c;
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  .stage[data-state="done"] .stage-num {
+    background: var(--green); border-color: var(--green); color: #06210f;
+  }
+  .stage[data-state="error"] .stage-num {
+    background: var(--red); border-color: var(--red); color: #2a0508;
   }
 
+  .stage-body { min-width: 0; }
+  .stage-name {
+    font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .stage[data-state="active"] .stage-name,
+  .stage[data-state="done"] .stage-name { color: var(--text); }
+  .stage-detail {
+    font-size: 13px; color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* ---------- stat strip ---------- */
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .stat { background: var(--bg-raised); padding: 12px 20px; }
+
   .stat-label {
-    font-size: 10px;
+    font-size: 12px;
     text-transform: uppercase;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.08em;
     color: var(--text-faint);
-    font-weight: 600;
-    margin-bottom: 3px;
+    font-weight: 700;
+    margin-bottom: 2px;
+    white-space: nowrap;
   }
 
   .stat-value {
     font-family: var(--mono);
-    font-size: 19px;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    font-size: clamp(24px, 2.1vw, 34px);
     font-weight: 500;
+    line-height: 1.2;
     letter-spacing: -0.02em;
+    color: var(--text);
+    /* Colour is the only thing that changes when a value updates: a size or
+       weight transition here would shift every neighbouring digit. */
     transition: color 0.3s ease;
+    white-space: nowrap;
   }
   .stat-value.bump { color: var(--accent); }
   .stat-value.cost { color: var(--amber); }
   .stat-value.good { color: var(--green); }
+  .stat-sub {
+    font-size: 12px; color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* ---------- readiness ---------- */
+
+  .readiness {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    padding: 16px 24px;
+    background: var(--bg-raised);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .readiness.hidden { display: none; }
+
+  .ready-verdict {
+    display: flex; align-items: center; gap: 12px;
+    padding-right: 22px;
+    border-right: 1px solid var(--border-bright);
+    flex-shrink: 0;
+  }
+  .ready-lamp {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--text-faint);
+    box-shadow: 0 0 0 4px rgba(98,107,128,0.16);
+    flex-shrink: 0;
+  }
+  .ready-lamp.ok { background: var(--green); box-shadow: 0 0 0 4px rgba(53,212,154,0.16); }
+  .ready-lamp.warn { background: var(--amber); box-shadow: 0 0 0 4px rgba(255,182,72,0.16); }
+  .ready-lamp.bad { background: var(--red); box-shadow: 0 0 0 4px rgba(255,95,109,0.16); }
+  .ready-headline { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+  .ready-sub { font-size: 13px; color: var(--text-faint); }
+
+  .ready-checks { display: flex; gap: 26px; flex: 1; min-width: 0; flex-wrap: wrap; }
+  .ready-check { min-width: 0; }
+  .rc-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--text-faint); font-weight: 700; margin-bottom: 1px;
+  }
+  .rc-value {
+    font-size: 15px; font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .rc-value.ok { color: var(--green); }
+  .rc-value.warn { color: var(--amber); }
+  .rc-value.bad { color: var(--red); }
 
   /* ---------- layout ---------- */
 
   main {
     flex: 1;
     display: grid;
-    grid-template-columns: 1.35fr 1fr;
+    grid-template-columns: 1.5fr 1fr;
     gap: 1px;
     background: var(--border);
     min-height: 0;
@@ -197,22 +352,30 @@
   }
 
   .panel-head {
-    display: flex; align-items: center; gap: 10px;
-    padding: 11px 18px;
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 20px;
     border-bottom: 1px solid var(--border);
     background: var(--bg-raised);
     flex-shrink: 0;
   }
 
   .panel-title {
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.09em;
     color: var(--text-dim);
   }
 
-  .panel-note { font-size: 11px; color: var(--text-faint); margin-left: auto; }
+  .panel-count {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .panel-note { font-size: 13px; color: var(--text-faint); margin-left: auto; }
 
   /* ---------- video ---------- */
 
@@ -221,58 +384,67 @@
     background: #000;
     aspect-ratio: 16 / 9;
     flex-shrink: 0;
+    max-height: 46vh;
   }
   .video-wrap video { width: 100%; height: 100%; object-fit: contain; display: block; }
 
   .video-empty {
     position: absolute; inset: 0;
     display: grid; place-items: center;
-    color: var(--text-faint);
-    font-size: 13px;
+    color: var(--text-dim);
+    font-size: 16px;
     text-align: center;
     padding: 30px;
+    line-height: 1.7;
   }
+  .video-empty.hidden { display: none; }
 
   .overlay-caption {
     position: absolute;
-    left: 14px; right: 14px; bottom: 14px;
-    background: rgba(8,9,13,0.86);
+    left: 16px; right: 16px; bottom: 16px;
+    background: rgba(8,9,13,0.88);
     backdrop-filter: blur(10px);
     border: 1px solid var(--border-bright);
-    border-radius: 9px;
-    padding: 10px 13px;
-    font-size: 13px;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 16px;
+    line-height: 1.45;
     opacity: 0;
     transition: opacity 0.25s ease;
   }
   .overlay-caption.show { opacity: 1; }
   .overlay-caption .oc-label {
-    font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em;
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
     color: var(--cyan); font-weight: 700; margin-bottom: 3px;
+    font-variant-numeric: tabular-nums;
   }
 
   /* ---------- timeline ---------- */
 
-  .timeline-section { padding: 14px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .timeline-section {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
 
   .timeline {
     position: relative;
-    height: 40px;
+    height: 44px;
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 7px;
+    border-radius: 8px;
     overflow: hidden;
   }
 
   .tl-window {
     position: absolute; top: 0; bottom: 0;
-    background: rgba(91,140,255,0.13);
-    border-left: 1px solid rgba(91,140,255,0.3);
+    background: rgba(91,140,255,0.15);
+    border-left: 1px solid rgba(91,140,255,0.32);
   }
   .tl-window.skipped { background: rgba(98,107,128,0.09); border-left-color: rgba(98,107,128,0.2); }
 
   .tl-event {
-    position: absolute; top: 4px; bottom: 4px;
+    position: absolute; top: 5px; bottom: 5px;
     width: 3px;
     border-radius: 2px;
     background: var(--amber);
@@ -286,6 +458,13 @@
     to { transform: scaleY(1); opacity: 1; }
   }
 
+  .tl-pick {
+    position: absolute; top: 0; bottom: 0;
+    background: rgba(53,212,154,0.16);
+    border-left: 2px solid var(--green);
+    border-right: 2px solid var(--green);
+  }
+
   .tl-playhead {
     position: absolute; top: 0; bottom: 0; width: 2px;
     background: #fff;
@@ -294,84 +473,29 @@
   }
 
   .tl-labels {
-    display: flex; justify-content: space-between;
-    font-family: var(--mono); font-size: 10px;
-    color: var(--text-faint); margin-top: 5px;
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+    color: var(--text-faint);
+    margin-top: 7px;
   }
-
-  /* ---------- reel rail ---------- */
-
-  .rail-section { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-  .rail { flex: 1; overflow-y: auto; padding: 12px 18px; display: flex; flex-direction: column; gap: 8px; }
-
-  .reel-card {
-    display: flex; align-items: center; gap: 12px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 9px;
-    padding: 11px 13px;
-    transition: all 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
-    animation: cardIn 0.35s ease;
-  }
-  .reel-card:hover { border-color: var(--border-bright); }
-  .reel-card.top { border-color: rgba(53,212,154,0.4); background: rgba(53,212,154,0.05); }
-
-  @keyframes cardIn {
-    from { opacity: 0; transform: translateY(-8px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .reel-rank {
-    font-family: var(--mono); font-size: 15px; font-weight: 600;
-    color: var(--text-faint); width: 26px; text-align: center; flex-shrink: 0;
-  }
-  .reel-card.top .reel-rank { color: var(--green); }
-
-  .reel-body { flex: 1; min-width: 0; }
-  .reel-label { font-weight: 600; font-size: 13px; margin-bottom: 3px; }
-  .reel-meta { font-family: var(--mono); font-size: 11px; color: var(--text-faint); }
-
-  .reel-score {
-    font-family: var(--mono); font-size: 17px; font-weight: 600;
-    flex-shrink: 0; text-align: right;
-  }
-  .reel-badges { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
-
-  .badge {
-    font-size: 9px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 2px 6px; border-radius: 4px;
-    background: var(--border); color: var(--text-dim);
-  }
-  .badge.chain { background: rgba(180,124,255,0.16); color: var(--purple); }
-  .badge.spoiler { background: rgba(255,95,109,0.16); color: var(--red); }
-  .badge.funny { background: rgba(255,182,72,0.16); color: var(--amber); }
+  .tl-now { color: var(--text); font-weight: 600; }
 
   /* ---------- annotation feed ---------- */
 
-  .tabs { display: flex; gap: 2px; margin-left: auto; }
-  .tab {
-    font-size: 11px; font-weight: 600; padding: 4px 10px;
-    border-radius: 6px; border: none; cursor: pointer;
-    background: transparent; color: var(--text-faint);
-    font-family: inherit; transition: all 0.14s;
-  }
-  .tab:hover { color: var(--text-dim); }
-  .tab.active { background: var(--bg-card); color: var(--text); }
-
-  .feed { flex: 1; overflow-y: auto; padding: 12px 16px; }
-  .feed.hidden { display: none; }
+  .feed { flex: 1; overflow-y: auto; padding: 12px 20px; }
 
   .ann {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-left: 2px solid var(--accent);
-    border-radius: 8px;
-    padding: 11px 13px;
-    margin-bottom: 8px;
+    border-left: 3px solid var(--accent);
+    border-radius: 9px;
+    padding: 12px 15px;
+    margin-bottom: 9px;
     animation: annIn 0.3s ease;
   }
-  .ann.skip { border-left-color: var(--text-faint); opacity: 0.62; }
+  .ann.skip { border-left-color: var(--text-faint); opacity: 0.6; }
   .ann.err { border-left-color: var(--red); }
 
   @keyframes annIn {
@@ -379,30 +503,33 @@
     to { opacity: 1; transform: translateX(0); }
   }
 
-  .ann-head {
-    display: flex; align-items: center; gap: 8px;
-    margin-bottom: 7px;
-  }
+  .ann-head { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
   .ann-time {
-    font-family: var(--mono); font-size: 11px;
-    color: var(--cyan); font-weight: 500;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: var(--cyan); font-weight: 600;
   }
   .ann-action {
-    font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.04em;
-    padding: 2px 7px; border-radius: 5px;
-    background: rgba(91,140,255,0.14); color: var(--accent);
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 3px 8px; border-radius: 5px;
+    background: rgba(91,140,255,0.16); color: var(--accent);
   }
-  .ann-reward { font-family: var(--mono); font-size: 11px; margin-left: auto; font-weight: 500; }
+  .ann-reward {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px; margin-left: auto; font-weight: 600;
+  }
   .ann-reward.pos { color: var(--green); }
   .ann-reward.neg { color: var(--red); }
 
-  .ann-caption { font-size: 13px; margin-bottom: 8px; }
+  .ann-caption { font-size: 15px; line-height: 1.5; }
 
-  .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
   .chip {
-    font-size: 10px; font-weight: 600;
-    padding: 3px 7px; border-radius: 5px;
+    font-size: 11px; font-weight: 600;
+    padding: 3px 8px; border-radius: 5px;
     background: rgba(255,182,72,0.13); color: var(--amber);
     font-family: var(--mono);
   }
@@ -410,86 +537,214 @@
   .chip.ent { background: rgba(61,219,217,0.11); color: var(--cyan); }
   .chip.causal { background: rgba(255,95,109,0.14); color: var(--red); }
 
-  .conf-grid {
-    display: grid; grid-template-columns: repeat(5, 1fr);
-    gap: 6px; margin-top: 8px;
+  .ann-err-count {
+    font-family: var(--mono); font-size: 13px; font-weight: 700;
+    color: var(--red); margin-left: auto;
   }
-  .conf { }
-  .conf-label {
-    font-size: 9px; text-transform: uppercase; color: var(--text-faint);
-    font-weight: 600; margin-bottom: 3px; letter-spacing: 0.04em;
+
+  /* ---------- highlight cards ---------- */
+
+  .rail { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 11px; }
+
+  .reel-card {
+    display: flex; gap: 13px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    padding: 11px;
+    animation: cardIn 0.35s ease;
   }
-  .conf-bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
-  .conf-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+  .reel-card.top { border-color: rgba(53,212,154,0.45); background: rgba(53,212,154,0.05); }
 
-  /* ---------- raw rows ---------- */
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 
-  .rows { font-family: var(--mono); font-size: 11px; }
+  .thumb {
+    position: relative;
+    width: 132px; height: 76px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, #1b2030, #262c40);
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+    overflow: hidden;
+    display: grid; place-items: center;
+  }
+  .thumb canvas { width: 100%; height: 100%; display: block; object-fit: cover; }
+  .thumb .thumb-fallback {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px; color: var(--text-faint);
+  }
+  .thumb .thumb-rank {
+    position: absolute; top: 4px; left: 4px;
+    min-width: 22px; height: 22px; padding: 0 5px;
+    border-radius: 6px;
+    background: rgba(8,9,13,0.86);
+    border: 1px solid var(--border-bright);
+    display: grid; place-items: center;
+    font-family: var(--mono); font-size: 12px; font-weight: 700;
+    color: var(--text);
+  }
+  .reel-card.top .thumb-rank { background: var(--green); color: #06210f; border-color: var(--green); }
+
+  .reel-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .reel-top { display: flex; align-items: baseline; gap: 10px; }
+  .reel-label {
+    font-weight: 700; font-size: 16px; letter-spacing: -0.01em;
+    flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .reel-score {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 22px; font-weight: 600;
+    flex-shrink: 0;
+    color: var(--text);
+  }
+  .reel-card.top .reel-score { color: var(--green); }
+  .reel-meta {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px; color: var(--text-faint);
+  }
+  .reel-badges { display: flex; gap: 5px; flex-wrap: wrap; }
+
+  .badge {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 3px 7px; border-radius: 4px;
+    background: var(--border); color: var(--text-dim);
+  }
+  .badge.chain { background: rgba(180,124,255,0.16); color: var(--purple); }
+  .badge.spoiler { background: rgba(255,95,109,0.16); color: var(--red); }
+  .badge.funny { background: rgba(255,182,72,0.16); color: var(--amber); }
+
+  /* ---------- log drawer ---------- */
+
+  .drawer {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    height: 46vh;
+    background: var(--bg-raised);
+    border-top: 1px solid var(--border-bright);
+    box-shadow: 0 -18px 40px rgba(0,0,0,0.55);
+    display: flex;
+    flex-direction: column;
+    transform: translateY(100%);
+    transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+    z-index: 60;
+  }
+  .drawer.open { transform: translateY(0); }
+
+  .tabs { display: flex; gap: 3px; }
+  .tab {
+    font-size: 13px; font-weight: 600; padding: 6px 13px;
+    border-radius: 7px; border: none; cursor: pointer;
+    background: transparent; color: var(--text-faint);
+    font-family: inherit;
+  }
+  .tab:hover { color: var(--text-dim); }
+  .tab.active { background: var(--bg-card); color: var(--text); }
+
+  .drawer-body { flex: 1; overflow-y: auto; }
+  .drawer-pane { display: none; }
+  .drawer-pane.active { display: block; }
+
+  .rows {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+  }
   .row-item {
-    padding: 7px 9px;
+    padding: 8px 20px;
     border-bottom: 1px solid var(--border);
     color: var(--text-dim);
     white-space: nowrap; overflow-x: auto;
-    animation: annIn 0.25s ease;
   }
-  .row-item:hover { background: var(--bg-card); color: var(--text); }
   .row-item .k { color: var(--text-faint); }
   .row-item .v { color: var(--cyan); }
 
   .rows-header {
-    padding: 8px 9px;
-    font-family: var(--mono); font-size: 10px;
+    padding: 9px 20px;
+    font-family: var(--mono); font-size: 12px;
     color: var(--text-faint);
     border-bottom: 1px solid var(--border-bright);
-    position: sticky; top: 0; background: var(--bg);
+    position: sticky; top: 0; background: var(--bg-raised);
   }
 
-  /* ---------- usage breakdown ---------- */
-
-  .usage { padding: 4px 0; }
   .usage-row {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 11px;
+    display: flex; align-items: center; gap: 14px;
+    padding: 11px 20px;
     border-bottom: 1px solid var(--border);
   }
   .usage-model {
-    font-family: var(--mono); font-size: 11px;
+    font-family: var(--mono); font-size: 13px;
     flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
   }
-  .usage-calls { font-family: var(--mono); font-size: 11px; color: var(--text-faint); }
-  .usage-cost { font-family: var(--mono); font-size: 12px; color: var(--amber); font-weight: 500; }
+  .usage-calls {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px; color: var(--text-faint);
+  }
+  .usage-cost {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 14px; color: var(--amber); font-weight: 600;
+    min-width: 84px; text-align: right;
+  }
+  .usage-row.total { border-top: 1px solid var(--border-bright); }
+  .usage-row.total .usage-model { color: var(--text); font-weight: 700; }
 
   .tier-note {
-    margin: 12px 11px;
-    padding: 11px 13px;
+    margin: 14px 20px;
+    padding: 13px 15px;
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 12px;
+    border-radius: 9px;
+    font-size: 14px;
     color: var(--text-dim);
-    line-height: 1.6;
+    line-height: 1.65;
   }
   .tier-note strong { color: var(--text); }
 
-  .empty {
-    padding: 40px 20px; text-align: center;
-    color: var(--text-faint); font-size: 13px;
+  .diag { padding: 6px 0; font-size: 14px; }
+  .diag-row {
+    display: flex; gap: 16px;
+    padding: 9px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .diag-k { color: var(--text-faint); min-width: 210px; }
+  .diag-v {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-dim); flex: 1; word-break: break-all;
   }
 
-  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  .empty {
+    padding: 44px 20px; text-align: center;
+    color: var(--text-faint); font-size: 15px;
+    line-height: 1.6;
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 5px; }
   ::-webkit-scrollbar-thumb:hover { background: #3d4459; }
 
   .toast {
-    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
     background: var(--bg-card); border: 1px solid var(--border-bright);
-    padding: 11px 18px; border-radius: 9px; font-size: 13px;
+    padding: 13px 20px; border-radius: 10px; font-size: 15px;
     opacity: 0; pointer-events: none; transition: opacity 0.25s;
     z-index: 100; max-width: 70vw;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
   }
   .toast.show { opacity: 1; }
-  .toast.err { border-color: var(--red); color: var(--red); }
+  .toast.err { border-color: var(--red); color: #ffd2d6; }
+
+  #thumbSource { display: none; }
 </style>
 </head>
 <body>
@@ -497,41 +752,140 @@
 <header>
   <div class="brand">
     <div class="brand-mark">S</div>
-    <span>Substream</span>
+    <span class="brand-name">Substream</span>
     <span class="brand-sub">Live World-Model Annotation</span>
   </div>
   <div class="header-spacer"></div>
   <span class="pill" id="backendPill"><span class="dot"></span><span id="backendText">checking…</span></span>
   <span class="pill" id="statusPill"><span class="dot"></span><span id="statusText">idle</span></span>
+  <select id="contentSel" title="Title"></select>
   <select id="speedSel" title="Playback pacing">
     <option value="1">1× real time</option>
     <option value="2">2× rehearsal</option>
     <option value="4">4× rehearsal</option>
     <option value="8">8× rehearsal</option>
   </select>
-  <select id="contentSel" title="Prepared content"></select>
   <button class="btn primary" id="startBtn">Start stream</button>
+  <button class="btn danger hidden" id="stopBtn">Stop</button>
+  <button class="btn" id="restartBtn">Restart</button>
+  <button class="btn" id="logBtn" title="Toggle raw console (L)">Console</button>
 </header>
 
-<div class="stats">
-  <div class="stat"><div class="stat-label">Stream time</div><div class="stat-value" id="sStream">0:00</div></div>
-  <div class="stat"><div class="stat-label">Windows</div><div class="stat-value" id="sWindows">0</div></div>
-  <div class="stat"><div class="stat-label">Events</div><div class="stat-value" id="sEvents">0</div></div>
-  <div class="stat"><div class="stat-label">Causal links</div><div class="stat-value" id="sCausal">0</div></div>
-  <div class="stat"><div class="stat-label">Tokens</div><div class="stat-value" id="sTokens">0</div></div>
-  <div class="stat"><div class="stat-label">Cost</div><div class="stat-value cost" id="sCost">$0.0000</div></div>
-  <div class="stat"><div class="stat-label">Annotation lag</div><div class="stat-value" id="sLag">—</div></div>
+<div class="banner" id="banner">
+  <div class="b-icon" id="bannerIcon">!</div>
+  <div class="b-text">
+    <div class="b-title" id="bannerTitle"></div>
+    <div class="b-detail" id="bannerDetail"></div>
+  </div>
+  <button class="btn hidden" id="bannerAction"></button>
+  <button class="btn" id="bannerDismiss">Dismiss</button>
 </div>
+
+<section class="stages">
+  <div class="stage" data-stage="ingest" data-state="idle">
+    <div class="stage-num">1</div>
+    <div class="stage-body">
+      <div class="stage-name">Footage arriving</div>
+      <div class="stage-detail" id="stIngest">waiting to start</div>
+    </div>
+  </div>
+  <div class="stage" data-stage="analyze" data-state="idle">
+    <div class="stage-num">2</div>
+    <div class="stage-body">
+      <div class="stage-name">Windows analyzed</div>
+      <div class="stage-detail" id="stAnalyze">no windows yet</div>
+    </div>
+  </div>
+  <div class="stage" data-stage="select" data-state="idle">
+    <div class="stage-num">3</div>
+    <div class="stage-body">
+      <div class="stage-name">Highlights selected</div>
+      <div class="stage-detail" id="stSelect">no candidates yet</div>
+    </div>
+  </div>
+  <div class="stage" data-stage="reel" data-state="idle">
+    <div class="stage-num">4</div>
+    <div class="stage-body">
+      <div class="stage-name">Reel ready</div>
+      <div class="stage-detail" id="stReel">ready at stream end</div>
+    </div>
+  </div>
+</section>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-label">Elapsed</div>
+    <div class="stat-value" id="sElapsed">0:00</div>
+    <div class="stat-sub" id="sElapsedSub">wall clock</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Windows</div>
+    <div class="stat-value" id="sWindows">0</div>
+    <div class="stat-sub" id="sWindowsSub">analyzed</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Events</div>
+    <div class="stat-value" id="sEvents">0</div>
+    <div class="stat-sub" id="sEventsSub">extracted</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Highlights</div>
+    <div class="stat-value" id="sHighlights">0</div>
+    <div class="stat-sub" id="sHighlightsSub">candidates</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Cache</div>
+    <div class="stat-value" id="sCache">0 / 0</div>
+    <div class="stat-sub" id="sCacheSub">hits / calls</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Cost</div>
+    <div class="stat-value cost" id="sCost">$0.0000</div>
+    <div class="stat-sub" id="sCostSub">0 tokens</div>
+  </div>
+</div>
+
+<section class="readiness" id="readiness">
+  <div class="ready-verdict">
+    <div class="ready-lamp" id="readyLamp"></div>
+    <div>
+      <div class="ready-headline" id="readyHeadline">Checking readiness…</div>
+      <div class="ready-sub" id="readySub">asking the service what it has loaded</div>
+    </div>
+  </div>
+  <div class="ready-checks">
+    <div class="ready-check">
+      <div class="rc-label">Title loaded</div>
+      <div class="rc-value" id="rcTitle">—</div>
+    </div>
+    <div class="ready-check">
+      <div class="rc-label">Footage</div>
+      <div class="rc-value" id="rcFootage">—</div>
+    </div>
+    <div class="ready-check">
+      <div class="rc-label">Cache</div>
+      <div class="rc-value" id="rcCache">—</div>
+    </div>
+    <div class="ready-check">
+      <div class="rc-label">Model backend</div>
+      <div class="rc-value" id="rcBackend">—</div>
+    </div>
+    <div class="ready-check">
+      <div class="rc-label">Pacing</div>
+      <div class="rc-value" id="rcSpeed">—</div>
+    </div>
+  </div>
+  <button class="btn primary big" id="readyStartBtn">Start stream</button>
+</section>
 
 <main>
   <div class="col">
-    <div class="panel-head">
-      <span class="panel-title">Stream</span>
-      <span class="panel-note" id="episodeNote">no session</span>
-    </div>
     <div class="video-wrap">
       <video id="video" muted playsinline></video>
-      <div class="video-empty" id="videoEmpty">Pick prepared content and start the stream.<br />Annotation runs while it plays.</div>
+      <div class="video-empty" id="videoEmpty">
+        Gameplay plays here while the model annotates it.<br />
+        <span style="color:var(--text-faint);font-size:14px">Press Start stream.</span>
+      </div>
       <div class="overlay-caption" id="overlay">
         <div class="oc-label" id="ocLabel">annotating</div>
         <div id="ocText"></div>
@@ -542,56 +896,75 @@
       <div class="timeline" id="timeline">
         <div class="tl-playhead" id="playhead" style="left:0"></div>
       </div>
-      <div class="tl-labels"><span>0:00</span><span id="tlEnd">—</span></div>
+      <div class="tl-labels">
+        <span>0:00</span>
+        <span class="tl-now" id="tlNow">0:00</span>
+        <span id="tlEnd">—</span>
+      </div>
     </div>
 
-    <div class="rail-section">
-      <div class="panel-head">
-        <span class="panel-title">Highlight candidates</span>
-        <span class="panel-note" id="railNote">re-ranks live</span>
-      </div>
-      <div class="rail" id="rail">
-        <div class="empty">Candidates appear as the arbiter scores them.</div>
-      </div>
+    <div class="panel-head">
+      <span class="panel-title">Live annotation</span>
+      <span class="panel-count" id="feedCount">0</span>
+      <span class="panel-note" id="episodeNote">no session</span>
+    </div>
+    <div class="feed" id="tabFeed">
+      <div class="empty">Each window the model annotates appears here as it lands.</div>
     </div>
   </div>
 
   <div class="col">
     <div class="panel-head">
-      <span class="panel-title">SWA-1 annotation</span>
-      <div class="tabs">
-        <button class="tab active" data-tab="feed">Feed</button>
-        <button class="tab" data-tab="rows">Rows</button>
-        <button class="tab" data-tab="usage">Cost</button>
-      </div>
+      <span class="panel-title">Highlights</span>
+      <span class="panel-count" id="railCount">0</span>
+      <span class="panel-note" id="railNote">re-ranks live</span>
     </div>
-
-    <div class="feed" id="tabFeed">
-      <div class="empty">Annotations stream in here as windows are processed.</div>
+    <div class="rail" id="rail">
+      <div class="empty">Highlight candidates appear here, best first, as the arbiter scores them.</div>
     </div>
+  </div>
+</main>
 
-    <div class="feed hidden" id="tabRows">
+<section class="drawer" id="drawer">
+  <div class="panel-head">
+    <span class="panel-title">Raw console</span>
+    <div class="tabs">
+      <button class="tab active" data-pane="rows">SWA-1 rows</button>
+      <button class="tab" data-pane="usage">Cost breakdown</button>
+      <button class="tab" data-pane="diag">Diagnostics</button>
+    </div>
+    <span class="panel-note">
+      <button class="btn" id="drawerClose">Close</button>
+    </span>
+  </div>
+  <div class="drawer-body">
+    <div class="drawer-pane active" id="paneRows">
       <div class="rows" id="rowsBody">
-        <div class="rows-header">episode_id · window_id · t_start · action · event_types · reward · causal</div>
+        <div class="rows-header">window_id · t_start · action · event_types · reward · causal</div>
         <div class="empty">Flattened Parquet rows appear here.</div>
       </div>
     </div>
-
-    <div class="feed hidden" id="tabUsage">
+    <div class="drawer-pane" id="paneUsage">
       <div class="tier-note">
         <strong>Tiered annotation.</strong> Every window gets a cheap triage pass;
         only windows that clear the salience threshold get dense annotation, and
         only candidate spans reach the arbiter. Annotating everything densely
         would cost roughly 2.8× more per stream-hour.
       </div>
-      <div class="usage" id="usageBody">
+      <div id="usageBody">
         <div class="empty">Per-model cost breakdown appears here.</div>
       </div>
     </div>
+    <div class="drawer-pane" id="paneDiag">
+      <div class="diag" id="diagBody">
+        <div class="empty">Session and transport diagnostics appear here.</div>
+      </div>
+    </div>
   </div>
-</main>
+</section>
 
 <div class="toast" id="toast"></div>
+<video id="thumbSource" muted playsinline preload="auto" crossorigin="anonymous"></video>
 
 <script>
 (() => {
@@ -600,17 +973,35 @@
   const API = '/api/v1';
   const el = (id) => document.getElementById(id);
 
+  // How long the console will sit through silence before telling the operator
+  // that nothing is arriving. Dense windows are 8s wide with a 4s stride, so
+  // real gaps at 1x are a few seconds; 25s of nothing means something broke.
+  const STALL_SECONDS = 25;
+
   const state = {
     sessionId: null,
     source: null,
+    sourceTitle: '',
     duration: 0,
     speed: 1,
     startedAt: 0,
     es: null,
-    segments: new Map(),
-    lastStats: null,
-    lagSamples: [],
     running: false,
+    finished: false,
+    segments: new Map(),
+    seenWindows: new Set(),
+    seenTriage: new Set(),
+    errorCards: new Map(),
+    lastStats: null,
+    lastEventAt: 0,
+    drops: 0,
+    reconnecting: false,
+    stalled: false,
+    status: null,
+    health: null,
+    thumbs: true,
+    videoOk: true,
+    diag: {},
   };
 
   // ---------- helpers ----------
@@ -638,7 +1029,7 @@
     t.textContent = msg;
     t.className = 'toast show' + (isErr ? ' err' : '');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => (t.className = 'toast'), 4200);
+    toastTimer = setTimeout(() => (t.className = 'toast'), 5000);
   }
 
   function bump(id, value) {
@@ -646,7 +1037,7 @@
     if (node.textContent === value) return;
     node.textContent = value;
     node.classList.add('bump');
-    setTimeout(() => node.classList.remove('bump'), 320);
+    setTimeout(() => node.classList.remove('bump'), 340);
   }
 
   function setStatus(text, cls) {
@@ -654,91 +1045,285 @@
     el('statusPill').className = 'pill' + (cls ? ' ' + cls : '');
   }
 
+  function setStage(name, stateName, detail) {
+    const node = document.querySelector(`.stage[data-stage="${name}"]`);
+    if (node) node.dataset.state = stateName;
+    if (detail !== undefined) {
+      const id = 'st' + name[0].toUpperCase() + name.slice(1);
+      const d = el(id);
+      if (d) d.textContent = detail;
+    }
+  }
+
+  // A single place for every operator-visible failure or notice, so nothing
+  // fails quietly: if the console cannot proceed, it says so in words.
+  function banner(kind, title, detail, action) {
+    const b = el('banner');
+    b.className = 'banner show ' + kind;
+    el('bannerIcon').textContent = kind === 'bad' ? '!' : kind === 'warn' ? '!' : 'i';
+    el('bannerTitle').textContent = title;
+    el('bannerDetail').textContent = detail || '';
+    const btn = el('bannerAction');
+    if (action) {
+      btn.textContent = action.label;
+      btn.className = 'btn' + (action.primary ? ' primary' : '');
+      btn.onclick = action.onClick;
+    } else {
+      btn.className = 'btn hidden';
+      btn.onclick = null;
+    }
+  }
+
+  function clearBanner() {
+    el('banner').className = 'banner';
+  }
+
+  function setDiag(key, value) {
+    state.diag[key] = value;
+    renderDiag();
+  }
+
+  function renderDiag() {
+    const body = el('diagBody');
+    const keys = Object.keys(state.diag);
+    if (!keys.length) return;
+    body.innerHTML = keys
+      .map(
+        (k) =>
+          `<div class="diag-row"><div class="diag-k">${esc(k)}</div>` +
+          `<div class="diag-v">${esc(state.diag[k])}</div></div>`
+      )
+      .join('');
+  }
+
   // ---------- boot ----------
 
   async function boot() {
+    const params = new URLSearchParams(window.location.search);
+    state.thumbs = params.get('thumbs') !== '0';
+
+    await Promise.all([loadHealth(), loadStatus()]);
+    populateContent();
+    applyUrlPreferences(params);
+    renderReadiness();
+    setInterval(watchdog, 2000);
+  }
+
+  async function loadHealth() {
     try {
       const res = await fetch('/health');
-      const health = await res.json();
-      const g = health.gemini || {};
+      if (!res.ok) throw new Error(`health ${res.status}`);
+      state.health = await res.json();
+      const g = state.health.gemini || {};
       const backend = g.backend || 'unknown';
       el('backendText').textContent =
         `${backend} · ${(g.models && g.models.dense) || '?'}`;
-      el('backendPill').className = 'pill' + (backend === 'replay' ? '' : ' done');
-      if (backend === 'replay') {
-        toast('Gemini backend is in replay mode — serving cached annotations only.', true);
-      }
+      el('backendPill').className = 'pill' + (backend === 'replay' ? ' warn' : ' done');
+      setDiag('gemini backend', `${backend} · dense ${(g.models && g.models.dense) || '?'}`);
     } catch (e) {
       el('backendText').textContent = 'service unreachable';
+      el('backendPill').className = 'pill bad';
+      setDiag('gemini backend', 'unreachable: ' + e.message);
     }
+  }
 
+  async function loadStatus() {
     try {
-      const res = await fetch(`${API}/demo/content`);
-      const data = await res.json();
-      const sel = el('contentSel');
-      sel.innerHTML = '';
-      if (!data.content || !data.content.length) {
-        sel.innerHTML = '<option value="">no prepared content</option>';
-        el('startBtn').disabled = true;
-        toast('No prepared content found. Run scripts/prepare_demo_content.py first.', true);
-        return;
-      }
-      for (const item of data.content) {
-        const opt = document.createElement('option');
-        opt.value = item.path;
-        opt.textContent = `${item.title} · ${fmtTime(item.duration)}`;
-        opt.dataset.duration = item.duration;
-        opt.dataset.title = item.title;
-        sel.appendChild(opt);
-      }
+      const res = await fetch(`${API}/demo/status`);
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      state.status = await res.json();
+      setDiag('content dir', state.status.content_dir || '—');
+      setDiag('cached responses', fmtNum(state.status.cached_responses));
     } catch (e) {
-      toast('Could not load prepared content list.', true);
+      // A failed readiness check must not be the thing that stops a demo, so
+      // this degrades to "unknown" and leaves the run path open.
+      state.status = null;
+      setDiag('readiness check', 'failed: ' + e.message);
     }
+  }
 
-    applyUrlPreferences();
+  function contentItems() {
+    if (state.status && Array.isArray(state.status.content)) return state.status.content;
+    return [];
+  }
+
+  function populateContent() {
+    const sel = el('contentSel');
+    sel.innerHTML = '';
+    const items = contentItems();
+    if (!items.length) {
+      sel.innerHTML = '<option value="">no prepared content</option>';
+      el('startBtn').disabled = true;
+      el('readyStartBtn').disabled = true;
+      return;
+    }
+    for (const item of items) {
+      const opt = document.createElement('option');
+      opt.value = item.path;
+      opt.textContent = `${item.title} · ${fmtTime(item.duration)}`;
+      opt.dataset.duration = item.duration;
+      opt.dataset.title = item.title;
+      sel.appendChild(opt);
+    }
   }
 
   // Preselect title and pacing from the query string, and optionally start
   // immediately. A bookmarked link means no fumbling with dropdowns in front
   // of an audience: /demo?title=stumble&speed=1&autostart=1
-  function applyUrlPreferences() {
-    const params = new URLSearchParams(window.location.search);
+  //
+  // Both guards below deliberately hold an autostart rather than running:
+  // starting the wrong title, or a run the service already said will not work,
+  // is worse in front of a customer than a console that says why it stopped.
+  function applyUrlPreferences(params) {
+    const sel = el('contentSel');
+    let titleMissed = null;
 
     const wanted = (params.get('title') || '').toLowerCase();
     if (wanted) {
-      const sel = el('contentSel');
       const match = Array.from(sel.options).find(
         (o) => o.value.toLowerCase().includes(wanted) ||
                (o.dataset.title || '').toLowerCase().includes(wanted),
       );
       if (match) sel.value = match.value;
+      else if (sel.options.length && sel.options[0].value) titleMissed = params.get('title');
     }
 
     const speed = params.get('speed');
-    if (speed && Array.from(el('speedSel').options).some((o) => o.value === speed)) {
-      el('speedSel').value = speed;
+    if (speed) {
+      const speedSel = el('speedSel');
+      const known = Array.from(speedSel.options).some((o) => o.value === speed);
+      if (known) {
+        speedSel.value = speed;
+      } else if (isFinite(parseFloat(speed)) && parseFloat(speed) > 0) {
+        const opt = document.createElement('option');
+        opt.value = speed;
+        opt.textContent = `${speed}× rehearsal`;
+        speedSel.appendChild(opt);
+        speedSel.value = speed;
+      }
     }
 
-    if (params.get('autostart') === '1' && !el('startBtn').disabled) {
-      start();
+    if (params.get('log') === '1') openDrawer(true);
+
+    const wantsAutostart = params.get('autostart') === '1';
+    if (!wantsAutostart) return;
+
+    if (titleMissed) {
+      const available = contentItems().map((c) => c.title).join(', ');
+      banner(
+        'warn',
+        `No title matching “${titleMissed}” — nothing was started`,
+        `Loaded titles: ${available || 'none'}. Pick one from the title menu, ` +
+          `or press Start with “${sel.selectedOptions[0].textContent}”.`,
+        { label: 'Start anyway', primary: true, onClick: () => { clearBanner(); start(); } }
+      );
+      setStatus('needs a title', 'warn');
+      return;
     }
+
+    if (state.status && state.status.ready === false) {
+      banner(
+        'bad',
+        'Service is not ready — nothing was started',
+        (state.status.blockers || []).join(' ') || 'The service reported ready: false.',
+        { label: 'Start anyway', onClick: () => { clearBanner(); start(); } }
+      );
+      setStatus('not ready', 'bad');
+      return;
+    }
+
+    if (!el('startBtn').disabled) start();
   }
 
-  // ---------- start ----------
+  // ---------- readiness ----------
+
+  function renderReadiness() {
+    if (state.running) return;
+    const sel = el('contentSel');
+    const opt = sel.selectedOptions[0];
+    const items = contentItems();
+    const st = state.status;
+
+    const titleOk = !!(opt && opt.value);
+    el('rcTitle').textContent = titleOk ? opt.dataset.title : 'none selected';
+    el('rcTitle').className = 'rc-value ' + (titleOk ? 'ok' : 'bad');
+
+    el('rcFootage').textContent = items.length
+      ? `${items.length} clip${items.length === 1 ? '' : 's'} present`
+      : 'missing';
+    el('rcFootage').className = 'rc-value ' + (items.length ? 'ok' : 'bad');
+
+    const cached = st ? st.cached_responses || 0 : null;
+    el('rcCache').textContent =
+      cached === null ? 'unknown' : cached > 0 ? `${fmtNum(cached)} warm` : 'cold';
+    el('rcCache').className =
+      'rc-value ' + (cached === null ? 'warn' : cached > 0 ? 'ok' : 'bad');
+
+    const backend = (state.health && state.health.gemini && state.health.gemini.backend) || null;
+    el('rcBackend').textContent = backend || 'unreachable';
+    el('rcBackend').className =
+      'rc-value ' + (!backend ? 'bad' : backend === 'replay' ? (cached ? 'ok' : 'bad') : 'ok');
+
+    const speed = el('speedSel').value;
+    el('rcSpeed').textContent = speed === '1' ? '1× real time' : `${speed}× rehearsal`;
+    el('rcSpeed').className = 'rc-value ' + (speed === '1' ? 'ok' : 'warn');
+
+    const blockers = st ? st.blockers || [] : [];
+    let lamp = 'ok';
+    let headline = 'Ready to start';
+    let sub = opt && opt.value
+      ? `${opt.dataset.title} · ${fmtTime(parseFloat(opt.dataset.duration) || 0)} · ` +
+        (speed === '1' ? 'real time' : `${speed}× rehearsal`)
+      : 'no title selected';
+
+    if (!st) {
+      lamp = 'warn';
+      headline = 'Readiness unknown';
+      sub = 'Could not reach /demo/status. The run path is still open.';
+    } else if (!st.ready || blockers.length) {
+      lamp = 'bad';
+      headline = 'Not safe to start';
+      sub = blockers.join(' ') || 'The service reported ready: false.';
+    } else if (!titleOk) {
+      lamp = 'bad';
+      headline = 'No title loaded';
+      sub = 'No prepared content was found in the content directory.';
+    }
+
+    el('readyLamp').className = 'ready-lamp ' + lamp;
+    el('readyHeadline').textContent = headline;
+    el('readySub').textContent = sub;
+  }
+
+  function showReadiness(show) {
+    el('readiness').classList.toggle('hidden', !show);
+  }
+
+  // ---------- start / stop ----------
 
   async function start() {
     const sel = el('contentSel');
     const opt = sel.selectedOptions[0];
-    if (!opt || !opt.value) return;
+    if (!opt || !opt.value) {
+      banner('bad', 'No prepared content to play',
+        'The service found no gameplay files. Run scripts/prepare_demo_content.py, ' +
+        'or check that the GCS asset sync succeeded on boot.');
+      return;
+    }
 
+    clearBanner();
     el('startBtn').disabled = true;
+    el('stopBtn').classList.remove('hidden');
     setStatus('starting…');
     resetView();
+    showReadiness(false);
 
     state.source = opt.value;
+    state.sourceTitle = opt.dataset.title || '';
     state.duration = parseFloat(opt.dataset.duration) || 0;
     state.speed = parseFloat(el('speedSel').value) || 1;
     el('tlEnd').textContent = fmtTime(state.duration);
+    setStage('ingest', 'active', `0:00 / ${fmtTime(state.duration)}`);
 
     try {
       const res = await fetch(`${API}/live/replay`, {
@@ -746,53 +1331,133 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           source_path: state.source,
-          game_title: opt.dataset.title,
+          game_title: state.sourceTitle,
           speed: state.speed,
           run_arbiter: true,
         }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new Error(await describeHttpError(res));
       const data = await res.json();
       state.sessionId = data.session_id;
       state.startedAt = performance.now();
       state.running = true;
+      state.finished = false;
+      state.lastEventAt = performance.now();
 
       el('episodeNote').textContent = `${data.episode_id} · ${state.speed}×`;
       setStatus(state.speed === 1 ? 'live' : `live ${state.speed}×`, 'live');
+      setDiag('session id', data.session_id);
+      setDiag('episode id', data.episode_id);
+      setDiag('source', state.source);
+      setDiag('speed', `${state.speed}× (paced_realtime=${data.paced_realtime})`);
 
       startVideo();
       subscribe(data.session_id);
       tick();
     } catch (e) {
-      toast('Failed to start: ' + e.message, true);
-      setStatus('failed');
+      setStatus('failed to start', 'bad');
+      setStage('ingest', 'error', 'could not start');
+      banner('bad', 'Could not start the run', e.message,
+        { label: 'Try again', primary: true, onClick: () => { clearBanner(); start(); } });
       el('startBtn').disabled = false;
+      el('stopBtn').classList.add('hidden');
+      showReadiness(true);
     }
+  }
+
+  async function describeHttpError(res) {
+    let detail = '';
+    try {
+      const body = await res.json();
+      detail = body.detail || JSON.stringify(body);
+    } catch (e) {
+      try { detail = await res.text(); } catch (e2) { detail = ''; }
+    }
+    return `HTTP ${res.status}. ${String(detail).slice(0, 300)}`;
+  }
+
+  async function stop(quiet) {
+    const sid = state.sessionId;
+    state.running = false;
+    if (state.es) { state.es.close(); state.es = null; }
+    const v = el('video');
+    try { v.pause(); } catch (e) { /* nothing to pause */ }
+    el('stopBtn').classList.add('hidden');
+    el('startBtn').disabled = false;
+    if (!quiet) {
+      setStatus('stopped');
+      setStage('ingest', 'idle', 'stopped by operator');
+      setStage('analyze', 'idle');
+      setStage('select', 'idle');
+      setStage('reel', 'idle');
+      showReadiness(true);
+      renderReadiness();
+    }
+    if (!sid) return;
+    try {
+      await fetch(`${API}/live/replay/${sid}/stop`, { method: 'POST' });
+    } catch (e) {
+      // Best effort: the operator asked for the UI to stop, and it has.
+      setDiag('stop request', 'failed: ' + e.message);
+    }
+  }
+
+  async function restart() {
+    await stop(true);
+    clearBanner();
+    await loadStatus();
+    renderReadiness();
+    resetView();
+    start();
   }
 
   function startVideo() {
     const v = el('video');
+    state.videoOk = true;
     v.src = `${API}/demo/content/stream?path=${encodeURIComponent(state.source)}`;
     v.playbackRate = state.speed;
-    el('videoEmpty').style.display = 'none';
+    el('videoEmpty').classList.add('hidden');
     v.play().catch(() => {
-      toast('Autoplay blocked — press play on the video.', true);
+      toast('Autoplay was blocked — press play on the video. Annotation is already running.', true);
     });
+    if (state.thumbs) el('thumbSource').src = v.src;
   }
 
   function resetView() {
     state.segments.clear();
-    state.lagSamples = [];
+    state.seenWindows.clear();
+    state.seenTriage.clear();
+    state.errorCards.clear();
     state.lastStats = null;
-    el('tabFeed').innerHTML = '';
+    state.drops = 0;
+    state.reconnecting = false;
+    state.stalled = false;
+    state.finished = false;
+    el('tabFeed').innerHTML =
+      '<div class="empty">Each window the model annotates appears here as it lands.</div>';
     el('rowsBody').innerHTML =
-      '<div class="rows-header">episode_id · window_id · t_start · action · event_types · reward · causal</div>';
-    el('rail').innerHTML = '<div class="empty">Candidates appear as the arbiter scores them.</div>';
-    el('usageBody').innerHTML = '';
-    document.querySelectorAll('.tl-window, .tl-event').forEach((n) => n.remove());
-    ['sWindows', 'sEvents', 'sCausal', 'sTokens'].forEach((id) => (el(id).textContent = '0'));
+      '<div class="rows-header">window_id · t_start · action · event_types · reward · causal</div>';
+    el('rail').innerHTML =
+      '<div class="empty">Highlight candidates appear here, best first, as the arbiter scores them.</div>';
+    el('usageBody').innerHTML = '<div class="empty">Per-model cost breakdown appears here.</div>';
+    document.querySelectorAll('.tl-window, .tl-event, .tl-pick').forEach((n) => n.remove());
+    el('playhead').style.left = '0';
+    ['sWindows', 'sEvents', 'sHighlights'].forEach((id) => (el(id).textContent = '0'));
+    el('sElapsed').textContent = '0:00';
+    el('sCache').textContent = '0 / 0';
     el('sCost').textContent = '$0.0000';
-    el('sLag').textContent = '—';
+    el('sCostSub').textContent = '0 tokens';
+    el('sWindowsSub').textContent = 'analyzed';
+    el('sEventsSub').textContent = 'extracted';
+    el('sHighlightsSub').textContent = 'candidates';
+    el('feedCount').textContent = '0';
+    el('railCount').textContent = '0';
+    el('tlNow').textContent = '0:00';
+    el('overlay').classList.remove('show');
+    ['ingest', 'analyze', 'select', 'reel'].forEach((s) => setStage(s, 'idle'));
+    setStage('analyze', 'idle', 'no windows yet');
+    setStage('select', 'idle', 'no candidates yet');
+    setStage('reel', 'idle', 'ready at stream end');
   }
 
   // ---------- event stream ----------
@@ -802,9 +1467,29 @@
     const es = new EventSource(`${API}/live/sessions/${sessionId}/annotations`);
     state.es = es;
 
+    // Every handler is idempotent, because a dropped SSE connection reconnects
+    // and the server replays this session's history to the new subscriber. That
+    // is what makes a wifi blip recoverable instead of a duplicated console.
     const on = (kind, fn) =>
       es.addEventListener(kind, (e) => {
-        try { fn(JSON.parse(e.data)); } catch (err) { /* keep the stream alive */ }
+        if (typeof e.data !== 'string') return;
+        state.lastEventAt = performance.now();
+        if (state.reconnecting) onReconnected();
+        let payload;
+        try {
+          payload = JSON.parse(e.data);
+        } catch (err) {
+          setDiag('last malformed event', `${kind}: ${String(e.data).slice(0, 120)}`);
+          return;
+        }
+        try {
+          fn(payload);
+        } catch (err) {
+          // A rendering fault must never take the stream down, but it must not
+          // be invisible either.
+          setDiag('last render error', `${kind}: ${err && err.message}`);
+          addError({ message: `console could not render a ${kind} event` });
+        }
       });
 
     on('episode_identified', onIdentified);
@@ -812,55 +1497,148 @@
     on('window', onWindow);
     on('segment', onSegment);
     on('stats', onStats);
-    on('error', (d) => addError(d));
+    on('error', onServerError);
     on('done', onDone);
 
+    es.onopen = () => {
+      setDiag('sse state', 'open');
+      if (state.reconnecting) onReconnected();
+    };
+
     es.onerror = () => {
-      if (state.running) setStatus('stream interrupted');
+      setDiag('sse state', `error (readyState ${es.readyState})`);
+      if (!state.running || state.finished) return;
+      if (es.readyState === EventSource.CLOSED) onStreamClosed();
+      else onStreamDropped();
     };
   }
 
+  function onStreamDropped() {
+    if (state.reconnecting) return;
+    state.reconnecting = true;
+    state.drops += 1;
+    setStatus('reconnecting…', 'warn');
+    banner(
+      'warn',
+      'Event stream dropped — reconnecting',
+      'The run is still going on the server. The browser is retrying and will ' +
+        'replay everything it missed when it gets back.',
+      { label: 'Reconnect now', onClick: () => manualReconnect() }
+    );
+  }
+
+  function onReconnected() {
+    state.reconnecting = false;
+    state.stalled = false;
+    clearBanner();
+    setStatus(state.speed === 1 ? 'live' : `live ${state.speed}×`, 'live');
+    toast('Reconnected — the server replayed everything the console missed.');
+    setDiag('stream drops', String(state.drops));
+  }
+
+  // EventSource gives up permanently when the endpoint answers non-2xx, which
+  // is exactly what happens when the service restarted and the session id is
+  // gone. That case needs a different instruction than "wait".
+  async function onStreamClosed() {
+    state.reconnecting = false;
+    let sessionGone = false;
+    try {
+      const res = await fetch(`${API}/live/sessions/${state.sessionId}`);
+      sessionGone = res.status === 404;
+    } catch (e) {
+      sessionGone = false;
+    }
+    setStatus('stream lost', 'bad');
+    if (sessionGone) {
+      banner(
+        'bad',
+        'The session no longer exists on the server',
+        'The service most likely restarted. Nothing is running any more — press ' +
+          'Restart to begin a fresh run.',
+        { label: 'Restart', primary: true, onClick: () => restart() }
+      );
+    } else {
+      banner(
+        'bad',
+        'Event stream closed and will not retry',
+        'The run may still be going on the server. Reconnect to pick it back up, ' +
+          'or restart for a clean run.',
+        { label: 'Reconnect', primary: true, onClick: () => manualReconnect() }
+      );
+    }
+    el('startBtn').disabled = false;
+  }
+
+  function manualReconnect() {
+    if (!state.sessionId) return;
+    clearBanner();
+    state.reconnecting = true;
+    setStatus('reconnecting…', 'warn');
+    subscribe(state.sessionId);
+  }
+
+  function watchdog() {
+    if (state.running) {
+      const wall = (performance.now() - state.startedAt) / 1000;
+      el('sElapsed').textContent = fmtTime(wall);
+    }
+    if (!state.running || state.finished || state.reconnecting) return;
+    const quiet = (performance.now() - state.lastEventAt) / 1000;
+    if (quiet > STALL_SECONDS && !state.stalled) {
+      state.stalled = true;
+      setStatus('stalled', 'bad');
+      setStage('analyze', 'error', `no events for ${Math.round(quiet)}s`);
+      banner(
+        'bad',
+        `No annotation events for ${Math.round(quiet)}s`,
+        'The pipeline may have failed on the server. Check the Diagnostics tab, ' +
+          'then reconnect or restart.',
+        { label: 'Restart', primary: true, onClick: () => restart() }
+      );
+    }
+  }
+
+  // ---------- event handlers ----------
+
   function onIdentified(d) {
     el('episodeNote').textContent =
-      `${d.game_title || 'unknown'} · ${d.genre} · ${d.perspective}`;
+      `${d.game_title || state.sourceTitle || 'unknown'} · ${d.genre} · ${d.perspective}`;
     let note = `genre ${d.genre} · media resolution ${d.media_resolution}`;
     if (d.contains_real_world_video) note += ' · real-world video flagged';
     el('railNote').textContent = note;
+    setDiag('identified', `${d.game_title || '?'} · ${d.genre} · ${d.perspective}`);
   }
 
   function onTriage(d) {
-    if (!state.duration) return;
-    const tl = el('timeline');
-    const div = document.createElement('div');
-    const skipped = d.salience < 35;
-    div.className = 'tl-window' + (skipped ? ' skipped' : '');
-    div.style.left = `${(d.t_start / state.duration) * 100}%`;
-    div.style.width = `${((d.t_end - d.t_start) / state.duration) * 100}%`;
-    div.title = `${fmtTime(d.t_start)} salience ${d.salience}${skipped ? ' (skipped)' : ''}`;
-    tl.appendChild(div);
+    const key = `${d.t_start}|${d.t_end}`;
+    if (state.seenTriage.has(key)) return;
+    state.seenTriage.add(key);
 
-    if (skipped) addSkip(d);
+    setStage('analyze', 'active');
+    if (state.duration) {
+      const tl = el('timeline');
+      const div = document.createElement('div');
+      const skipped = d.salience < 35;
+      div.className = 'tl-window' + (skipped ? ' skipped' : '');
+      div.style.left = `${(d.t_start / state.duration) * 100}%`;
+      div.style.width = `${((d.t_end - d.t_start) / state.duration) * 100}%`;
+      div.title = `${fmtTime(d.t_start)} salience ${d.salience}${skipped ? ' (skipped)' : ''}`;
+      tl.appendChild(div);
+    }
+    if (d.salience < 35) addSkip(d);
   }
 
   function onWindow(d) {
     const w = d.window;
-    addAnnotation(w, d.triage_salience);
+    if (!w || !w.window_id) return;
+    if (state.seenWindows.has(w.window_id)) return;
+    state.seenWindows.add(w.window_id);
+
+    setStage('analyze', 'active');
+    addAnnotation(w);
     addRow(w);
     markEvents(w);
     showOverlay(w);
-
-    // Annotation lag: how far behind the stream the annotation landed.
-    if (state.running && state.speed) {
-      const streamElapsed = ((performance.now() - state.startedAt) / 1000) * state.speed;
-      const lag = streamElapsed - w.t_end;
-      if (lag >= 0 && lag < 120) {
-        state.lagSamples.push(lag);
-        const sorted = [...state.lagSamples].sort((a, b) => a - b);
-        const p50 = sorted[Math.floor(sorted.length / 2)];
-        el('sLag').textContent = `${p50.toFixed(1)}s`;
-        el('sLag').className = 'stat-value ' + (p50 < 15 ? 'good' : 'cost');
-      }
-    }
   }
 
   function markEvents(w) {
@@ -886,29 +1664,16 @@
 
   function showOverlay(w) {
     if (!w.scene_caption) return;
-    el('ocLabel').textContent =
-      `${fmtTime(w.t_start)}–${fmtTime(w.t_end)} · ${w.agent.action}`;
+    const action = (w.agent && w.agent.action) || 'annotated';
+    el('ocLabel').textContent = `${fmtTime(w.t_start)}–${fmtTime(w.t_end)} · ${action}`;
     el('ocText').textContent = w.scene_caption;
     el('overlay').classList.add('show');
   }
 
-  const CONF_FIELDS = [
-    ['camera', 'cam'],
-    ['agent', 'agent'],
-    ['entities', 'ent'],
-    ['events', 'events'],
-    ['ui_state', 'ui'],
-  ];
-
-  function confColor(v) {
-    if (v >= 75) return 'var(--green)';
-    if (v >= 50) return 'var(--amber)';
-    return 'var(--red)';
-  }
-
-  function addAnnotation(w, salience) {
+  function addAnnotation(w) {
     const feed = el('tabFeed');
-    if (feed.querySelector('.empty')) feed.innerHTML = '';
+    const empty = feed.querySelector('.empty');
+    if (empty) empty.remove();
 
     const chips = [];
     for (const ev of w.events || []) {
@@ -927,33 +1692,27 @@
 
     const reward = w.reward_signal || 0;
     const rewardCls = reward > 0.05 ? 'pos' : reward < -0.05 ? 'neg' : '';
-
-    const conf = CONF_FIELDS.map(([key, label]) => {
-      const v = (w.uncertainty && w.uncertainty[key]) || 0;
-      return `<div class="conf">
-        <div class="conf-label">${label}</div>
-        <div class="conf-bar"><div class="conf-fill" style="width:${v}%;background:${confColor(v)}"></div></div>
-      </div>`;
-    }).join('');
+    const action = (w.agent && w.agent.action) || '—';
 
     const div = document.createElement('div');
     div.className = 'ann';
     div.innerHTML = `
       <div class="ann-head">
         <span class="ann-time">${fmtTime(w.t_start)}–${fmtTime(w.t_end)}</span>
-        <span class="ann-action">${esc(w.agent.action)}</span>
+        <span class="ann-action">${esc(action)}</span>
         <span class="ann-reward ${rewardCls}">${reward >= 0 ? '+' : ''}${reward.toFixed(2)}</span>
       </div>
       <div class="ann-caption">${esc(w.scene_caption)}</div>
-      ${chips.length ? `<div class="chips">${chips.join('')}</div>` : ''}
-      <div class="conf-grid">${conf}</div>`;
+      ${chips.length ? `<div class="chips">${chips.join('')}</div>` : ''}`;
     feed.insertBefore(div, feed.firstChild);
     trim(feed, 60);
+    el('feedCount').textContent = fmtNum(state.seenWindows.size);
   }
 
   function addSkip(d) {
     const feed = el('tabFeed');
-    if (feed.querySelector('.empty')) feed.innerHTML = '';
+    const empty = feed.querySelector('.empty');
+    if (empty) empty.remove();
     const div = document.createElement('div');
     div.className = 'ann skip';
     div.innerHTML = `
@@ -967,13 +1726,80 @@
     trim(feed, 60);
   }
 
+  // Repeated identical failures collapse into one counted card. A wall of
+  // sixty identical red rows tells an audience the product is broken; one row
+  // that says "×60" tells the operator the same thing without the theatre.
   function addError(d) {
+    const message = String((d && d.message) || 'annotation error');
     const feed = el('tabFeed');
-    if (feed.querySelector('.empty')) feed.innerHTML = '';
+    const empty = feed.querySelector('.empty');
+    if (empty) empty.remove();
+
+    const existing = state.errorCards.get(message);
+    if (existing) {
+      existing.count += 1;
+      existing.countNode.textContent = `×${existing.count}`;
+      return existing.count;
+    }
+
     const div = document.createElement('div');
     div.className = 'ann err';
-    div.innerHTML = `<div class="ann-caption">${esc(d.message || 'annotation error')}</div>`;
+    div.innerHTML =
+      `<div class="ann-head"><span class="ann-action" ` +
+      `style="background:rgba(255,95,109,0.16);color:var(--red)">error</span>` +
+      `<span class="ann-err-count">×1</span></div>` +
+      `<div class="ann-caption">${esc(message)}</div>`;
     feed.insertBefore(div, feed.firstChild);
+    state.errorCards.set(message, {
+      count: 1,
+      countNode: div.querySelector('.ann-err-count'),
+    });
+    return 1;
+  }
+
+  function onServerError(d) {
+    const count = addError(d);
+    setDiag('last pipeline error', String((d && d.message) || '').slice(0, 200));
+
+    if (d && d.fatal) {
+      state.finished = true;
+      state.running = false;
+      el('startBtn').disabled = false;
+      el('stopBtn').classList.add('hidden');
+      setStatus('run failed', 'bad');
+      setStage('analyze', 'error', 'pipeline failed');
+      banner('bad', 'The run failed on the server', String(d.message || '').slice(0, 300),
+        { label: 'Restart', primary: true, onClick: () => restart() });
+      return;
+    }
+
+    if (count === 3) {
+      const d2 = diagnoseFailure();
+      banner(d2.kind, d2.title, d2.detail);
+    }
+  }
+
+  // Repeated annotation failures with a cold replay cache have exactly one
+  // cause worth naming, and it is the one that ruins a demo silently.
+  function diagnoseFailure() {
+    const backend = state.health && state.health.gemini && state.health.gemini.backend;
+    const cached = state.status ? state.status.cached_responses || 0 : null;
+    if (backend === 'replay' && cached === 0) {
+      return {
+        kind: 'bad',
+        title: 'Annotation is failing on every window',
+        detail:
+          'The model backend is in replay mode and the annotation cache is empty, ' +
+          'so no window can be annotated. Warm the cache with ' +
+          'scripts/warm_demo_cache.py, or set GEMINI_API_KEY / GCP_PROJECT.',
+      };
+    }
+    return {
+      kind: 'bad',
+      title: 'Windows are failing to annotate',
+      detail:
+        'Open Console → Diagnostics for the underlying error from the pipeline.',
+    };
   }
 
   function addRow(w) {
@@ -982,12 +1808,14 @@
     if (empty) empty.remove();
     const events = (w.events || []).map((e) => e.event_type).join('|') || '—';
     const causal = (w.events || []).some((e) => e.cause_event_id);
+    const agent = w.agent || {};
     const div = document.createElement('div');
     div.className = 'row-item';
     div.innerHTML =
       `<span class="k">${esc(w.window_id)}</span> ` +
-      `<span class="v">${w.t_start.toFixed(1)}</span> ` +
-      `<span class="k">${esc(w.agent.action_category)}/</span><span class="v">${esc(w.agent.action)}</span> ` +
+      `<span class="v">${(w.t_start || 0).toFixed(1)}</span> ` +
+      `<span class="k">${esc(agent.action_category)}/</span>` +
+      `<span class="v">${esc(agent.action)}</span> ` +
       `<span class="k">[${esc(events)}]</span> ` +
       `<span class="v">${(w.reward_signal || 0).toFixed(2)}</span> ` +
       `<span class="k">causal=</span><span class="v">${causal}</span>`;
@@ -997,48 +1825,190 @@
 
   function onSegment(d) {
     const s = d.segment;
+    if (!s || !s.segment_id) return;
     state.segments.set(s.segment_id, s);
+    setStage('select', 'active', `${state.segments.size} candidates`);
     renderRail();
   }
 
+  const blend = (s) => (s.score || 0) * 0.6 + (s.shareability || 0) * 0.4;
+
   function renderRail() {
     const rail = el('rail');
-    const items = [...state.segments.values()].sort(
-      (a, b) => (b.score * 0.6 + b.shareability * 0.4) - (a.score * 0.6 + a.shareability * 0.4)
-    );
+    const items = [...state.segments.values()].sort((a, b) => blend(b) - blend(a));
+    el('railCount').textContent = fmtNum(items.length);
+    bump('sHighlights', fmtNum(items.length));
+
     if (!items.length) {
-      rail.innerHTML = '<div class="empty">Candidates appear as the arbiter scores them.</div>';
+      rail.innerHTML =
+        '<div class="empty">Highlight candidates appear here, best first, as the arbiter scores them.</div>';
       return;
     }
+
     rail.innerHTML = items
       .map((s, i) => {
-        const blended = s.score * 0.6 + s.shareability * 0.4;
         const badges = [`<span class="badge">${esc(s.narrative_role)}</span>`];
         if (s.protected_chain) badges.push('<span class="badge chain">causal chain</span>');
         if (s.spoiler_risk >= 60) badges.push('<span class="badge spoiler">spoiler</span>');
         if (s.emotional_valence === 'funny') badges.push('<span class="badge funny">funny</span>');
-        return `<div class="reel-card${i === 0 ? ' top' : ''}">
-          <div class="reel-rank">${i + 1}</div>
+        const dur = Math.max(0, (s.t_end || 0) - (s.t_start || 0));
+        return `<div class="reel-card${i === 0 ? ' top' : ''}" data-seg="${esc(s.segment_id)}">
+          <div class="thumb" data-thumb="${esc(s.segment_id)}">
+            <div class="thumb-rank">${i + 1}</div>
+            <div class="thumb-fallback">${fmtTime(s.t_start)}</div>
+          </div>
           <div class="reel-body">
-            <div class="reel-label">${esc(s.label || s.narrative_role)}</div>
-            <div class="reel-meta">${fmtTime(s.t_start)}–${fmtTime(s.t_end)} · share ${s.shareability} · ${esc(s.pacing)}</div>
+            <div class="reel-top">
+              <div class="reel-label">${esc(s.label || s.narrative_role)}</div>
+              <div class="reel-score">${blend(s).toFixed(0)}</div>
+            </div>
+            <div class="reel-meta">${fmtTime(s.t_start)}–${fmtTime(s.t_end)} · ${dur.toFixed(1)}s · share ${s.shareability}</div>
             <div class="reel-badges">${badges.join('')}</div>
           </div>
-          <div class="reel-score">${blended.toFixed(0)}</div>
         </div>`;
       })
       .join('');
+
+    markPicks(items);
+    if (state.thumbs) queueThumbs(items.slice(0, 8));
   }
+
+  function markPicks(items) {
+    if (!state.duration) return;
+    const tl = el('timeline');
+    tl.querySelectorAll('.tl-pick').forEach((n) => n.remove());
+    for (const s of items.slice(0, 5)) {
+      const div = document.createElement('div');
+      div.className = 'tl-pick';
+      div.style.left = `${((s.t_start || 0) / state.duration) * 100}%`;
+      div.style.width = `${Math.max(0.4, (((s.t_end || 0) - (s.t_start || 0)) / state.duration) * 100)}%`;
+      div.title = `selected: ${s.label || s.narrative_role}`;
+      tl.appendChild(div);
+    }
+  }
+
+  // ---------- thumbnails ----------
+  //
+  // Frames are grabbed from the same locally-served file the player is using,
+  // by seeking a second hidden video element and drawing one frame to a canvas.
+  // No dependency, no network beyond the file already being served. If a grab
+  // fails or the browser will not seek, the card keeps its timestamp placeholder.
+
+  const thumbDone = new Set();
+  let thumbQueue = [];
+  let thumbRunning = false;
+
+  function queueThumbs(items) {
+    for (const s of items) {
+      if (thumbDone.has(s.segment_id)) {
+        paintCachedThumb(s.segment_id);
+        continue;
+      }
+      if (!thumbQueue.some((q) => q.segment_id === s.segment_id)) thumbQueue.push(s);
+    }
+    if (!thumbRunning) drainThumbs();
+  }
+
+  const thumbCache = new Map();
+
+  function paintCachedThumb(segId) {
+    const holder = document.querySelector(`[data-thumb="${segId}"]`);
+    const url = thumbCache.get(segId);
+    if (!holder || !url || holder.querySelector('img')) return;
+    const img = document.createElement('img');
+    img.src = url;
+    img.style.width = '100%';
+    img.style.height = '100%';
+    img.style.objectFit = 'cover';
+    img.style.display = 'block';
+    const fallback = holder.querySelector('.thumb-fallback');
+    if (fallback) fallback.remove();
+    holder.insertBefore(img, holder.firstChild);
+  }
+
+  async function drainThumbs() {
+    thumbRunning = true;
+    while (thumbQueue.length) {
+      const seg = thumbQueue.shift();
+      if (thumbDone.has(seg.segment_id)) continue;
+      try {
+        const url = await grabFrame(seg);
+        if (url) {
+          thumbCache.set(seg.segment_id, url);
+          thumbDone.add(seg.segment_id);
+          paintCachedThumb(seg.segment_id);
+        }
+      } catch (e) {
+        setDiag('thumbnails', 'unavailable: ' + (e && e.message));
+        thumbQueue = [];
+        break;
+      }
+    }
+    thumbRunning = false;
+  }
+
+  function grabFrame(seg) {
+    const vid = el('thumbSource');
+    const mid = Math.max(0.1, ((seg.t_start || 0) + (seg.t_end || 0)) / 2);
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (value, err) => {
+        if (settled) return;
+        settled = true;
+        vid.removeEventListener('seeked', onSeeked);
+        vid.removeEventListener('error', onError);
+        clearTimeout(timer);
+        err ? reject(err) : resolve(value);
+      };
+      const onSeeked = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = 264;
+          canvas.height = 152;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+          finish(canvas.toDataURL('image/jpeg', 0.72));
+        } catch (e) {
+          finish(null, e);
+        }
+      };
+      const onError = () => finish(null, new Error('thumbnail video failed to load'));
+      const timer = setTimeout(() => finish(null), 5000);
+      vid.addEventListener('seeked', onSeeked, { once: true });
+      vid.addEventListener('error', onError, { once: true });
+      try {
+        vid.currentTime = mid;
+      } catch (e) {
+        finish(null, e);
+      }
+    });
+  }
+
+  // ---------- stats ----------
 
   function onStats(d) {
     state.lastStats = d;
     bump('sWindows', fmtNum(d.windows_annotated));
     bump('sEvents', fmtNum(d.events_extracted));
-    bump('sCausal', fmtNum(d.causal_links));
+
     const usage = d.usage || {};
     const tokens = (usage.input_tokens || 0) + (usage.output_tokens || 0);
-    bump('sTokens', fmtNum(tokens));
+    const calls = usage.calls || 0;
+    const hits = usage.cache_hits || 0;
+
+    el('sCache').textContent = `${fmtNum(hits)} / ${fmtNum(calls)}`;
+    el('sCache').className =
+      'stat-value' + (calls > 0 && hits === calls ? ' good' : hits > 0 ? '' : '');
+    el('sCacheSub').textContent =
+      calls > 0 ? `${Math.round((hits / calls) * 100)}% hit · ${fmtNum(calls - hits)} miss` : 'hits / calls';
+
     el('sCost').textContent = fmtCost(usage.cost_usd);
+    el('sCostSub').textContent = `${fmtNum(tokens)} tokens`;
+
+    el('sWindowsSub').textContent =
+      `${fmtNum(d.windows_triaged)} triaged · ${fmtNum(d.windows_skipped)} skipped`;
+    el('sEventsSub').textContent = `${fmtNum(d.causal_links)} causal links`;
+    setStage('analyze', 'active', `${fmtNum(d.windows_annotated)} annotated`);
     renderUsage(usage);
   }
 
@@ -1058,45 +2028,104 @@
         </div>`
       );
 
-    const extra = `<div class="usage-row" style="border-top:1px solid var(--border-bright)">
-        <div class="usage-model" style="color:var(--text-faint)">p50 / p95 latency</div>
-        <div class="usage-calls">${usage.p50_latency_ms || 0}ms / ${usage.p95_latency_ms || 0}ms</div>
+    const total = `<div class="usage-row total">
+        <div class="usage-model">Total</div>
+        <div class="usage-calls">${fmtNum(usage.calls)} calls · ${fmtNum(usage.cache_hits)} cache hits · p50 ${usage.p50_latency_ms || 0}ms / p95 ${usage.p95_latency_ms || 0}ms</div>
         <div class="usage-cost">${fmtCost(usage.cost_usd)}</div>
       </div>`;
 
-    body.innerHTML = rows.join('') + extra;
+    body.innerHTML = rows.join('') + total;
   }
 
   function onDone(d) {
     state.running = false;
+    state.finished = true;
+    state.reconnecting = false;
+    state.stalled = false;
     setStatus('complete', 'done');
     el('startBtn').disabled = false;
-    if (state.es) state.es.close();
+    el('stopBtn').classList.add('hidden');
+    if (state.es) { state.es.close(); state.es = null; }
+    clearBanner();
 
-    const ttr = d.time_to_reel_seconds;
-    if (typeof ttr === 'number') {
-      toast(
-        `Stream ended. Highlight reel ready ${ttr.toFixed(1)}s later — ` +
-        `dense annotation was already done.`
-      );
-    }
     if (d.segments) {
       for (const s of d.segments) state.segments.set(s.segment_id, s);
       renderRail();
     }
     if (d.annotation) onStats(d.annotation);
-    el('railNote').textContent =
-      `${state.segments.size} candidates · reel ready in ${(ttr || 0).toFixed(1)}s`;
+
+    const ttr = typeof d.time_to_reel_seconds === 'number' ? d.time_to_reel_seconds : null;
+    const picks = state.segments.size;
+
+    setStage('ingest', 'done', `${fmtTime(d.source_duration || state.duration)} ingested`);
+    setStage('analyze', 'done', `${fmtNum((d.annotation || {}).windows_annotated || 0)} windows annotated`);
+    setStage('select', picks ? 'done' : 'error', picks ? `${picks} candidates ranked` : 'no candidates');
+
+    // The service selects and orders the reel at stream end; it only cuts an
+    // mp4 when the session was finished with build_reel, which the demo path
+    // does not do. Say what actually happened rather than implying a file.
+    if (picks) {
+      const top = [...state.segments.values()].sort((a, b) => blend(b) - blend(a)).slice(0, 8);
+      const reelSeconds = top.reduce((acc, s) => acc + Math.max(0, (s.t_end || 0) - (s.t_start || 0)), 0);
+      setStage(
+        'reel',
+        'done',
+        `${top.length} clips · ${reelSeconds.toFixed(0)}s` + (ttr !== null ? ` · ready in ${ttr.toFixed(1)}s` : '')
+      );
+      el('railNote').textContent =
+        `${picks} candidates` + (ttr !== null ? ` · reel ready ${ttr.toFixed(1)}s after stream end` : '');
+      if (ttr !== null) {
+        toast(
+          `Stream ended. Highlight reel selected and ordered ${ttr.toFixed(1)}s later — ` +
+          `dense annotation was already done.`
+        );
+      }
+    } else {
+      setStage('reel', 'error', 'nothing to assemble');
+      // If windows were failing, the specific cause is more useful than the
+      // symptom, so it is not overwritten with a vaguer summary here.
+      if (state.errorCards.size) {
+        const d3 = diagnoseFailure();
+        banner(d3.kind, d3.title, d3.detail);
+      } else {
+        banner(
+          'warn',
+          'The run finished but produced no highlight candidates',
+          'Every window was skipped in triage. Open Console → Diagnostics for the ' +
+            'salience scores.'
+        );
+      }
+    }
+
+    if (d.reel && d.reel.output_path) {
+      banner('info', 'Highlight reel assembled', 'The service cut an mp4 for this session.', {
+        label: 'Open reel',
+        primary: true,
+        onClick: () => window.open(`${API}/demo/reel?session_id=${state.sessionId}`, '_blank'),
+      });
+    }
+
+    setDiag('wall seconds', String(d.wall_seconds));
+    setDiag('time to reel seconds', String(d.time_to_reel_seconds));
+    // The pre-flight panel deliberately stays hidden here: bringing it back at
+    // the moment the reel lands would push the whole stage down on screen. It
+    // returns on an explicit stop, and Restart is always in the header.
   }
 
   // ---------- playhead ----------
 
   function tick() {
-    if (!state.running && !state.lastStats) return;
     const v = el('video');
-    if (state.duration > 0 && isFinite(v.currentTime)) {
-      el('playhead').style.left = `${Math.min(100, (v.currentTime / state.duration) * 100)}%`;
-      el('sStream').textContent = fmtTime(v.currentTime);
+    if (state.duration > 0) {
+      // Fall back to the wall clock when the player is not the source of truth,
+      // so a video that fails to load cannot make a healthy run look frozen.
+      const wall = ((performance.now() - state.startedAt) / 1000) * state.speed;
+      const pos = state.videoOk && isFinite(v.currentTime) && v.currentTime > 0
+        ? v.currentTime
+        : Math.min(wall, state.duration);
+      el('playhead').style.left = `${Math.min(100, (pos / state.duration) * 100)}%`;
+      el('tlNow').textContent = fmtTime(pos);
+      if (state.running) setStage('ingest', 'active', `${fmtTime(pos)} / ${fmtTime(state.duration)}`);
     }
     if (state.running) requestAnimationFrame(tick);
   }
@@ -1105,25 +2134,52 @@
     while (node.children.length > max) node.lastChild.remove();
   }
 
-  // ---------- tabs ----------
+  // ---------- drawer ----------
+
+  function openDrawer(open) {
+    el('drawer').classList.toggle('open', open);
+  }
 
   document.querySelectorAll('.tab').forEach((tab) => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
       tab.classList.add('active');
-      const target = tab.dataset.tab;
-      for (const name of ['feed', 'rows', 'usage']) {
-        el('tab' + name[0].toUpperCase() + name.slice(1)).classList.toggle(
-          'hidden',
-          name !== target
-        );
-      }
+      const target = tab.dataset.pane;
+      document.querySelectorAll('.drawer-pane').forEach((p) => {
+        p.classList.toggle('active', p.id === 'pane' + target[0].toUpperCase() + target.slice(1));
+      });
     });
   });
 
-  el('startBtn').addEventListener('click', start);
-  el('video').addEventListener('timeupdate', () => {
-    if (!state.running) el('sStream').textContent = fmtTime(el('video').currentTime);
+  // ---------- wiring ----------
+
+  el('startBtn').addEventListener('click', () => start());
+  el('readyStartBtn').addEventListener('click', () => start());
+  el('stopBtn').addEventListener('click', () => stop(false));
+  el('restartBtn').addEventListener('click', () => restart());
+  el('logBtn').addEventListener('click', () => openDrawer(!el('drawer').classList.contains('open')));
+  el('drawerClose').addEventListener('click', () => openDrawer(false));
+  el('bannerDismiss').addEventListener('click', clearBanner);
+
+  el('contentSel').addEventListener('change', renderReadiness);
+  el('speedSel').addEventListener('change', renderReadiness);
+
+  el('video').addEventListener('error', () => {
+    state.videoOk = false;
+    if (!state.running) return;
+    banner(
+      'warn',
+      'The gameplay preview will not play in this browser',
+      'Annotation runs on the server and is unaffected — the numbers and the ' +
+        'annotation feed are still live.'
+    );
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+    if (e.key === 'l' || e.key === 'L') {
+      openDrawer(!el('drawer').classList.contains('open'));
+    }
   });
 
   boot();

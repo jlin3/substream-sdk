@@ -36,6 +36,10 @@ router = APIRouter(tags=["live"])
 # Guards against a client streaming until the disk fills.
 MAX_INGEST_BYTES = int(os.environ.get("MAX_INGEST_BYTES", str(4 * 1024 * 1024 * 1024)))
 
+# Pacers for in-flight replays, so an operator can abort a run from the console
+# instead of waiting it out or restarting the service.
+_active_pacers: dict[str, WallClockPacer] = {}
+
 
 class CreateSessionRequest(BaseModel):
     game_title: Optional[str] = Field(default=None)
@@ -255,12 +259,18 @@ async def start_replay(
         raise HTTPException(status_code=404, detail=f"No such file: {req.source_path}")
     session = registry.create(game_title=req.game_title)
     pacer = WallClockPacer(session, req.source_path, speed=req.speed)
+    _active_pacers[session.session_id] = pacer
 
     async def run() -> None:
         try:
             await pacer.run(run_arbiter=req.run_arbiter)
-        except Exception:
+        except Exception as exc:
             logger.exception("[%s] Replay failed", session.session_id)
+            # Without this the browser waits on a stream that will never produce
+            # another event, and a dead run just looks like a slow one.
+            await session.publish_error(f"replay failed: {exc}", fatal=True)
+        finally:
+            _active_pacers.pop(session.session_id, None)
 
     background.add_task(run)
     return {
@@ -270,6 +280,33 @@ async def start_replay(
         "paced_realtime": abs(req.speed - 1.0) < 1e-6,
         "annotations_sse": f"/api/v1/live/sessions/{session.session_id}/annotations",
     }
+
+
+@router.post("/live/replay/{session_id}/stop")
+async def stop_replay(session_id: str) -> dict[str, Any]:
+    """Abort an in-flight replay, so an operator can end a run from the console.
+
+    Stopping the pacer lets its own loop fall through to the `session.finish()`
+    it was always going to call, so the run ends exactly the way a completed one
+    does: one `done` event, one arbiter pass, no duplicated spend.
+    """
+    session = _require_session(session_id)
+    pacer = _active_pacers.get(session_id)
+    if pacer is not None:
+        pacer.stop()
+        return {"stopped": True, "was_pacing": True, "session_id": session_id}
+
+    # Nothing is pacing this session. If it already ended, say so rather than
+    # finishing it a second time and paying for another arbiter pass.
+    if session.stats.ended_at is not None:
+        return {
+            "stopped": False,
+            "was_pacing": False,
+            "already_finished": True,
+            "session_id": session_id,
+        }
+    await session.mark_ended()
+    return {"stopped": True, "was_pacing": False, "session_id": session_id}
 
 
 @router.post("/live/replay/upload")

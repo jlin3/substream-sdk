@@ -185,6 +185,17 @@ class LiveSession:
         for queue in stale:
             self._subscribers.discard(queue)
 
+    async def publish_error(self, message: str, *, fatal: bool = False) -> None:
+        """Surface a failure to every watching client.
+
+        A background task that dies without saying so leaves a console sitting
+        on "live" forever, which is the worst way for a demo to fail. `fatal`
+        marks the run as over so the UI can stop waiting.
+        """
+        await self._publish(
+            AnnotationEvent(kind="error", payload={"message": message, "fatal": fatal})
+        )
+
     async def events(self) -> AsyncIterator[AnnotationEvent]:
         """Async iterator over this session's events, for SSE/WS handlers."""
         queue = self.subscribe()
