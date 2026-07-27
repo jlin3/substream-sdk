@@ -59,6 +59,13 @@ class ModelRates:
 
 
 # Verified against Google's published pricing pages, July 2026.
+#
+# Re-checked 2026-07-27 against ai.google.dev/gemini-api/docs/pricing. Two ids
+# used by this pipeline are not on that page at all — `gemini-3.6-flash` and
+# `gemini-3.5-flash-lite`. Their rates below are therefore unverified estimates,
+# not published figures, and they are left untouched rather than guessed at,
+# because the triage and dense tiers feed the per-stream-hour cost quoted in
+# customer-facing material. See the note on each.
 MODEL_RATES: dict[str, ModelRates] = {
     "gemini-3.1-pro-preview": ModelRates(
         input_per_m=2.00,
@@ -67,21 +74,29 @@ MODEL_RATES: dict[str, ModelRates] = {
         long_input_per_m=4.00,
         long_output_per_m=18.00,
     ),
+    # UNVERIFIED: not on Google's published price list. Dense annotation is the
+    # largest cost line, so confirm before quoting a figure that depends on it.
     "gemini-3.6-flash": ModelRates(
         input_per_m=1.50, output_per_m=7.50, cached_input_per_m=0.15
     ),
+    # Published 2026-07-27: $1.50 in / $9.00 out / $0.15 cached. Confirmed.
     "gemini-3.5-flash": ModelRates(
         input_per_m=1.50, output_per_m=9.00, cached_input_per_m=0.15
     ),
+    # UNVERIFIED: not on Google's published price list. These three values are
+    # exactly Gemini 2.5 Flash's published rates, which suggests they were
+    # copied from that row. The nearest published Lite tier (3.1 Flash-Lite) is
+    # $0.25 / $1.50 / $0.025, i.e. cheaper — so this entry, if wrong, overstates
+    # triage cost and the quoted stream-hour figure is conservative.
     "gemini-3.5-flash-lite": ModelRates(
         input_per_m=0.30, output_per_m=2.50, cached_input_per_m=0.03
     ),
-    # Re-checked against Google's published Gemini pricing page on 2026-07-27:
-    # $0.25 in / $1.50 out per 1M tokens. The previous $0.30/$2.50 was stale.
-    # No pipeline stage defaults to this model, so no quoted cost figure moves.
-    # cached_input_per_m is left as-is: it was not part of that verification.
+    # Published 2026-07-27: $0.25 in / $1.50 out / $0.025 cached, all three
+    # confirmed on ai.google.dev/gemini-api/docs/pricing. The previous
+    # $0.30/$2.50/$0.03 was stale. No pipeline stage defaults to this model, so
+    # no quoted cost figure moves.
     "gemini-3.1-flash-lite": ModelRates(
-        input_per_m=0.25, output_per_m=1.50, cached_input_per_m=0.03
+        input_per_m=0.25, output_per_m=1.50, cached_input_per_m=0.025
     ),
 }
 
@@ -89,12 +104,21 @@ _FALLBACK_RATES = ModelRates(input_per_m=1.50, output_per_m=7.50, cached_input_p
 
 
 def rates_for(model: str) -> ModelRates:
-    """Resolve rates for a model id, tolerating version suffixes."""
+    """Resolve rates for a model id, tolerating version suffixes.
+
+    The longest matching prefix wins. This used to return the first match in
+    insertion order, which billed any suffixed id like
+    `gemini-3.5-flash-lite-preview-01` at the plain `gemini-3.5-flash` rate —
+    5x the input and 3.6x the output of the Lite entry it should have matched —
+    because the less specific key happened to be declared first.
+    """
     if model in MODEL_RATES:
         return MODEL_RATES[model]
-    for known, rate in MODEL_RATES.items():
-        if model.startswith(known):
-            return rate
+    matches = [
+        (known, rate) for known, rate in MODEL_RATES.items() if model.startswith(known)
+    ]
+    if matches:
+        return max(matches, key=lambda item: len(item[0]))[1]
     logger.warning("No published rates for model %s; using Flash-class estimate", model)
     return _FALLBACK_RATES
 
