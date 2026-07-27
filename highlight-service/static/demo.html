@@ -1114,6 +1114,13 @@
     el('statusPill').className = 'pill' + (cls ? ' ' + cls : '');
   }
 
+  // Stage 4's headline changes with the outcome, so "Reel ready" never sits
+  // above a line explaining that no reel was cut.
+  function setStageName(name, text) {
+    const node = document.querySelector(`.stage[data-stage="${name}"] .stage-name`);
+    if (node) node.textContent = text;
+  }
+
   function setStage(name, stateName, detail) {
     const node = document.querySelector(`.stage[data-stage="${name}"]`);
     if (node) node.dataset.state = stateName;
@@ -1540,6 +1547,7 @@
     el('tlNow').textContent = '0:00';
     el('overlay').classList.remove('show');
     ['ingest', 'analyze', 'select', 'reel'].forEach((s) => setStage(s, 'idle'));
+    setStageName('reel', 'Reel ready');
     setStage('analyze', 'idle', 'no windows yet');
     setStage('select', 'idle', 'no candidates yet');
     setStage('reel', 'idle', 'ready at stream end');
@@ -2252,10 +2260,12 @@
       const clips = reel.segment_count || (reel.segments || []).length;
       const dur = reel.total_duration || 0;
       const build = typeof d.reel_seconds === 'number' ? d.reel_seconds : null;
+      setStageName('reel', 'Reel ready');
       setStage(
         'reel',
         'done',
-        `${clips} clips · ${dur.toFixed(0)}s mp4` + (build !== null ? ` · built in ${build.toFixed(1)}s` : '')
+        `${clips} clip${clips === 1 ? '' : 's'} · ${dur.toFixed(0)}s mp4` +
+          (build !== null ? ` · built in ${build.toFixed(1)}s` : '')
       );
       el('railNote').textContent =
         `${picks} candidates · reel cut in ${(ttr || 0).toFixed(1)}s after stream end`;
@@ -2266,8 +2276,9 @@
       const best = Math.max(...[...state.segments.values()].map(blend));
       const floor = state.status && typeof state.status.reel_min_score === 'number'
         ? state.status.reel_min_score : 40;
+      setStageName('reel', 'Reel not cut');
       setStage('reel', 'warn',
-        `not cut · best clip ${best.toFixed(0)} of ${floor} needed`);
+        `best clip ${best.toFixed(0)}, needed ${floor}`);
       el('railNote').textContent =
         `${picks} candidates · none cleared the reel quality floor (${floor})`;
       banner(
