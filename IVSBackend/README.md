@@ -67,6 +67,32 @@ See [IVS_BACKEND_SETUP.md](../IVS_BACKEND_SETUP.md) for complete AWS setup instr
 
 ---
 
+## Cost calculator
+
+This app also serves the public infrastructure cost model at `/cost-calculator`
+(live at `https://substream.ai/cost-calculator`), from
+`src/components/CostModel/`.
+
+The pricing logic in `src/components/CostModel/model.ts` is **duplicated
+verbatim** in `docs-site/src/components/CostModel/model.ts`. The two apps have
+separate build graphs and no shared package, so there is no import to keep them
+honest — the copies must be kept byte-identical by hand, or the two surfaces
+will quote different numbers to the same customer. Check before committing:
+
+```bash
+diff IVSBackend/src/components/CostModel/model.ts \
+     docs-site/src/components/CostModel/model.ts
+```
+
+Only the model is shared. The UI layers differ on purpose: Tailwind here, CSS
+modules on the Docusaurus side.
+
+Rates in that file carry a source comment naming the vendor SKU and the date
+checked. `docs/PRICING_RECOMMENDATION.md` quotes figures derived from this
+model, so changing a rate means re-deriving the numbers in that document too.
+
+---
+
 ## Environment Variables
 
 See `env.example.txt` for all required configuration.

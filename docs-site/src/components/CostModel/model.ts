@@ -12,6 +12,23 @@
  * `computeCost` is the single entry point and is total: it normalizes its input
  * first, so no combination of user input can produce NaN, Infinity, or a
  * negative cost.
+ *
+ * DUPLICATED FILE. This model exists twice, once per app:
+ *
+ *   IVSBackend/src/components/CostModel/model.ts   (Next.js, serves substream.ai)
+ *   docs-site/src/components/CostModel/model.ts    (Docusaurus)
+ *
+ * The two apps have separate build graphs and no shared package, so the model
+ * is duplicated rather than imported. Both copies must stay byte-identical: a
+ * customer reading the docs site and a customer reading substream.ai have to
+ * get the same number. Only the UI layer differs (Tailwind in the Next.js app,
+ * CSS modules in Docusaurus). Verify from the repo root with:
+ *
+ *   diff IVSBackend/src/components/CostModel/model.ts \
+ *        docs-site/src/components/CostModel/model.ts
+ *
+ * Figures quoted in `docs/PRICING_RECOMMENDATION.md` are derived from this
+ * file. Changing a rate here means re-deriving them there.
  */
 
 // --- Units and rates -----------------------------------------------------

@@ -2,7 +2,9 @@
 
 For a large mobile-first studio embedding a Twitch-style streaming platform plus AI highlights.
 
-Infrastructure figures come from the interactive cost model published at **`/cost-calculator`** on the docs site (source: `docs-site/src/components/CostModel/`), built on AWS, LiveKit and bunny.net list prices verified 2026-07. That page is unlisted — not in the sidebar, not indexed — so it is shareable by link without being public. Every input is editable and the URL carries the configuration, so a specific scenario can be sent to the studio's finance team as a link.
+Infrastructure figures come from the interactive cost model published at **`https://substream.ai/cost-calculator`** (source: `IVSBackend/src/components/CostModel/`, with a byte-identical `model.ts` in `docs-site/`), built on AWS, LiveKit, bunny.net and Cloudflare list prices verified 2026-07-27. That page is unlisted — not in the sidebar, not indexed — so it is shareable by link without being public. Every input is editable and the URL carries the configuration, so a specific scenario can be sent to the studio's finance team as a link.
+
+Every infrastructure number below is reproducible from that page's **Pilot**, **Scaled studio** and **Twitch-scale** presets at NA/EU, 2.5 Mbps, and a 65/30/5 HD/SD/audio-only rendition mix. Where a figure needs other inputs, the inputs are named next to it.
 
 AI figures come from the tiered annotator's own cost meter, measured over four real titles, not estimated.
 
@@ -43,7 +45,7 @@ Itemized in the dashboard, reconciled monthly against actual AWS and GCP invoice
 
 **Why they should believe cost+20% is actually cheap.** Volume tiers reset monthly and are per-region. Aggregating many studios into one account clears tier steps that a single studio never reaches on its own, and at this volume AWS private pricing typically lands 15–30% below list. So cost+20% against *our* aggregated rate can land at or below their DIY cost against list. That is a testable claim, and it is the strongest thing we can say here.
 
-Commit in writing to passing through future rate reductions. The CDN migration below is worth 8–9x; if we keep that, the whole pass-through story was a lie and they will find out.
+Commit in writing to passing through future rate reductions. The CDN migration below is worth 13–14x; if we keep that, the whole pass-through story was a lie and they will find out.
 
 ### The fixed blended alternative
 
@@ -57,27 +59,31 @@ This is a genuine choice, not a trap. Run it against the model:
 
 | Scenario | Cost + 20% | Fixed blended | Better for them |
 |---|---|---|---|
-| Pilot — 10k stream-hrs, 25 viewers | $18.6k/mo | $17.3k/mo | Fixed |
-| Scaled — 200k stream-hrs, 40 viewers | $478k/mo | $540k/mo | Cost-plus |
-| Scaled, if on the hybrid HLS path | $597k/mo | $540k/mo | Fixed |
+| Pilot — 10k stream-hrs, 25 viewers | $18.2k/mo | $17.3k/mo | Fixed |
+| Scaled — 200k stream-hrs, 40 viewers | $465k/mo | $540k/mo | Cost-plus |
+| Scaled, if on the hybrid HLS path | $604k/mo | $540k/mo | Fixed |
 
-Cost-plus figures are against IVS Real-Time, which is the cheaper IVS path below ~60 concurrent viewers per stream. The fixed rate wins at pilot scale and on the HLS path, and loses at scale on WebRTC. That asymmetry is honest and worth showing them — it demonstrates the number was derived, not picked.
+The cost-plus column is 1.2x the sum of the calculator's ingest, live delivery, storage and clip-egress lines. It excludes the AI line, which is priced separately in section 3 — a blended cost-plus number that swallowed annotation would misrepresent both.
+
+Cost-plus figures are against IVS Real-Time, which is the cheaper IVS path below ~79 concurrent viewers per stream. The fixed rate wins at pilot scale and on the HLS path, and loses at scale on WebRTC. That asymmetry is honest and worth showing them — it demonstrates the number was derived, not picked.
 
 We absorb basis risk on regional mix, ABR mix, and low-viewer streams, and we keep the CDN-migration upside. That is the trade.
 
 ### What to tell them about the migration, up front
 
-At scale, delivery is the entire bill and IVS is the wrong place to buy it. IVS output never drops below $0.048 per viewer-hour; the same 720p30 bytes on a commodity CDN volume tier are about $0.0056 — roughly **9x cheaper at the floor, 13x at the first tier**.
+At scale, delivery is the entire bill and IVS is the wrong place to buy it. IVS output never drops below $0.048 per viewer-hour in NA/EU; the same 720p30 bytes cost about $0.0056 on the commodity CDN's first tier and $0.0034 at its floor — roughly **13x cheaper tier-for-tier at the first tier, 14x at the floor**.
 
 | Monthly volume | IVS Real-Time | Own origin + commodity CDN |
 |---|---|---|
-| 250k viewer-hrs | $15.5k | $2.6k |
-| 8M viewer-hrs | $399k | $53k |
-| 100M viewer-hrs | $4.9M | $639k |
+| 250k viewer-hrs | $14.8k | $2.6k |
+| 8M viewer-hrs | $381k | $52.5k |
+| 100M viewer-hrs | $4.71M | $639k |
+
+Both columns are ingest plus live delivery only, at 40 concurrent viewers per stream (25 at pilot scale), so the rows correspond to the Pilot, Scaled studio and Twitch-scale presets in order. The IVS column bills audio-only participants at a tenth of the standard rate, which is what AWS actually charges and what the calculator now computes.
 
 Start on IVS anyway. Time-to-market dominates at pilot scale, and the commodity path is a team to operate — the per-stream-hour figure above covers ingest, transcode and origin compute but not the engineers. Put the migration on the roadmap as a named milestone with a volume trigger rather than pretending IVS scales economically.
 
-**LiveKit is not the alternative.** At $0.03 per participant-hour plus $0.12/GB egress it lands near $0.166 per viewer-hour — about 3.3x IVS. It is priced for conversational AI with a handful of participants, not broadcast fanout. Mention it only to close it off.
+**LiveKit is not the alternative.** At $0.03 per participant-hour plus $0.12/GB egress it lands at $0.165 per viewer-hour — about 3.4x the IVS floor rate, and 1.7x IVS Real-Time on the full monthly bill at scaled volume. It is priced for conversational AI with a handful of participants, not broadcast fanout. Mention it only to close it off.
 
 ---
 
@@ -101,7 +107,7 @@ Where the money goes, per the cost meter: dense annotation 50%, narrative arbite
 
 The previously published **$0.50/highlight price is badly underwater** — roughly 5x below cost — and so is the $3.00/stream-hour live annotation figure in earlier drafts. Do not quote either. If $0.50 has already been shown to this studio, lead with the correction rather than letting them find it.
 
-**AI is not a rounding error against infrastructure.** At 40 concurrent viewers, delivery runs about $2.40 per stream-hour on commodity CDN while annotation runs $5.10. Annotation scales with *stream*-hours and delivery scales with *viewer*-hours, so for the long tail of streams with small audiences the model is the entire bill. Two levers keep this sane, and both should be in the contract: annotate on a **coverage fraction** rather than every stream, and gate annotation behind a minimum concurrent-viewer threshold so streams nobody watches are never annotated.
+**AI is not a rounding error against infrastructure.** At 40 concurrent viewers, delivery runs about $0.23 per stream-hour on commodity CDN — $0.35 including ingest, transcode and origin — and $2.82 on IVS Real-Time, while annotation runs $5.10 — the largest single line item on either path. Annotation scales with *stream*-hours and delivery scales with *viewer*-hours, so for the long tail of streams with small audiences the model is the entire bill. Two levers keep this sane, and both should be in the contract: annotate on a **coverage fraction** rather than every stream, and gate annotation behind a minimum concurrent-viewer threshold so streams nobody watches are never annotated.
 
 Live annotation still carries the highest price relative to cost because it is the differentiated capability — the reel is ready the instant the stream ends. It is also the line most exposed to model price moves in either direction, so keep the contract pinned to a per-unit price revisited annually rather than a cost-plus formula.
 
