@@ -2,7 +2,7 @@
 
 For a large mobile-first studio embedding a Twitch-style streaming platform plus AI highlights.
 
-Infrastructure figures come from the interactive cost model published at **`https://substream.ai/cost-calculator`** (source: `IVSBackend/src/components/CostModel/`, with a byte-identical `model.ts` in `docs-site/`), built on AWS, LiveKit, bunny.net and Cloudflare list prices verified 2026-07-27. That page is unlisted — not in the sidebar, not indexed — so it is shareable by link without being public. Every input is editable and the URL carries the configuration, so a specific scenario can be sent to the studio's finance team as a link.
+Infrastructure figures come from the interactive cost model published at **`https://substream.ai/cost-calculator`** (source: `IVSBackend/src/components/CostModel/`, with a byte-identical `model.ts` in `docs-site/`), built on AWS, LiveKit, bunny.net and Cloudflare list prices verified 2026-07-27. That page is linked from the site header as **Pricing** and is reachable in one click from anywhere on substream.ai. It is still `noindex`, so it does not surface in search results. Every input is editable and the URL carries the configuration, so a specific scenario can be sent to the studio's finance team as a link.
 
 Every infrastructure number below is reproducible from that page's **Pilot**, **Scaled studio** and **Twitch-scale** presets at NA/EU, 2.5 Mbps, and a 65/30/5 HD/SD/audio-only rendition mix. Where a figure needs other inputs, the inputs are named next to it.
 

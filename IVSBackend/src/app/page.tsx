@@ -7,6 +7,7 @@ import TwitchSiteDemo from '@/components/TwitchSiteDemo';
 import HeroPlatformDemo from '@/components/HeroPlatformDemo';
 import HighlightPipelineDemo from '@/components/HighlightPipelineDemo';
 import Globe from '@/components/ui/Globe';
+import { SiteFooter, SiteHeader } from '@/components/SiteChrome';
 import FlickeringGrid from '@/components/ui/FlickeringGrid';
 import SecurityShield from '@/components/ui/SecurityShield';
 import { FAQS } from '@/lib/faqs';
@@ -16,18 +17,6 @@ const geist = Geist({ subsets: ['latin'] });
 const BRAND = '#2B7FFF';
 
 // Substream wave mark (matches substream.ai navbar logo)
-function SubstreamLogo({ className }: { className?: string }) {
-  return (
-    <svg width="42" height="24" viewBox="0 0 42 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      <g clipPath="url(#ss_clip_home)">
-        <path d="M22.3546 0.96832C22.9097 0.390834 23.6636 0.0664062 24.4487 0.0664062C27.9806 0.0664062 31.3091 0.066408 34.587 0.0664146C41.1797 0.0664284 44.481 8.35854 39.8193 13.2082L29.6649 23.7718C29.1987 24.2568 28.4016 23.9133 28.4016 23.2274V13.9234L29.5751 12.7025C30.5075 11.7326 29.8472 10.0742 28.5286 10.0742H13.6016L22.3546 0.96832Z" fill={BRAND} />
-        <path d="M19.6469 23.0305C19.0919 23.608 18.338 23.9324 17.5529 23.9324C14.021 23.9324 10.6925 23.9324 7.41462 23.9324C0.821896 23.9324 -2.47942 15.6403 2.18232 10.7906L12.3367 0.227022C12.8029 -0.257945 13.6 0.0855283 13.6 0.771372L13.6 10.0754L12.4265 11.2963C11.4941 12.2662 12.1544 13.9246 13.473 13.9246L28.4001 13.9246L19.6469 23.0305Z" fill={BRAND} />
-      </g>
-      <defs><clipPath id="ss_clip_home"><rect width="42" height="24" fill="white" /></clipPath></defs>
-    </svg>
-  );
-}
-
 // ============================================================
 // Data
 // ============================================================
@@ -341,18 +330,7 @@ export default function LandingPage() {
         }
       `}</style>
 
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-6 py-4 border-b border-white/10 sticky top-0 bg-[#18181B]/85 backdrop-blur-lg z-30">
-        <Link href="/" className="flex items-center gap-2.5">
-          <SubstreamLogo className="h-5 w-auto" />
-          <span className="text-lg font-semibold">Substream</span>
-        </Link>
-        <div className="flex items-center gap-4">
-          <Link href="/docs" className="text-sm text-white/60 hover:text-white transition-colors">Docs</Link>
-          <Link href="/api/auth/demo-auto" className="hidden sm:block text-sm text-white/60 hover:text-white transition-colors">Dashboard</Link>
-          <Link href="/try" className={BTN_PRIMARY + ' h-9'}>See your platform</Link>
-        </div>
-      </nav>
+      <SiteHeader />
 
       {/* Hero — copy left, live platform demo right */}
       <header className="relative overflow-hidden px-6 pt-16 pb-16 lg:pt-20">
@@ -819,20 +797,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 py-8 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5 text-sm text-white/40">
-            <SubstreamLogo className="h-4 w-auto opacity-70" />
-            Substream — live streaming infrastructure for games
-          </div>
-          <div className="flex items-center gap-6 text-sm">
-            <Link href="/docs" className="text-white/40 hover:text-white transition-colors">Docs</Link>
-            <Link href="/product-demo" className="text-white/40 hover:text-white transition-colors">Product</Link>
-            <Link href="/demo" className="text-white/40 hover:text-white transition-colors">SDK Demo</Link>
-            <Link href="https://github.com/jlin3/substream-sdk" className="text-white/40 hover:text-white transition-colors">GitHub</Link>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

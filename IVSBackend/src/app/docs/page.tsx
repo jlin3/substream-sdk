@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { SiteFooter, SiteHeader } from '@/components/SiteChrome';
 
 const SECTIONS = [
   {
@@ -87,26 +88,7 @@ const DEMO_CREDS = [
 export default function DocsPage() {
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-        <Link href="/" className="text-lg font-bold tracking-tight">
-          <span className="text-brand-400">sub</span>stream
-        </Link>
-        <div className="flex items-center gap-3">
-          <Link href="/demo" className="text-sm text-white/60 hover:text-white transition-colors">
-            Demo
-          </Link>
-          <Link href="/api/auth/demo-auto" className="text-sm text-white/60 hover:text-white transition-colors">
-            Dashboard
-          </Link>
-          <Link
-            href="https://github.com/jlin3/substream-sdk"
-            className="rounded-lg border border-white/20 px-4 py-2 text-sm font-medium hover:bg-white/5 transition-colors"
-          >
-            GitHub
-          </Link>
-        </div>
-      </nav>
+      <SiteHeader />
 
       <div className="max-w-4xl mx-auto px-6 py-12 space-y-16">
         {/* Header */}
@@ -216,12 +198,16 @@ export default function DocsPage() {
 
         {/* Footer links */}
         <section className="border-t border-white/10 pt-8 flex flex-wrap gap-6 text-sm">
-          <Link href="/demo" className="text-brand-400 hover:text-brand-300">Interactive Demo</Link>
+          <Link href="/demo" className="text-brand-400 hover:text-brand-300">Live SDK demo</Link>
+          <Link href="/product-demo" className="text-brand-400 hover:text-brand-300">Product tour</Link>
+          <Link href="/cost-calculator" className="text-brand-400 hover:text-brand-300">Pricing</Link>
           <Link href="/api/auth/demo-auto" className="text-brand-400 hover:text-brand-300">Dashboard</Link>
           <Link href="https://github.com/jlin3/substream-sdk" className="text-brand-400 hover:text-brand-300">GitHub</Link>
           <Link href="https://github.com/jlin3/substream-sdk/tree/main/packages/web-sdk" className="text-brand-400 hover:text-brand-300">npm Package</Link>
         </section>
       </div>
+
+      <SiteFooter />
     </div>
   );
 }

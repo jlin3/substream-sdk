@@ -9,9 +9,11 @@ export const metadata: Metadata = {
 };
 
 /**
- * Unlisted shareable cost model. Same calculator as docs.livewave.ai/cost-calculator,
- * hosted here so the link is HTTPS-clean for sending to a studio finance team.
- * State round-trips through the query string.
+ * Linked from the site header as "Pricing". Kept `noindex` so it stays out of
+ * search results while remaining one click from anywhere on the site. Same
+ * calculator as docs.livewave.ai/cost-calculator, hosted here so the link is
+ * HTTPS-clean for sending to a studio finance team. State round-trips through
+ * the query string.
  */
 export default function CostCalculatorPage() {
   return <CostModel />;

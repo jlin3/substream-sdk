@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Geist } from 'next/font/google';
+import { SiteFooter, SiteHeader } from '@/components/SiteChrome';
 import {
   CostInputs,
   CostLineItemKey,
@@ -65,35 +66,6 @@ const PATH_COLORS: Record<DeliveryPathKey, string> = {
   cloudflareStream: '#A78BFA',
   livekitCloud: '#EF4444',
 };
-
-function SubstreamLogo({ className }: { className?: string }) {
-  return (
-    <svg
-      width="42"
-      height="24"
-      viewBox="0 0 42 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      aria-hidden>
-      <g clipPath="url(#ss_clip_cost)">
-        <path
-          d="M22.3546 0.96832C22.9097 0.390834 23.6636 0.0664062 24.4487 0.0664062C27.9806 0.0664062 31.3091 0.066408 34.587 0.0664146C41.1797 0.0664284 44.481 8.35854 39.8193 13.2082L29.6649 23.7718C29.1987 24.2568 28.4016 23.9133 28.4016 23.2274V13.9234L29.5751 12.7025C30.5075 11.7326 29.8472 10.0742 28.5286 10.0742H13.6016L22.3546 0.96832Z"
-          fill={BRAND}
-        />
-        <path
-          d="M19.6469 23.0305C19.0919 23.608 18.338 23.9324 17.5529 23.9324C14.021 23.9324 10.6925 23.9324 7.41462 23.9324C0.821896 23.9324 -2.47942 15.6403 2.18232 10.7906L12.3367 0.227022C12.8029 -0.257945 13.6 0.0855283 13.6 0.771372L13.6 10.0754L12.4265 11.2963C11.4941 12.2662 12.1544 13.9246 13.473 13.9246L28.4001 13.9246L19.6469 23.0305Z"
-          fill={BRAND}
-        />
-      </g>
-      <defs>
-        <clipPath id="ss_clip_cost">
-          <rect width="42" height="24" fill="white" />
-        </clipPath>
-      </defs>
-    </svg>
-  );
-}
 
 // --- primitives ----------------------------------------------------------
 
@@ -971,22 +943,7 @@ export default function CostModel() {
   return (
     <div
       className={`${geist.className} flex min-h-screen flex-col bg-[#18181B] text-[#FAFAFA] tracking-tight`}>
-      <nav className="sticky top-0 z-30 flex items-center justify-between border-b border-white/10 bg-[#18181B]/85 px-6 py-4 backdrop-blur-lg">
-        <Link href="/" className="flex items-center gap-2.5">
-          <SubstreamLogo className="h-5 w-auto" />
-          <span className="text-lg font-semibold">Substream</span>
-        </Link>
-        <div className="flex items-center gap-4">
-          <Link
-            href="/docs"
-            className="text-sm text-white/60 transition-colors hover:text-white">
-            Docs
-          </Link>
-          <Link href="/try" className={`${BTN_PRIMARY} h-9`}>
-            See your platform
-          </Link>
-        </div>
-      </nav>
+      <SiteHeader />
 
       <header className="relative overflow-hidden px-6 pb-10 pt-14">
         <div
@@ -1143,24 +1100,7 @@ export default function CostModel() {
         </div>
       </main>
 
-      <footer className="border-t border-white/10 px-6 py-8">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row">
-          <div className="flex items-center gap-2.5 text-sm text-white/40">
-            <SubstreamLogo className="h-4 w-auto opacity-70" />
-            Substream — live streaming infrastructure for games
-          </div>
-          <div className="flex items-center gap-6 text-sm">
-            <Link href="/docs" className="text-white/40 transition-colors hover:text-white">
-              Docs
-            </Link>
-            <Link
-              href="https://github.com/jlin3/substream-sdk"
-              className="text-white/40 transition-colors hover:text-white">
-              GitHub
-            </Link>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
