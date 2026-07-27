@@ -401,7 +401,17 @@ class LiveSession:
                     )
                 )
                 return
-            clip = WindowClip(index=index, t_start=start, t_end=end, data=data)
+            clip = WindowClip(
+                index=index,
+                t_start=start,
+                t_end=end,
+                data=data,
+                cache_identity=(
+                    None
+                    if self.frame_mode
+                    else f"{os.path.basename(self.recording_path)}|{start:.3f}|{end:.3f}|h480"
+                ),
+            )
             await self.annotator.process_clip(clip)
         except asyncio.CancelledError:
             raise

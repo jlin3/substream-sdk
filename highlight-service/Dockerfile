@@ -16,4 +16,7 @@ RUN mkdir -p /tmp/highlight-service
 ENV PORT=8080
 EXPOSE 8080
 
-CMD uvicorn main:app --host 0.0.0.0 --port $PORT
+# Pull prepared demo footage + annotation cache from GCS before serving.
+# The assets are too large for `railway up`; sync_demo_assets.py is the
+# path that keeps the demo console ready on a fresh container.
+CMD python scripts/sync_demo_assets.py download && uvicorn main:app --host 0.0.0.0 --port $PORT
