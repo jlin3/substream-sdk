@@ -44,9 +44,10 @@ final class AnnotationTapConfigTests: XCTestCase {
               "streamerId": "s1"
             }
             """
-        let config = try JSONDecoder().decode(
-            SubstreamBroadcastConfig.self, from: Data(json.utf8)
-        )
+        let config = try JSONDecoder()
+            .decode(
+                SubstreamBroadcastConfig.self, from: Data(json.utf8)
+            )
         XCTAssertNil(config.annotation)
         XCTAssertEqual(config.streamerId, "s1")
     }

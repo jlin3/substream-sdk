@@ -193,11 +193,13 @@ public struct AnnotationTapStats: Sendable {
             guard decision.accept else { return }
 
             // Encode inline, while ReplayKit's buffer is still guaranteed valid.
-            guard let jpeg = Self.encodeJPEG(
-                pixelBuffer: pixelBuffer,
-                maxDimension: config.maxDimension,
-                quality: config.jpegQuality
-            ) else {
+            guard
+                let jpeg = Self.encodeJPEG(
+                    pixelBuffer: pixelBuffer,
+                    maxDimension: config.maxDimension,
+                    quality: config.jpegQuality
+                )
+            else {
                 withLock {
                     inFlight -= 1
                     stats.framesDroppedEncodeFailed += 1
@@ -288,9 +290,10 @@ public struct AnnotationTapStats: Sendable {
             format.opaque = true
             let renderer = UIGraphicsImageRenderer(size: targetSize, format: format)
             let image = renderer.image { _ in
-                UIImage(cgImage: cgImage).draw(
-                    in: CGRect(origin: .zero, size: targetSize)
-                )
+                UIImage(cgImage: cgImage)
+                    .draw(
+                        in: CGRect(origin: .zero, size: targetSize)
+                    )
             }
             return image.jpegData(compressionQuality: CGFloat(quality))
         }
