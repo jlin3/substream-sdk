@@ -210,6 +210,9 @@ async def demo_status() -> dict[str, Any]:
         # this one response, so the two can never disagree about what is loaded.
         "content": content["content"],
         "manifest": content["manifest"],
+        # So the console can say *why* a run produced no reel rather than just
+        # reporting that it did not.
+        "reel_min_score": config.REEL_MIN_SCORE,
     }
 
 

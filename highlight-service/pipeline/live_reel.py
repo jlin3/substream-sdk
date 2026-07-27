@@ -26,6 +26,7 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
+import config
 from pipeline.highlight_selection import SelectedSegment
 from schemas.world_annotation import DenseWindow, NarrativeSegment
 
@@ -127,9 +128,11 @@ def select_reel_segments(
     windows: list[DenseWindow],
     target_duration: float = 90.0,
     stream_duration: Optional[float] = None,
-    min_score: float = 40.0,
+    min_score: Optional[float] = None,
 ) -> ReelPlan:
     """Choose and order the segments that make up the reel."""
+    if min_score is None:
+        min_score = config.REEL_MIN_SCORE
     if not segments:
         return ReelPlan([], 0.0, [], 0, 0)
 

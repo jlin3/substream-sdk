@@ -204,6 +204,7 @@
   .stage[data-state="active"] { background: rgba(91,140,255,0.09); }
   .stage[data-state="done"] { background: rgba(53,212,154,0.06); }
   .stage[data-state="error"] { background: rgba(255,95,109,0.09); }
+  .stage[data-state="warn"] { background: rgba(255,182,72,0.08); }
 
   .stage-num {
     width: 28px; height: 28px; border-radius: 50%;
@@ -225,6 +226,10 @@
   .stage[data-state="error"] .stage-num {
     background: var(--red); border-color: var(--red); color: #2a0508;
   }
+  .stage[data-state="warn"] .stage-num {
+    background: var(--amber); border-color: var(--amber); color: #2a1c02;
+  }
+  .stage[data-state="warn"] .stage-name { color: var(--text); }
 
   .stage-body { min-width: 0; }
   .stage-name {
@@ -1512,6 +1517,7 @@
     state.finished = false;
     state.finishing = null;
     state.reelUrl = null;
+    state.reelSkipped = false;
     el('tabFeed').innerHTML =
       '<div class="empty">Each window the model annotates appears here as it lands.</div>';
     el('rowsBody').innerHTML =
@@ -1908,8 +1914,18 @@
   }
 
   function onServerError(d) {
+    const message = String((d && d.message) || '');
+    setDiag('last pipeline error', message.slice(0, 200));
+
+    // Not a fault: the arbiter simply scored nothing above the reel's quality
+    // floor. Reporting it as an error card implies the pipeline broke, and it
+    // is the one message an audience would read over the presenter's shoulder.
+    if (/no segments cleared selection/i.test(message)) {
+      state.reelSkipped = true;
+      return;
+    }
+
     const count = addError(d);
-    setDiag('last pipeline error', String((d && d.message) || '').slice(0, 200));
 
     if (d && d.fatal) {
       state.finished = true;
@@ -2246,6 +2262,21 @@
       playReel();
       setDiag('reel path', reel.output_path);
       setDiag('reel seconds (ffmpeg)', String(d.reel_seconds));
+    } else if (picks && state.reelSkipped) {
+      const best = Math.max(...[...state.segments.values()].map(blend));
+      const floor = state.status && typeof state.status.reel_min_score === 'number'
+        ? state.status.reel_min_score : 40;
+      setStage('reel', 'warn',
+        `not cut · best clip ${best.toFixed(0)} of ${floor} needed`);
+      el('railNote').textContent =
+        `${picks} candidates · none cleared the reel quality floor (${floor})`;
+      banner(
+        'warn',
+        'No clip cleared the reel quality bar, so no reel was cut',
+        `The best candidate in this run scored ${best.toFixed(0)}; a clip needs ` +
+          `${floor} to make the reel. The annotation above is complete and correct — ` +
+          `this is the reel's editorial threshold, not a failure.`
+      );
     } else if (picks) {
       const top = [...state.segments.values()].sort((a, b) => blend(b) - blend(a)).slice(0, 8);
       const reelSeconds = top.reduce((acc, s) => acc + Math.max(0, (s.t_end || 0) - (s.t_start || 0)), 0);

@@ -105,6 +105,12 @@ MAX_VIDEO_DURATION_SECONDS = int(os.environ.get("MAX_VIDEO_DURATION_SECONDS", "3
 MIN_VIDEO_DURATION_SECONDS = int(os.environ.get("MIN_VIDEO_DURATION_SECONDS", "60"))
 DEFAULT_HIGHLIGHT_DURATION_SECONDS = int(os.environ.get("DEFAULT_HIGHLIGHT_DURATION_SECONDS", "90"))
 
+# Blended-score floor a candidate must clear to appear in an assembled reel.
+# Exposed as an env var only so the bar can be moved without a code change; the
+# default is the long-standing 40 and is deliberately not lowered here, because
+# what counts as reel-worthy is a product judgement rather than a config detail.
+REEL_MIN_SCORE = float(os.environ.get("REEL_MIN_SCORE", "40.0"))
+
 TEMP_DIR = os.environ.get("TEMP_DIR", "/tmp/highlight-service")
 
 # Quality review
