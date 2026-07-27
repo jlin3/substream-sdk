@@ -379,14 +379,61 @@
 
   /* ---------- video ---------- */
 
+  /* The frame is sized from the source's own aspect ratio rather than assuming
+     16:9, because two of the prepared titles are portrait phone capture. The
+     ratio is known from the content manifest before playback starts, so the
+     stage does not reflow when the video's dimensions arrive. */
+  .video-stage {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    height: 46vh;
+    background: #000;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  /* Slightly taller than the 16:9 stage, but not so tall that it starves the
+     annotation feed underneath. */
+  body.is-portrait .video-stage { height: 48vh; }
+
   .video-wrap {
     position: relative;
+    height: 100%;
+    aspect-ratio: var(--src-ar, 16 / 9);
+    flex: 0 0 auto;
+    margin: 0 auto;
     background: #000;
-    aspect-ratio: 16 / 9;
-    flex-shrink: 0;
-    max-height: 46vh;
   }
+  body.is-portrait .video-wrap { margin: 0 0 0 28px; }
   .video-wrap video { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+  /* Portrait capture leaves most of a 16:9 stage empty. Rather than let that
+     read as a broken layout, the space carries the caption the overlay would
+     otherwise print across the video. */
+  .video-side { display: none; }
+  body.is-portrait .video-side {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+    padding: 22px 26px;
+    background: var(--bg-raised);
+    border-left: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .vs-title { font-size: 22px; font-weight: 700; letter-spacing: -0.015em; }
+  .vs-meta {
+    font-family: var(--mono);
+    font-size: 13px; color: var(--text-faint);
+  }
+  .vs-label {
+    margin-top: 8px;
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--cyan); font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .vs-caption { font-size: 19px; line-height: 1.5; color: var(--text); }
 
   .video-empty {
     position: absolute; inset: 0;
@@ -413,6 +460,7 @@
     transition: opacity 0.25s ease;
   }
   .overlay-caption.show { opacity: 1; }
+  body.is-portrait .overlay-caption { display: none; }
   .overlay-caption .oc-label {
     font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
     color: var(--cyan); font-weight: 700; margin-bottom: 3px;
@@ -880,15 +928,23 @@
 
 <main>
   <div class="col">
-    <div class="video-wrap">
-      <video id="video" muted playsinline></video>
-      <div class="video-empty" id="videoEmpty">
-        Gameplay plays here while the model annotates it.<br />
-        <span style="color:var(--text-faint);font-size:14px">Press Start stream.</span>
+    <div class="video-stage" id="videoStage">
+      <div class="video-wrap" id="videoWrap">
+        <video id="video" muted playsinline></video>
+        <div class="video-empty" id="videoEmpty">
+          Gameplay plays here while the model annotates it.<br />
+          <span style="color:var(--text-faint);font-size:14px">Press Start stream.</span>
+        </div>
+        <div class="overlay-caption" id="overlay">
+          <div class="oc-label" id="ocLabel">annotating</div>
+          <div id="ocText"></div>
+        </div>
       </div>
-      <div class="overlay-caption" id="overlay">
-        <div class="oc-label" id="ocLabel">annotating</div>
-        <div id="ocText"></div>
+      <div class="video-side" id="videoSide">
+        <div class="vs-title" id="vsTitle">—</div>
+        <div class="vs-meta" id="vsMeta">portrait capture</div>
+        <div class="vs-label" id="vsLabel">annotating</div>
+        <div class="vs-caption" id="vsText">Waiting for the first annotated window.</div>
       </div>
     </div>
 
@@ -982,6 +1038,7 @@
     sessionId: null,
     source: null,
     sourceTitle: '',
+    sourceAspect: null,
     duration: 0,
     speed: 1,
     startedAt: 0,
@@ -1147,6 +1204,12 @@
     return [];
   }
 
+  function selectedItem() {
+    const opt = el('contentSel').selectedOptions[0];
+    if (!opt || !opt.value) return null;
+    return contentItems().find((c) => c.path === opt.value) || null;
+  }
+
   function populateContent() {
     const sel = el('contentSel');
     sel.innerHTML = '';
@@ -1293,6 +1356,8 @@
     el('readyLamp').className = 'ready-lamp ' + lamp;
     el('readyHeadline').textContent = headline;
     el('readySub').textContent = sub;
+
+    applySourceAspect(selectedItem());
   }
 
   function showReadiness(show) {
@@ -1318,6 +1383,7 @@
     resetView();
     showReadiness(false);
 
+    applySourceAspect(selectedItem());
     state.source = opt.value;
     state.sourceTitle = opt.dataset.title || '';
     state.duration = parseFloat(opt.dataset.duration) || 0;
@@ -1665,9 +1731,28 @@
   function showOverlay(w) {
     if (!w.scene_caption) return;
     const action = (w.agent && w.agent.action) || 'annotated';
-    el('ocLabel').textContent = `${fmtTime(w.t_start)}–${fmtTime(w.t_end)} · ${action}`;
+    const label = `${fmtTime(w.t_start)}–${fmtTime(w.t_end)} · ${action}`;
+    el('ocLabel').textContent = label;
     el('ocText').textContent = w.scene_caption;
     el('overlay').classList.add('show');
+    // Portrait runs read the caption from the side panel instead; both are kept
+    // current so switching titles never shows a stale caption.
+    el('vsLabel').textContent = label;
+    el('vsText').textContent = w.scene_caption;
+  }
+
+  // Aspect ratio comes from the manifest, so the frame is correct before the
+  // first byte of video arrives and the stage never jumps.
+  function applySourceAspect(item) {
+    const w = item && parseFloat(item.width);
+    const h = item && parseFloat(item.height);
+    const ratio = w > 0 && h > 0 ? w / h : null;
+    document.body.classList.toggle('is-portrait', ratio !== null && ratio < 1);
+    el('videoWrap').style.setProperty('--src-ar', ratio ? `${w} / ${h}` : '16 / 9');
+    state.sourceAspect = ratio;
+    el('vsTitle').textContent = (item && item.title) || '—';
+    el('vsMeta').textContent =
+      ratio ? `${Math.round(w)}×${Math.round(h)} · portrait capture` : '';
   }
 
   function addAnnotation(w) {
@@ -1966,7 +2051,22 @@
           canvas.width = 264;
           canvas.height = 152;
           const ctx = canvas.getContext('2d');
-          ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+          // Centre-crop to the card's shape rather than scaling the whole frame
+          // into it, which squashed portrait capture out of proportion.
+          const sw = vid.videoWidth || canvas.width;
+          const sh = vid.videoHeight || canvas.height;
+          const target = canvas.width / canvas.height;
+          let cw = sw;
+          let ch = sw / target;
+          if (ch > sh) {
+            ch = sh;
+            cw = sh * target;
+          }
+          ctx.drawImage(
+            vid,
+            (sw - cw) / 2, (sh - ch) / 2, cw, ch,
+            0, 0, canvas.width, canvas.height
+          );
           finish(canvas.toDataURL('image/jpeg', 0.72));
         } catch (e) {
           finish(null, e);
@@ -2163,6 +2263,18 @@
 
   el('contentSel').addEventListener('change', renderReadiness);
   el('speedSel').addEventListener('change', renderReadiness);
+
+  // Only a safety net: a hand-dropped file with no manifest entry has no known
+  // dimensions, so fall back to what the decoder reports.
+  el('video').addEventListener('loadedmetadata', () => {
+    const v = el('video');
+    if (state.sourceAspect || !v.videoWidth || !v.videoHeight) return;
+    applySourceAspect({
+      title: state.sourceTitle,
+      width: v.videoWidth,
+      height: v.videoHeight,
+    });
+  });
 
   el('video').addEventListener('error', () => {
     state.videoOk = false;
