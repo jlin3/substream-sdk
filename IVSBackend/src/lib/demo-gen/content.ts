@@ -76,6 +76,80 @@ function videosFor(genre: string): string[] {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Brand-specific overrides (slug → real footage + themed copy)
+// Used when a generated /d/[slug] should show the actual game rather
+// than the generic genre pool (e.g. Stumble Guys sales demos).
+// All YouTube IDs verified embeddable via oEmbed.
+// ─────────────────────────────────────────────────────────────────
+
+interface BrandContentOverride {
+  genreLabel: string;
+  /** Longer gameplay / tournament VODs for the "live" player */
+  videos: string[];
+  /** Short highlight compilations for the clips rail */
+  clipVideos: string[];
+  titles: string[];
+  clipTitles: string[];
+  names: string[];
+  chatLines: string[];
+  categories: { label: string; videoId: string }[];
+}
+
+const BRAND_OVERRIDES: Record<string, BrandContentOverride> = {
+  'stumble-guys': {
+    genreLabel: 'Party Royale',
+    videos: [
+      'leUDdRXMhhI', // Stumble Guys (2025) gameplay 4K
+      'zkG_eOrwSNo', // Official Creators vs Creators tournament finals
+      'yhMAmaSlpuk', // $12k Stumble Guys Showdown (live VOD)
+      'b28VXIES5zY', // 32-player Grand Prix lobby
+      '19BXQXN7cUM', // Stumble Guys (2023) gameplay 4K
+    ],
+    clipVideos: [
+      'HyLSir7npTM', // Top 100 Super Punch moments
+      'KkTUYL5Q-u4', // Block Dash Endless clutch
+      'hDXi-UTZA30', // Super Slide race showdown
+      'cdX5Z0Mli3Y', // Punch training highlight
+      'KvW6Sx97A9k', // Best moments compilation
+    ],
+    titles: [
+      'Block Dash Endless — wave 1000 grind',
+      'Ranked climb to Champion',
+      'Stumble Cup custom lobby night',
+      'Creators tournament practice',
+      'Grand Prix 32-player lobby',
+      'Super Punch only challenge',
+    ],
+    clipTitles: [
+      'Last-second Block Dash save',
+      'Super Punch yeet into the void',
+      'Wave 1000 clutch underblock',
+      'Perfect shortcut on Tile Fall',
+      'Final round 1v1 stumble',
+    ],
+    names: [
+      'TrentSG', 'ChenteSG', 'BlockDashKing', 'PunchQueen', 'StumbleAce',
+      'WaveWalker', 'LobbyLegend', 'DashDemon', 'TileHopper', 'CrownClutch',
+      'NeonStumble', 'GemsGoblin', 'RoyaleRookie', 'FinalCircle', 'SkinCollector',
+    ],
+    chatLines: [
+      'LETS GOOO', 'that punch tho', 'BLOCK DASH clutch', 'clip it', 'CLIP THAT',
+      'how did you make that jump??', 'gg', 'W', 'stumble king', 'first time here, this is sick',
+      'POG', 'sheeesh', 'that underblock was dirty', 'ok that was actually cracked',
+      'wave 1000 energy', 'been grinding ranked all week', 'do that again', 'skin check?',
+      'built different', 'someone gif this', 'run it back', 'one more lobby', 'MVP', 'carried',
+    ],
+    categories: [
+      { label: 'Block Dash Endless', videoId: 'KkTUYL5Q-u4' },
+      { label: 'Ranked', videoId: 'leUDdRXMhhI' },
+      { label: 'Stumble Cup', videoId: 'zkG_eOrwSNo' },
+      { label: 'Grand Prix', videoId: 'b28VXIES5zY' },
+      { label: 'Party Mode', videoId: 'yhMAmaSlpuk' },
+    ],
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────
 // Persona + copy pools per vertical
 // ─────────────────────────────────────────────────────────────────
 
@@ -251,12 +325,18 @@ export interface SimContent {
 export function buildSimContent(slug: string, genre: string): SimContent {
   const vertical = verticalForGenre(genre);
   const seed = hashString(slug);
-  const videos = videosFor(genre);
-  const titles = TITLES[genre] || TITLES.shooter;
-  const clipTitles = CLIPS[genre] || CLIPS.shooter;
-  const names = NAMES[vertical];
+  const brand = BRAND_OVERRIDES[slug];
+
+  const videos = brand?.videos ?? videosFor(genre);
+  const clipVideos = brand?.clipVideos ?? videos;
+  const titles = brand?.titles ?? TITLES[genre] ?? TITLES.shooter;
+  const clipTitles = brand?.clipTitles ?? CLIPS[genre] ?? CLIPS.shooter;
+  const names = brand?.names ?? NAMES[vertical];
+  const chatLines = brand?.chatLines ?? CHAT[vertical];
   const genreLabel =
-    GENRES_BY_VERTICAL[vertical].find((g) => g.id === genre)?.label || GENRES_BY_VERTICAL[vertical][0].label;
+    brand?.genreLabel ??
+    GENRES_BY_VERTICAL[vertical].find((g) => g.id === genre)?.label ??
+    GENRES_BY_VERTICAL[vertical][0].label;
 
   const channels: SimChannel[] = Array.from({ length: Math.min(6, Math.max(4, videos.length)) }, (_, i) => ({
     streamer: pick(names, seed, i * 3),
@@ -270,20 +350,26 @@ export function buildSimContent(slug: string, genre: string): SimContent {
   const clips: SimClip[] = clipTitles.map((title, i) => ({
     title,
     streamer: pick(names, seed, i * 5 + 1),
-    videoId: videos[(seed + i * 2 + 1) % videos.length],
+    videoId: clipVideos[(seed + i * 2 + 1) % clipVideos.length],
     views: `${(3 + ((seed >> i) % 90)) / 10}k`,
     duration: `0:${(20 + ((seed >> i) % 39)).toString().padStart(2, '0')}`,
     likes: 40 + ((seed >> (i + 1)) % 900),
   }));
 
-  const categories: SimCategory[] = CATEGORY_LABELS[vertical].map((c, i) => {
-    const vids = videosFor(c.id);
-    return {
-      label: c.label,
-      videoId: vids[(seed + i) % vids.length],
-      watching: `${(8 + ((seed >> (i + 1)) % 240)) / 10}k`,
-    };
-  });
+  const categories: SimCategory[] = brand
+    ? brand.categories.map((c, i) => ({
+        label: c.label,
+        videoId: c.videoId,
+        watching: `${(8 + ((seed >> (i + 1)) % 240)) / 10}k`,
+      }))
+    : CATEGORY_LABELS[vertical].map((c, i) => {
+        const vids = videosFor(c.id);
+        return {
+          label: c.label,
+          videoId: vids[(seed + i) % vids.length],
+          watching: `${(8 + ((seed >> (i + 1)) % 240)) / 10}k`,
+        };
+      });
 
   const hours = [10, 12, 14, 16, 19, 21];
   const schedule: SimScheduleItem[] = Array.from({ length: 5 }, (_, i) => ({
@@ -293,7 +379,7 @@ export function buildSimContent(slug: string, genre: string): SimContent {
     status: i < 2 ? 'live' : 'upcoming',
   }));
 
-  return { vertical, channels, clips, categories, schedule, chatUsers: CHAT_USERS, chatLines: CHAT[vertical] };
+  return { vertical, channels, clips, categories, schedule, chatUsers: CHAT_USERS, chatLines };
 }
 
 /** youtube embed URL that behaves like a live stream feed */
